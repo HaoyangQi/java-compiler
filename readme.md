@@ -1,9 +1,19 @@
 # Java Compiler
 
+## Open & Run The Project
+You need Visual Studio Toolchain for C/C++ for the project.
+
+To open the project, run Visual Studio Developer Command Prompt in project root directory, and type `code .` to bring up Visual Studio Code.
+
+You must run VS Code from Visual Studio Developer Command Prompt, otherwise building will generate errors.
+
+To build & run, simply click run button on top-right.
+
 ## Branch Naming Convention
 ```
 <class>/<stage>/<description>
 ```
+
 ### class
 * dev: feature
 * bugfx: bug fix
