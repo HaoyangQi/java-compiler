@@ -6,7 +6,7 @@
  *
  * Here comes the magic number of 33
  */
-hash_bits hash(unsigned char* str)
+hash_bits hash(byte* str)
 {
     hash_bits hash = 5381;
     int c;
@@ -19,7 +19,7 @@ hash_bits hash(unsigned char* str)
     return hash;
 }
 
-hash_bits hash_mod(unsigned char* str, hash_bits mod)
+hash_bits hash_mod(byte* str, hash_bits mod)
 {
     return MOD_OF_HASH(hash(str), mod);
 }
