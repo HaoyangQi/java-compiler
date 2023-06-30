@@ -1,0 +1,23 @@
+{
+    "editor.formatOnSave": true,
+    "files.associations": {
+        "*.sqc": "c",
+        "README": "markdown",
+        "jcl.h": "c",
+        "jcl_lex.h": "c",
+        "file.h": "c",
+        "error.h": "c",
+        "stack": "c",
+        "lex.h": "c",
+        "functional": "c",
+        "utility": "c",
+        "xutility": "c",
+        "compare": "c",
+        "memory": "c",
+        "tuple": "c",
+        "type_traits": "c",
+        "xmemory": "c",
+        "xstring": "c",
+        "xtr1common": "c"
+    }
+}
