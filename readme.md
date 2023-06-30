@@ -1,4 +1,21 @@
-# JCL
+# Java Compiler
+
+## Branch Naming Convention
+```
+<class>/<stage>/<description>
+```
+### class
+* dev: feature
+* bugfx: bug fix
+
+### stage
+* system: architecture design, system-wise support
+* syntax: syntax parsing: token, parsing
+* context: semantics parsing
+* ir: intermediate representation
+
+### description
+describe purpose of the feature briefly
 
 ## Architecture
 
