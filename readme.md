@@ -29,6 +29,21 @@ describe purpose of the feature briefly
 
 ## Architecture
 
+### File Reader
+File reader reads a source file into memory in binary format, so the file handle will only stay active during initialization process.
+
+The manipulation of file content will all be directed to the memory in order to speed up control of high precision during parsing.
+
+### Reserved Words
+This is the example where hash table is used.
+
+Reserved words are stored in a global array `java_reserved_words`, each element describes a reserved word.
+This array is initialized on stack so no need to free it, and it is being used through pointer references.
+
+A symbol table is a hash table for reserved words, each slot in hash table is a `java_symbol`, which is a hash wrapper of `java_reserved_words`.
+
+The hash table is contructed in run-time, and collision is handled by linear probing.
+
 ### Token
 
 ### Lexeme & Hash Table
