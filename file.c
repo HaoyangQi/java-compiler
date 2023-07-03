@@ -1,18 +1,18 @@
 #include "file.h"
 
-void file_buffer_init(file_buffer* buffer)
+void init_file_buffer(file_buffer* buffer)
 {
     buffer->size = 0;
     buffer->buf = NULL;
     buffer->cur = NULL;
 }
 
-void file_buffer_release(file_buffer* buffer)
+void release_file_buffer(file_buffer* buffer)
 {
     free(buffer->buf);
 }
 
-bool file_buffer_load_file(file_buffer* buffer, const char* name)
+bool load_source_file(file_buffer* buffer, const char* name)
 {
     if (!name)
     {
