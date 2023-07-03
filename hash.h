@@ -11,7 +11,8 @@ typedef unsigned long hash_bits;
 
 typedef hash_bits(*hash_func)(byte* str);
 
-hash_bits hash(byte* str);
+hash_bits hash_djb2(byte* str);
+hash_bits hash_sdbm(byte* str);
 hash_bits hash_mod(byte* str, hash_bits mod);
 
 #endif

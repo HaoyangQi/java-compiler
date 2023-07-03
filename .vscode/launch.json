@@ -1,16 +1,28 @@
 {
     "configurations": [
         {
-            "name": "C/C++: cl.exe build and debug active file",
+            "name": "release build launch",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}\\build\\${workspaceFolderBasename}.exe",
+            "program": "${workspaceFolder}\\build\\release\\${workspaceFolderBasename}.exe",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [],
             "console": "externalTerminal",
-            "preLaunchTask": "C/C++: cl.exe build active file"
+            "preLaunchTask": "release build"
+        },
+        {
+            "name": "debug build launch",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}\\build\\debug\\${workspaceFolderBasename}.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "console": "externalTerminal",
+            "preLaunchTask": "debug build"
         }
     ],
     "version": "2.0.0"

@@ -20,8 +20,8 @@ typedef struct _file_buffer
     byte* cur;
 } file_buffer;
 
-void file_buffer_init(file_buffer* buffer);
-void file_buffer_release(file_buffer* buffer);
-bool file_buffer_load_file(file_buffer* buffer, const char* name);
+void init_file_buffer(file_buffer* buffer);
+void release_file_buffer(file_buffer* buffer);
+bool load_source_file(file_buffer* buffer, const char* name);
 
 #endif
