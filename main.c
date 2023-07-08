@@ -13,7 +13,7 @@ typedef struct _parser_info
     java_symbol_table rw_lookup_table;
 } parser_info;
 
-bool init_parser(parser_info* parser, char* source_path)
+bool init_compiler(parser_info* parser, char* source_path)
 {
     parser->source_file_name = source_path;
 
@@ -36,12 +36,13 @@ int main(int argc, char* argv[])
 {
     parser_info parser;
 
-    init_parser(&parser, "./test/1.java");
+    init_compiler(&parser, "./test/1.java");
 
-    debug_print_reserved_words();
-    debug_file_buffer(&parser.reader);
-    debug_print_symbol_table(&parser.rw_lookup_table);
+    // debug_print_reserved_words();
+    // debug_file_buffer(&parser.reader);
+    // debug_print_symbol_table(&parser.rw_lookup_table);
     debug_format_report(REPORT_INTERNAL | REPORT_GENERAL);
+    debug_tokenize(&parser.reader, &parser.rw_lookup_table);
 
     release_file_buffer(&parser.reader);
     return 0;
