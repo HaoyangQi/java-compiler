@@ -16,7 +16,8 @@
 #define ARRAY_SIZE(arr) (sizeof (arr) / sizeof ((arr)[0]))
 
 typedef unsigned char byte;
-typedef unsigned int bit_flag;
-typedef unsigned long int long_bit_flag;
+typedef unsigned char bbit_flag;
+typedef unsigned int ibit_flag;
+typedef unsigned long int lbit_flag;
 
 #endif
