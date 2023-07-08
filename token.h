@@ -7,8 +7,6 @@
 #include "file.h"
 #include "symtbl.h"
 
-#define IS_INTEGRAL_NUMBER(jnt) ((jnt) >= JT_NUM_DEC && (jnt) <= JT_NUM_BIN)
-
 /**
  * Top-level language lexeme type
  *  token JT_EOF will keep recurring once reaching end of file
@@ -48,8 +46,6 @@ typedef enum
 /**
  * Java number literal type
  *
- * integral types stay on top (or at least together)
- * for classification macro to work properly
 */
 typedef enum
 {
@@ -127,7 +123,7 @@ typedef struct _java_token
     /* number type id, JT_NUM_NONE is set if not */
     java_number_type number;
     /* number data size */
-    java_number_bit_length number_length;
+    java_number_bit_length number_bit_length;
 } java_token;
 
 void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* table);

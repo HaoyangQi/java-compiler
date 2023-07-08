@@ -3,23 +3,21 @@
 /**
  * token helper
  *
- * consume decimal digits, but it will not check whether
- * start character is digit in order to maintain efficiency
- *
- * this is a context-dependent helper tailored for get_next_token:
- *
- * the loop pattern intends to NOT check first character and
- * unconditionally consumes it
+ * consume decimal digits, returns false if accepted nothing
 */
-static void consume_digits(file_buffer* buffer)
+static bool consume_digits(file_buffer* buffer)
 {
-    while (buffer_ptr_safe_move(buffer))
+    if (!isdigit(*buffer->cur))
     {
-        if (!isdigit(*buffer->cur))
-        {
-            break;
-        }
+        return false;
     }
+
+    while (isdigit(*buffer->cur))
+    {
+        buffer_ptr_safe_move(buffer);
+    }
+
+    return true;
 }
 
 /**
@@ -45,10 +43,11 @@ static bool consume_number_exponent_part(file_buffer* buffer)
         // roughly peek, fix later
         char sign_peek = buffer_peek(buffer, 1);
         char digit_peek = buffer_peek(buffer, 2);
+        bool has_sign = isexpsign(sign_peek);
 
         // adjust digit peek location for validation
         // do NOT move cursor before validation
-        if (!isexpsign(sign_peek))
+        if (!has_sign)
         {
             digit_peek = sign_peek;
         }
@@ -59,9 +58,14 @@ static bool consume_number_exponent_part(file_buffer* buffer)
         {
             // letter 'e|E' now must be part of FP number now
 
-            // consume exp indicator so that 
-            // the sign will be consume by consume_digits
+            // consume exp indicator
             buffer_ptr_safe_move(buffer);
+
+            // consume sign
+            if (has_sign)
+            {
+                buffer_ptr_safe_move(buffer);
+            }
 
             // same idea, consume digits
             consume_digits(buffer);
@@ -151,7 +155,7 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
     token->type = JT_EOF;
     token->keyword = NULL;
     token->number = JT_NUM_NONE;
-    token->number_length = JT_NUM_BIT_LENGTH_NONE;
+    token->number_bit_length = JT_NUM_BIT_LENGTH_NORMAL;
 
     if (is_eof(buffer))
     {
@@ -201,7 +205,7 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
         token->type = JT_LITERAL;
         token->subtype.li = JT_LI_NUM;
         token->number = JT_NUM_DEC;
-        token->number_length = JT_NUM_BIT_LENGTH_NORMAL;
+        token->number_bit_length = JT_NUM_BIT_LENGTH_NORMAL;
 
         /**
          * before we start consuming a pattern,
@@ -231,7 +235,7 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                 token->number = JT_NUM_BIN;
                 buffer_ptr_safe_move(buffer);
             }
-            else if (isdigit(c))
+            else if (isdigit(after_first_digit))
             {
                 // for octal, valid digits are 0-7,
                 // but we losen the rule a bit because we do not have
@@ -317,19 +321,26 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                 // fractional part
                 if (isfractionindicator(*buffer->cur))
                 {
-                    // now, after DOT there could exists Digits, let's
-                    // consume them
-                    consume_digits(buffer);
+                    // consume the DOT first, if it becomes ambiguous
+                    // we will revert later, because in here situation
+                    // after DOT is fairly complex and it is not worth
+                    // it to determine now
+                    buffer_ptr_safe_move(buffer);
 
                     /**
+                     * now, after DOT there could exists Digits, let's
+                     * consume them
+                     *
                      * if no digits are consumed, then DOT is still ambiguous
                      * otherwise DOT is definitely part of FP number
                      *
                      * it also works with EOF case, when EOF, cur at \0,
                      * before is DOT; but a FP number can end with a DOT,
                      * so it is still a valid FP number
+                     *
+                     * must consume digits first, then test eof
                     */
-                    if (!isfractionindicator(buffer_peek(buffer, -1)))
+                    if (consume_digits(buffer) || is_eof(buffer))
                     {
                         token->number = JT_NUM_FP_DOUBLE;
                     }
@@ -345,100 +356,132 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                     token->number = JT_NUM_FP_DOUBLE;
                 }
 
-                /**
-                 * prefix validation (HEX and BIN only)
-                 *
-                 * if prefix exists, then there must exist at least
-                 * one valid digit (dec, hex, oct, bin) before suffix
-                 *
-                 * e.g. 0x and 0b are not valid number
-                 *
-                 * but... we do not have to stop it from accepting
-                 * suffix (rule of longest matching)
-                */
-
-                if (token->number == JT_NUM_HEX || token->number == JT_NUM_BIN)
-                {
-                    if (isdigit(*(buffer->cur)))
-                    {
-                        /**
-                         * TODO: log error
-                        */
-                        fprintf(stderr, "TODO error: number must contain digit");
-                    }
-                }
-
-                /**
-                 * suffix trigger
-                 *
-                 * l|L : integral number, long type
-                 * d|D : FP number, (enforce) double type
-                 * f|F : FP number, float type
-                */
-
-                c = *buffer->cur;
-                peeks[0] = buffer_peek(buffer, -1); // char before current
-                peeks[1] = buffer_peek(buffer, 1); // char after cur
-
-                /**
-                 * this is interesting...
-                 *
-                 * so if a FP ends with DOT, e.g. 23.
-                 * now we read: 23.f
-                 *
-                 * but we need to know what is behind 'f'
-                 * because if 'f' is not cutoff, then DOT
-                 * should not be part of number, hence no
-                 * longer a FP, e.g. 23.fSomeName
-                 *
-                 * and other things are simply for tolerance:
-                 * 1. when name followed by a [, it becomes array access
-                 * 2. when name followed by a (, it becomes method invocation
-                 * in these cases, we also not treat it as FP
-                 *
-                 * those are not quite necessary, but parsing result could be
-                 * more flexible
-                 *
-                 * this boolean only works under condition where current character
-                 * in stream is suffix trigger
-                */
-                bool should_reject_suffix_trigger =
-                    isfractionindicator(peeks[0]) && (
-                        isidchar(peeks[1])
-                        || peeks[1] == '('
-                        || peeks[1] == '[');
-
-                // triggers
-                if (islongsuffix(c))
-                {
-                    // only integral number allows such suffix
-                    // only matters where we cut-off
-                    if (IS_INTEGRAL_NUMBER(token->number))
-                    {
-                        token->number_length = JT_NUM_BIT_LENGTH_LONG;
-                        buffer_ptr_safe_move(buffer);
-                    }
-                }
-                else if (isfloatsuffix(c))
-                {
-                    if (!should_reject_suffix_trigger)
-                    {
-                        token->number = JT_NUM_FP_FLOAT;
-                        buffer_ptr_safe_move(buffer);
-                    }
-                }
-                else if (isdoublesuffix(c))
-                {
-                    if (!should_reject_suffix_trigger)
-                    {
-                        // by default we have double type, 
-                        // so no need to set type again
-                        buffer_ptr_safe_move(buffer);
-                    }
-                }
-                // otherwise we simply cut-off
-
                 break;
+            }
+        }
+
+        /**
+         * prefix validation (HEX and BIN only)
+         *
+         * if prefix exists, then there must exist at least
+         * one valid digit (dec, hex, oct, bin) before suffix
+         *
+         * e.g. 0x and 0b are not valid number
+         *
+         * but... we do not have to stop it from accepting
+         * suffix (rule of longest matching)
+        */
+
+        if (token->number == JT_NUM_HEX || token->number == JT_NUM_BIN)
+        {
+            if (isdigit(*(buffer->cur)))
+            {
+                /**
+                 * TODO: log error
+                */
+                fprintf(stderr, "TODO error: number must contain digit");
+            }
+        }
+
+        /**
+         * suffix trigger
+         *
+         * l|L : integral number, long type
+         * d|D : FP number, (enforce) double type
+         * f|F : FP number, float type
+        */
+
+        c = *buffer->cur;
+        peeks[0] = buffer_peek(buffer, -1); // char before current
+        peeks[1] = buffer_peek(buffer, 1); // char after cur
+
+        /**
+         * this is interesting...
+         *
+         * so if a FP ends with DOT, e.g. 23.
+         * now we read: 23.f
+         *
+         * but we need to know what is behind 'f'
+         * because if 'f' is not cutoff, then DOT
+         * should not be part of number, hence no
+         * longer a FP, e.g. 23.fSomeName
+         *
+         * and other things are simply for tolerance:
+         * 1. when name followed by a [, it becomes array access
+         * 2. when name followed by a (, it becomes method invocation
+         * in these cases, we also not treat it as FP
+         *
+         * those are not quite necessary, but parsing result could be
+         * more flexible
+         *
+         * this boolean only works under condition where current character
+         * in stream is suffix trigger and number is a FP ends with DOT
+        */
+        bool should_reject_suffix_trigger =
+            isfractionindicator(peeks[0]) && (
+                isidchar(peeks[1])
+                || peeks[1] == '('
+                || peeks[1] == '[');
+
+        // triggers
+        if (islongsuffix(c))
+        {
+            // only integral number allows such suffix
+            // only matters where we cut-off
+            switch (token->number)
+            {
+                case JT_NUM_DEC:
+                case JT_NUM_HEX:
+                case JT_NUM_OCT:
+                case JT_NUM_BIN:
+                    token->number_bit_length = JT_NUM_BIT_LENGTH_LONG;
+                    buffer_ptr_safe_move(buffer);
+                    break;
+                default:
+                    break;
+            }
+        }
+        else if (isfloatsuffix(c))
+        {
+            if (!should_reject_suffix_trigger)
+            {
+                token->number = JT_NUM_FP_FLOAT;
+                buffer_ptr_safe_move(buffer);
+            }
+            else if (isfractionindicator(peeks[0]))
+            {
+                /**
+                 * otherwise we simply cut-off
+                 *
+                 * but if we just rejected suffix and last char of number
+                 * is a DOT, we need to reject the DOT as well
+                 *
+                 * this is a safe move as the number contains at least
+                 * one digit in here
+                */
+                buffer->cur--;
+            }
+        }
+        else if (isdoublesuffix(c))
+        {
+            if (!should_reject_suffix_trigger)
+            {
+                // by default we have double type, 
+                // so no need to set type again
+                buffer_ptr_safe_move(buffer);
+            }
+            else if (isfractionindicator(peeks[0]))
+            {
+                /**
+                 * otherwise we simply cut-off
+                 *
+                 * but if we just rejected suffix and last char of number
+                 * is a DOT, we need to reject the DOT as well
+                 *
+                 * this is a safe move as the number contains at least
+                 * one digit in here
+                */
+                buffer->cur--;
             }
         }
     }

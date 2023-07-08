@@ -16,7 +16,7 @@ To build & run, simply click run button on top-right.
 
 ### class
 * dev: feature
-* bugfx: bug fix
+* bugfix: bug fix
 
 ### stage
 * system: architecture design, system-wise support

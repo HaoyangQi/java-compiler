@@ -474,6 +474,22 @@ void debug_print_separator_type(java_separator_type sp)
     }
 }
 
+void debug_print_number_bit_length(java_number_bit_length l)
+{
+    switch (l)
+    {
+        case JT_NUM_BIT_LENGTH_NORMAL:
+            printf("Regular");
+            break;
+        case JT_NUM_BIT_LENGTH_LONG:
+            printf("Long");
+            break;
+        default:
+            printf("(UNKNOWN)");
+            break;
+    }
+}
+
 void debug_print_number_type(java_number_type number)
 {
     switch (number)
@@ -550,7 +566,8 @@ void debug_tokenize(file_buffer* buffer, java_symbol_table* table)
                 {
                     printf(" ");
                     debug_print_number_type(token->number);
-                    printf(" length: %d", token->number_length);
+                    printf(" length: ");
+                    debug_print_number_bit_length(token->number_bit_length);
                 }
                 printf("\n");
                 debug_print_token_content(token);
