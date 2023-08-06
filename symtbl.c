@@ -33,8 +33,7 @@ void release_symbol_table(java_symbol_table* table)
 */
 java_symbol* create_symbol(java_reserved_word* word)
 {
-    java_symbol* symbol = (java_symbol*)malloc(sizeof(java_symbol));
-    ASSERT_ALLOCATION(symbol);
+    java_symbol* symbol = (java_symbol*)malloc_assert(sizeof(java_symbol));
 
     symbol->full_hash = hash_djb2(word->content);
     symbol->word = word;
@@ -98,8 +97,7 @@ void load_language_spec(java_symbol_table* table)
 
     // create the table
     table->num_slot = find_next_prime(2 * num_java_reserved_words);
-    table->slots = (java_symbol**)malloc(sizeof(java_symbol*) * table->num_slot);
-    ASSERT_ALLOCATION(table->slots);
+    table->slots = (java_symbol**)malloc_assert(sizeof(java_symbol*) * table->num_slot);
     memset(table->slots, 0, sizeof(java_symbol*) * table->num_slot);
 
     report_reserved_words_lookup_table_size(table->num_slot);

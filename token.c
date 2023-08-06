@@ -1007,8 +1007,7 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
     if (token->type == JT_IDENTIFIER)
     {
         size_t len = buffer_count(token->from, token->to);
-        char* content = (char*)malloc(sizeof(char) * (len + 1));
-        ASSERT_ALLOCATION(content);
+        char* content = (char*)malloc_assert(sizeof(char) * (len + 1));
 
         buffer_substring(content, token->from, len);
         java_symbol* sym = symbol_lookup(table, content);

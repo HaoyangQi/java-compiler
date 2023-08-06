@@ -20,4 +20,6 @@ typedef unsigned char bbit_flag;
 typedef unsigned int ibit_flag;
 typedef unsigned long int lbit_flag;
 
+void* malloc_assert(size_t sz);
+
 #endif
