@@ -76,30 +76,16 @@ static void consume_token(java_parser* parser, java_token* dest)
     parser->num_token_available--;
 }
 
-/**
- * peek next token and test if it is expected reserved word
- *
- * TODO: should we test deprecation and disable flag here?
-*/
-static bool peek_next_token_is_reserved_word(java_parser* parser, size_t idx, rwid id)
+static bool peek_token_class_is(java_parser* parser, size_t idx, java_token_class class)
 {
-    java_token* peek = token_peek(parser, TOKEN_PEEK_1st);
-    return peek->keyword && peek->keyword->id == id;
+    java_token* peek = token_peek(parser, idx);
+    return peek->class == class;
 }
 
-static bool peek_next_token_is_id(java_parser* parser, size_t idx)
+static bool peek_token_type_is(java_parser* parser, size_t idx, java_lexeme_type type)
 {
-    java_token* peek = token_peek(parser, TOKEN_PEEK_1st);
-    return peek->type == JT_IDENTIFIER;
-}
-
-/**
- * peek next token and test if it is expected separator
-*/
-static bool peek_next_token_is_separator(java_parser* parser, size_t idx, java_separator_type sp)
-{
-    java_token* peek = token_peek(parser, TOKEN_PEEK_1st);
-    return peek->type == JT_SEPARATOR && peek->subtype.sp == sp;
+    java_token* peek = token_peek(parser, idx);
+    return peek->type == type;
 }
 
 /**
@@ -139,6 +125,12 @@ static tree_node* parse_name(java_parser* parser);
 void parse_compilation_unit(java_parser* parser)
 {
     parser->ast_root = ast_node_compilation_unit();
+
+    // package declaration
+    if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_RWD_PACKAGE))
+    {
+        tree_node_add_child(parser->ast_root, parse_name(parser));
+    }
 }
 
 /**
@@ -162,8 +154,8 @@ static tree_node* parse_name(java_parser* parser)
     linked_list_append(&data->name, parser->token_buffer);
 
     // {. ID}*
-    while (peek_next_token_is_separator(parser, TOKEN_PEEK_1st, JT_SP_DOT)
-        && peek_next_token_is_id(parser, TOKEN_PEEK_2nd))
+    while (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_DOT)
+        && peek_token_class_is(parser, TOKEN_PEEK_2nd, JT_IDENTIFIER))
     {
         consume_token(parser, NULL);
         consume_token(parser, new_token_buffer(parser));
@@ -183,9 +175,14 @@ static tree_node* parse_package_declaration(java_parser* parser)
 
     // package
     consume_token(parser, NULL);
-    tree_node_add_child(node, parse_name(parser));
 
-    if (peek_next_token_is_separator(parser, TOKEN_PEEK_1st, JT_SP_SC))
+    // Name
+    if (peek_token_class_is(parser, TOKEN_PEEK_1st, JT_IDENTIFIER))
+    {
+        tree_node_add_child(node, parse_name(parser));
+    }
+
+    if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_SEMICOLON))
     {
         consume_token(parser, NULL);
     }

@@ -152,10 +152,10 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
     consume_spaces(buffer);
 
     token->from = buffer->cur;
-    token->type = JT_EOF;
+    token->class = JT_EOF;
     token->keyword = NULL;
-    token->number = JT_NUM_NONE;
-    token->number_bit_length = JT_NUM_BIT_LENGTH_NORMAL;
+    token->number.type = JT_NUM_NONE;
+    token->number.bits = JT_NUM_BIT_LENGTH_NORMAL;
 
     if (is_eof(buffer))
     {
@@ -185,8 +185,7 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
     */
     if (isidfirstchar(c))
     {
-        token->type = JT_IDENTIFIER;
-        token->subtype.id = JT_ID_GENERIC;
+        token->class = JT_IDENTIFIER;
 
         // before 1st iteration, buffer_ptr_safe_move consumes
         // first ID char that just checked
@@ -202,10 +201,10 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
     }
     else if (isdigit(c))
     {
-        token->type = JT_LITERAL;
-        token->subtype.li = JT_LI_NUM;
-        token->number = JT_NUM_DEC;
-        token->number_bit_length = JT_NUM_BIT_LENGTH_NORMAL;
+        token->class = JT_LITERAL;
+        token->type = JLT_LTR_NUMBER;
+        token->number.type = JT_NUM_DEC;
+        token->number.bits = JT_NUM_BIT_LENGTH_NORMAL;
 
         /**
          * before we start consuming a pattern,
@@ -227,12 +226,12 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
             // entire prefix sequence
             if (ishexindicator(after_first_digit))
             {
-                token->number = JT_NUM_HEX;
+                token->number.type = JT_NUM_HEX;
                 buffer_ptr_safe_move(buffer);
             }
             else if (isbinaryindicator(after_first_digit))
             {
-                token->number = JT_NUM_BIN;
+                token->number.type = JT_NUM_BIN;
                 buffer_ptr_safe_move(buffer);
             }
             else if (isdigit(after_first_digit))
@@ -240,7 +239,7 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                 // for octal, valid digits are 0-7,
                 // but we losen the rule a bit because we do not have
                 // to go that far
-                token->number = JT_NUM_OCT;
+                token->number.type = JT_NUM_OCT;
                 buffer_ptr_safe_move(buffer);
             }
         }
@@ -250,7 +249,7 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
          *
          * only one pattern is allowed on top-level
         */
-        switch (token->number)
+        switch (token->number.type)
         {
             case JT_NUM_HEX:
                 // for hex, stop when not a hex digit
@@ -342,7 +341,7 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                     */
                     if (consume_digits(buffer) || is_eof(buffer))
                     {
-                        token->number = JT_NUM_FP_DOUBLE;
+                        token->number.type = JT_NUM_FP_DOUBLE;
                     }
                 }
 
@@ -353,7 +352,7 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                     // indicator, so we need to set FP type again here
 
                     // default FP has double type
-                    token->number = JT_NUM_FP_DOUBLE;
+                    token->number.type = JT_NUM_FP_DOUBLE;
                 }
 
                 break;
@@ -372,7 +371,7 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
          * suffix (rule of longest matching)
         */
 
-        if (token->number == JT_NUM_HEX || token->number == JT_NUM_BIN)
+        if (token->number.type == JT_NUM_HEX || token->number.type == JT_NUM_BIN)
         {
             if (isdigit(*(buffer->cur)))
             {
@@ -422,19 +421,20 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                 isidchar(peeks[1])
                 || peeks[1] == '('
                 || peeks[1] == '[');
+        printf("==== reject check: %d %c %c %c\n", should_reject_suffix_trigger, peeks[0], c, peeks[1]);
 
         // triggers
         if (islongsuffix(c))
         {
             // only integral number allows such suffix
             // only matters where we cut-off
-            switch (token->number)
+            switch (token->number.type)
             {
                 case JT_NUM_DEC:
                 case JT_NUM_HEX:
                 case JT_NUM_OCT:
                 case JT_NUM_BIN:
-                    token->number_bit_length = JT_NUM_BIT_LENGTH_LONG;
+                    token->number.bits = JT_NUM_BIT_LENGTH_LONG;
                     buffer_ptr_safe_move(buffer);
                     break;
                 default:
@@ -445,7 +445,7 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
         {
             if (!should_reject_suffix_trigger)
             {
-                token->number = JT_NUM_FP_FLOAT;
+                token->number.type = JT_NUM_FP_FLOAT;
                 buffer_ptr_safe_move(buffer);
             }
             else if (isfractionindicator(peeks[0]))
@@ -484,65 +484,85 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                 buffer->cur--;
             }
         }
+        else if (isfractionindicator(peeks[0]))
+        {
+            if (isidchar(c))
+            {
+                /**
+                 * if last is a DOT but no suffix trigger, we only accept the DOT
+                 * when the next character does NOT trigger an ID acceptance
+                */
+                buffer->cur--;
+            }
+            else
+            {
+                /**
+                 * otherwise, we fix type, default to DOUBLE
+                 *
+                 * and since we have accepted the DOT, so no further accepting here
+                */
+                token->number.type = JT_NUM_FP_DOUBLE;
+            }
+        }
     }
     else
     {
         switch (c)
         {
             case '(':
-                token->type = JT_SEPARATOR;
-                token->subtype.sp = JT_SP_PL;
+                token->class = JT_SEPARATOR;
+                token->type = JLT_SYM_PARENTHESIS_OPEN;
                 buffer_ptr_safe_move(buffer);
                 break;
             case ')':
-                token->type = JT_SEPARATOR;
-                token->subtype.sp = JT_SP_PR;
+                token->class = JT_SEPARATOR;
+                token->type = JLT_SYM_PARENTHESIS_CLOSE;
                 buffer_ptr_safe_move(buffer);
                 break;
             case '{':
-                token->type = JT_SEPARATOR;
-                token->subtype.sp = JT_SP_BL;
+                token->class = JT_SEPARATOR;
+                token->type = JLT_SYM_BRACE_OPEN;
                 buffer_ptr_safe_move(buffer);
                 break;
             case '}':
-                token->type = JT_SEPARATOR;
-                token->subtype.sp = JT_SP_BR;
+                token->class = JT_SEPARATOR;
+                token->type = JLT_SYM_BRACE_CLOSE;
                 buffer_ptr_safe_move(buffer);
                 break;
             case '[':
-                token->type = JT_SEPARATOR;
-                token->subtype.sp = JT_SP_SL;
+                token->class = JT_SEPARATOR;
+                token->type = JLT_SYM_BRACKET_OPEN;
                 buffer_ptr_safe_move(buffer);
                 break;
             case ']':
-                token->type = JT_SEPARATOR;
-                token->subtype.sp = JT_SP_SR;
+                token->class = JT_SEPARATOR;
+                token->type = JLT_SYM_BRACKET_CLOSE;
                 buffer_ptr_safe_move(buffer);
                 break;
             case ';':
-                token->type = JT_SEPARATOR;
-                token->subtype.sp = JT_SP_SC;
+                token->class = JT_SEPARATOR;
+                token->type = JLT_SYM_SEMICOLON;
                 buffer_ptr_safe_move(buffer);
                 break;
             case ',':
-                token->type = JT_SEPARATOR;
-                token->subtype.sp = JT_SP_CM;
+                token->class = JT_SEPARATOR;
+                token->type = JLT_SYM_COMMA;
                 buffer_ptr_safe_move(buffer);
                 break;
             case '@':
-                token->type = JT_SEPARATOR;
-                token->subtype.sp = JT_SP_AT;
+                token->class = JT_SEPARATOR;
+                token->type = JLT_SYM_AT;
                 buffer_ptr_safe_move(buffer);
                 break;
             case '?':
-                token->type = JT_SEPARATOR;
-                token->subtype.sp = JT_SP_QST;
+                token->class = JT_SEPARATOR;
+                token->type = JLT_SYM_QUESTION;
                 buffer_ptr_safe_move(buffer);
                 break;
             case '.':
             {
-                token->type = JT_SEPARATOR;
-                token->subtype.sp = JT_SP_DOT;
+                token->class = JT_SEPARATOR;
+                token->type = JLT_SYM_DOT;
                 buffer_ptr_safe_move(buffer);
 
                 c = *buffer->cur;
@@ -554,7 +574,7 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                     */
                     if (buffer_peek(buffer, 1) == '.')
                     {
-                        token->subtype.sp = JT_SP_DDD;
+                        token->type = JLT_SYM_VARIADIC;
 
                         // need to accept 2 times for 2 DOTs
                         buffer_ptr_safe_move(buffer);
@@ -575,9 +595,9 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                     */
 
                     // once we are here, we are sure it is at least a double
-                    token->type = JT_LITERAL;
-                    token->subtype.li = JT_LI_NUM;
-                    token->number = JT_NUM_FP_DOUBLE;
+                    token->class = JT_LITERAL;
+                    token->type = JLT_LTR_NUMBER;
+                    token->number.type = JT_NUM_FP_DOUBLE;
 
                     // digits, followed by optional exponent part
                     consume_digits(buffer);
@@ -596,7 +616,7 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                     */
                     if (isfloatsuffix(c))
                     {
-                        token->number = JT_NUM_FP_FLOAT;
+                        token->number.type = JT_NUM_FP_FLOAT;
                         buffer_ptr_safe_move(buffer);
                     }
                     else if (isdoublesuffix(c))
@@ -610,8 +630,8 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                 break;
             }
             case ':':
-                token->type = JT_SEPARATOR;
-                token->subtype.sp = JT_SP_CL;
+                token->class = JT_SEPARATOR;
+                token->type = JLT_SYM_COLON;
                 buffer_ptr_safe_move(buffer);
 
                 /**
@@ -619,14 +639,14 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                 */
                 if (*buffer->cur == ':')
                 {
-                    token->subtype.sp = JT_SP_CC;
+                    token->type = JLT_SYM_METHOD_REFERENCE;
                     buffer_ptr_safe_move(buffer);
                 }
 
                 break;
             case '=':
-                token->type = JT_OPERATOR;
-                token->subtype.op = JT_OP_ASN;
+                token->class = JT_OPERATOR;
+                token->type = JLT_SYM_EQUAL;
                 buffer_ptr_safe_move(buffer);
 
                 /**
@@ -634,14 +654,14 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                 */
                 if (*buffer->cur == '=')
                 {
-                    token->subtype.op = JT_OP_EQ;
+                    token->type = JLT_SYM_RELATIONAL_EQUAL;
                     buffer_ptr_safe_move(buffer);
                 }
 
                 break;
             case '>':
-                token->type = JT_OPERATOR;
-                token->subtype.op = JT_OP_GT;
+                token->class = JT_OPERATOR;
+                token->type = JLT_SYM_ANGLE_BRACKET_CLOSE;
                 buffer_ptr_safe_move(buffer);
 
                 c = *buffer->cur;
@@ -652,13 +672,13 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                 if (c == '=')
                 {
                     // >=
-                    token->subtype.op = JT_OP_GE;
+                    token->type = JLT_SYM_GREATER_EQUAL;
                     buffer_ptr_safe_move(buffer);
                 }
                 else if (c == '>')
                 {
                     // >>
-                    token->subtype.op = JT_OP_RS;
+                    token->type = JLT_SYM_RIGHT_SHIFT;
                     buffer_ptr_safe_move(buffer);
 
                     c = *buffer->cur;
@@ -666,28 +686,28 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                     if (c == '>')
                     {
                         // >>>
-                        token->subtype.op = JT_OP_ZFRS;
+                        token->type = JLT_SYM_RIGHT_SHIFT_UNSIGNED;
                         buffer_ptr_safe_move(buffer);
 
                         if (*buffer->cur == '=')
                         {
                             // >>>=
-                            token->subtype.op = JT_OP_ZFRSASN;
+                            token->type = JLT_SYM_RIGHT_SHIFT_UNSIGNED_ASSIGNMENT;
                             buffer_ptr_safe_move(buffer);
                         }
                     }
                     else if (c == '=')
                     {
                         // >>=
-                        token->subtype.op = JT_OP_RSASN;
+                        token->type = JLT_SYM_RIGHT_SHIFT_ASSIGNMENT;
                         buffer_ptr_safe_move(buffer);
                     }
                 }
 
                 break;
             case '<':
-                token->type = JT_OPERATOR;
-                token->subtype.op = JT_OP_LT;
+                token->class = JT_OPERATOR;
+                token->type = JLT_SYM_ANGLE_BRACKET_OPEN;
                 buffer_ptr_safe_move(buffer);
 
                 c = *buffer->cur;
@@ -698,27 +718,27 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                 if (c == '=')
                 {
                     // <=
-                    token->subtype.op = JT_OP_LE;
+                    token->type = JLT_SYM_LESS_EQUAL;
                     buffer_ptr_safe_move(buffer);
                 }
                 else if (c == '<')
                 {
                     // <<
-                    token->subtype.op = JT_OP_LS;
+                    token->type = JLT_SYM_LEFT_SHIFT;
                     buffer_ptr_safe_move(buffer);
 
                     if (*buffer->cur == '=')
                     {
                         // <<=
-                        token->subtype.op = JT_OP_LSASN;
+                        token->type = JLT_SYM_LEFT_SHIFT_ASSIGNMENT;
                         buffer_ptr_safe_move(buffer);
                     }
                 }
 
                 break;
             case '!':
-                token->type = JT_OPERATOR;
-                token->subtype.op = JT_OP_NEG;
+                token->class = JT_OPERATOR;
+                token->type = JLT_SYM_EXCALMATION;
                 buffer_ptr_safe_move(buffer);
 
                 /**
@@ -726,19 +746,19 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                 */
                 if (*buffer->cur == '=')
                 {
-                    token->subtype.op = JT_OP_NE;
+                    token->type = JLT_SYM_NOT_EQUAL;
                     buffer_ptr_safe_move(buffer);
                 }
 
                 break;
             case '~':
-                token->type = JT_OPERATOR;
-                token->subtype.op = JT_OP_CPM;
+                token->class = JT_OPERATOR;
+                token->type = JLT_SYM_TILDE;
                 buffer_ptr_safe_move(buffer);
                 break;
             case '+':
-                token->type = JT_OPERATOR;
-                token->subtype.op = JT_OP_ADD;
+                token->class = JT_OPERATOR;
+                token->type = JLT_SYM_PLUS;
                 buffer_ptr_safe_move(buffer);
 
                 c = *buffer->cur;
@@ -748,19 +768,19 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                 */
                 if (c == '=')
                 {
-                    token->subtype.op = JT_OP_ADDASN;
+                    token->type = JLT_SYM_ADD_ASSIGNMENT;
                     buffer_ptr_safe_move(buffer);
                 }
                 else if (c == '+')
                 {
-                    token->subtype.op = JT_OP_INC;
+                    token->type = JLT_SYM_INCREMENT;
                     buffer_ptr_safe_move(buffer);
                 }
 
                 break;
             case '-':
-                token->type = JT_OPERATOR;
-                token->subtype.op = JT_OP_SUB;
+                token->class = JT_OPERATOR;
+                token->type = JLT_SYM_MINUS;
                 buffer_ptr_safe_move(buffer);
 
                 c = *buffer->cur;
@@ -770,24 +790,24 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                 */
                 if (c == '=')
                 {
-                    token->subtype.op = JT_OP_SUBASN;
+                    token->type = JLT_SYM_SUBTRACT_ASSIGNMENT;
                     buffer_ptr_safe_move(buffer);
                 }
                 else if (c == '-')
                 {
-                    token->subtype.op = JT_OP_DEC;
+                    token->type = JLT_SYM_DECREMENT;
                     buffer_ptr_safe_move(buffer);
                 }
                 else if (c == '>')
                 {
-                    token->subtype.op = JT_OP_AWR;
+                    token->type = JLT_SYM_ARROW;
                     buffer_ptr_safe_move(buffer);
                 }
 
                 break;
             case '*':
-                token->type = JT_OPERATOR;
-                token->subtype.op = JT_OP_MUL;
+                token->class = JT_OPERATOR;
+                token->type = JLT_SYM_ASTERISK;
                 buffer_ptr_safe_move(buffer);
 
                 /**
@@ -795,14 +815,14 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                 */
                 if (*buffer->cur == '=')
                 {
-                    token->subtype.op = JT_OP_MULASN;
+                    token->type = JLT_SYM_MULTIPLY_ASSIGNMENT;
                     buffer_ptr_safe_move(buffer);
                 }
 
                 break;
             case '/':
-                token->type = JT_OPERATOR;
-                token->subtype.op = JT_OP_DIV;
+                token->class = JT_OPERATOR;
+                token->type = JLT_SYM_FORWARD_SLASH;
                 buffer_ptr_safe_move(buffer);
 
                 c = *buffer->cur;
@@ -812,14 +832,14 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                 */
                 if (c == '=')
                 {
-                    token->subtype.op = JT_OP_DIVASN;
+                    token->type = JLT_SYM_DIVIDE_ASSIGNMENT;
                     buffer_ptr_safe_move(buffer);
                 }
                 else if (c == '*')
                 {
                     // now we trigger multi-line comment
-                    token->type = JT_COMMENT;
-                    token->subtype.cm = JT_CM_MULTI_LINE;
+                    token->class = JT_COMMENT;
+                    token->type = JLT_CMT_MULTI_LINE;
 
                     while (buffer_ptr_safe_move(buffer))
                     {
@@ -835,8 +855,8 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                 else if (c == '/')
                 {
                     // now we trigger one-line comment
-                    token->type = JT_COMMENT;
-                    token->subtype.cm = JT_CM_SINGLE_LINE;
+                    token->class = JT_COMMENT;
+                    token->type = JLT_CMT_SINGLE_LINE;
 
                     while (buffer_ptr_safe_move(buffer))
                     {
@@ -851,8 +871,8 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
 
                 break;
             case '&':
-                token->type = JT_OPERATOR;
-                token->subtype.op = JT_OP_AND;
+                token->class = JT_OPERATOR;
+                token->type = JLT_SYM_AMPERSAND;
                 buffer_ptr_safe_move(buffer);
 
                 c = *buffer->cur;
@@ -862,19 +882,19 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                 */
                 if (c == '=')
                 {
-                    token->subtype.op = JT_OP_ANDASN;
+                    token->type = JLT_SYM_BIT_AND_ASSIGNMENT;
                     buffer_ptr_safe_move(buffer);
                 }
                 else if (c == '&')
                 {
-                    token->subtype.op = JT_OP_LAND;
+                    token->type = JLT_SYM_LOGIC_AND;
                     buffer_ptr_safe_move(buffer);
                 }
 
                 break;
             case '|':
-                token->type = JT_OPERATOR;
-                token->subtype.op = JT_OP_OR;
+                token->class = JT_OPERATOR;
+                token->type = JLT_SYM_PIPE;
                 buffer_ptr_safe_move(buffer);
 
                 c = *buffer->cur;
@@ -884,19 +904,19 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                 */
                 if (c == '=')
                 {
-                    token->subtype.op = JT_OP_ORASN;
+                    token->type = JLT_SYM_BIT_OR_ASSIGNMENT;
                     buffer_ptr_safe_move(buffer);
                 }
                 else if (c == '|')
                 {
-                    token->subtype.op = JT_OP_LOR;
+                    token->type = JLT_SYM_LOGIC_OR;
                     buffer_ptr_safe_move(buffer);
                 }
 
                 break;
             case '^':
-                token->type = JT_OPERATOR;
-                token->subtype.op = JT_OP_XOR;
+                token->class = JT_OPERATOR;
+                token->type = JLT_SYM_CARET;
                 buffer_ptr_safe_move(buffer);
 
                 c = *buffer->cur;
@@ -906,14 +926,14 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                 */
                 if (c == '=')
                 {
-                    token->subtype.op = JT_OP_XORASN;
+                    token->type = JLT_SYM_BIT_XOR_ASSIGNMENT;
                     buffer_ptr_safe_move(buffer);
                 }
 
                 break;
             case '%':
-                token->type = JT_OPERATOR;
-                token->subtype.op = JT_OP_MOD;
+                token->class = JT_OPERATOR;
+                token->type = JLT_SYM_PERCENT;
                 buffer_ptr_safe_move(buffer);
 
                 c = *buffer->cur;
@@ -923,7 +943,7 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                 */
                 if (c == '=')
                 {
-                    token->subtype.op = JT_OP_MODASN;
+                    token->type = JLT_SYM_MODULO_ASSIGNMENT;
                     buffer_ptr_safe_move(buffer);
                 }
 
@@ -936,8 +956,8 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                  * but we do need to skip escape sequence triggered by backslash
                  * so that we will not enclose literal with escaped character
                 */
-                token->type = JT_LITERAL;
-                token->subtype.cm = JT_LI_CHAR;
+                token->class = JT_LITERAL;
+                token->type = JLT_LTR_CHARACTER;
 
                 // here c is previous character
                 c = *buffer->cur;
@@ -966,8 +986,8 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                  * but we do need to skip escape sequence triggered by backslash
                  * so that we will not enclose literal with escaped character
                 */
-                token->type = JT_LITERAL;
-                token->subtype.cm = JT_LI_STR;
+                token->class = JT_LITERAL;
+                token->type = JLT_LTR_STRING;
 
                 // here c is previous character
                 c = *buffer->cur;
@@ -994,7 +1014,7 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                 // funny thing is: longest match could be costly here
                 // due to the complexity of condition logic
                 // so we accept it one by one
-                token->type = JT_ILLEGAL;
+                token->class = JT_ILLEGAL;
                 buffer_ptr_safe_move(buffer);
                 break;
         }
@@ -1004,9 +1024,10 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
     token->to = buffer->cur;
 
     // check if id is a keyword
-    if (token->type == JT_IDENTIFIER)
+    if (token->class == JT_IDENTIFIER)
     {
         size_t len = buffer_count(token->from, token->to);
+        // len + 1 because we need \0 to terminate string
         char* content = (char*)malloc_assert(sizeof(char) * (len + 1));
 
         buffer_substring(content, token->from, len);
@@ -1014,13 +1035,11 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
 
         if (sym)
         {
+            token->type = sym->word->id;
             token->keyword = sym->word;
         }
 
         free(content);
-
-        // in tokenization, we cannot classify ID further
-        token->subtype.id = JT_ID_GENERIC;
     }
 
     /**
@@ -1030,9 +1049,9 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
      * includes: multi-line comment, character literal, string literal
     */
     c = buffer_peek(buffer, -1);
-    if (token->type == JT_LITERAL)
+    if (token->class == JT_LITERAL)
     {
-        if (token->subtype.li == JT_LI_CHAR)
+        if (token->type == JLT_LTR_CHARACTER)
         {
             if (c != '\'')
             {
@@ -1042,7 +1061,7 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                 fprintf(stderr, "TODO error: character literal incomplete");
             }
         }
-        else if (token->subtype.li == JT_LI_STR)
+        else if (token->type == JLT_LTR_STRING)
         {
             if (c != '\"')
             {
@@ -1053,9 +1072,9 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
             }
         }
     }
-    else if (token->type == JT_COMMENT)
+    else if (token->class == JT_COMMENT)
     {
-        if (token->subtype.cm == JT_CM_MULTI_LINE)
+        if (token->type == JLT_CMT_MULTI_LINE)
         {
             if (c != '/' || buffer_peek(buffer, -2) != '*')
             {

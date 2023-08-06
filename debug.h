@@ -6,6 +6,7 @@
 
 #include "types.h"
 #include "file.h"
+#include "symtbl.h"
 
 void debug_print_reserved_words();
 void debug_file_buffer(file_buffer* reader);

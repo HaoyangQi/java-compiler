@@ -53,156 +53,134 @@
 #define DP_C_FAMILY 0x01 /* C-family reserved words, not meaningful in Java */
 
 /**
- * Java reserved word id
+ * Java Lexeme Type ID
  *
- * modifiers stay on top because they are also bit flags
- * so the number of modifiers are limited by bit length
- * of data type chosen, and consideration of other IDs
+ * JLT_RWD_*: reserved words
+ * JLT_SYM_*: all sequences made by non-letter symbols
+ * JLT_LTR_*: literals
+ * JLT_CMT_*: comments
 */
 typedef enum
 {
-    RWID_PUBLIC = 0,
-    RWID_PRIVATE,
-    RWID_PROTECTED,
-    RWID_FINAL,
-    RWID_STATIC,
-    RWID_ABSTRACT,
-    RWID_TRANSIENT,
-    RWID_SYNCHRONIZED,
-    RWID_VOLATILE,
+    // modifier words
+    JLT_RWD_PUBLIC = 0,
+    JLT_RWD_PRIVATE,
+    JLT_RWD_PROTECTED,
+    JLT_RWD_FINAL,
+    JLT_RWD_STATIC,
+    JLT_RWD_ABSTRACT,
+    JLT_RWD_TRANSIENT,
+    JLT_RWD_SYNCHRONIZED,
+    JLT_RWD_VOLATILE,
+    // keywords
+    JLT_RWD_DEFAULT,
+    JLT_RWD_IF,
+    JLT_RWD_THROW,
+    JLT_RWD_BOOLEAN,
+    JLT_RWD_DO,
+    JLT_RWD_IMPLEMENTS,
+    JLT_RWD_THROWS,
+    JLT_RWD_BREAK,
+    JLT_RWD_DOUBLE,
+    JLT_RWD_IMPORT,
+    JLT_RWD_BYTE,
+    JLT_RWD_ELSE,
+    JLT_RWD_INSTANCEOF,
+    JLT_RWD_RETURN,
+    JLT_RWD_TRY,
+    JLT_RWD_CASE,
+    JLT_RWD_EXTENDS,
+    JLT_RWD_INT,
+    JLT_RWD_SHORT,
+    JLT_RWD_VOID,
+    JLT_RWD_CATCH,
+    JLT_RWD_INTERFACE,
+    JLT_RWD_CHAR,
+    JLT_RWD_FINALLY,
+    JLT_RWD_LONG,
+    JLT_RWD_SUPER,
+    JLT_RWD_WHILE,
+    JLT_RWD_CLASS,
+    JLT_RWD_FLOAT,
+    JLT_RWD_NATIVE,
+    JLT_RWD_SWITCH,
+    JLT_RWD_FOR,
+    JLT_RWD_NEW,
+    JLT_RWD_CONTINUE,
+    JLT_RWD_PACKAGE,
+    JLT_RWD_THIS,
+    // not valid in language, but reserved
+    JLT_RWD_CONST,
+    JLT_RWD_GOTO,
+    // literals but are words
+    JLT_RWD_TRUE,
+    JLT_RWD_FALSE,
+    JLT_RWD_NULL,
 
-    RWID_DEFAULT,
-    RWID_IF,
-    RWID_THROW,
-    RWID_BOOLEAN,
-    RWID_DO,
-    RWID_IMPLEMENTS,
-    RWID_THROWS,
-    RWID_BREAK,
-    RWID_DOUBLE,
-    RWID_IMPORT,
-    RWID_BYTE,
-    RWID_ELSE,
-    RWID_INSTANCEOF,
-    RWID_RETURN,
-    RWID_TRY,
-    RWID_CASE,
-    RWID_EXTENDS,
-    RWID_INT,
-    RWID_SHORT,
-    RWID_VOID,
-    RWID_CATCH,
-    RWID_INTERFACE,
-    RWID_CHAR,
-    RWID_FINALLY,
-    RWID_LONG,
-    RWID_SUPER,
-    RWID_WHILE,
-    RWID_CLASS,
-    RWID_FLOAT,
-    RWID_NATIVE,
-    RWID_SWITCH,
-    RWID_FOR,
-    RWID_NEW,
-    RWID_CONTINUE,
-    RWID_PACKAGE,
-    RWID_THIS,
+    // symbol character set
+    // this part uses English word to describe
+    JLT_SYM_EQUAL, /* = */
+    JLT_SYM_ANGLE_BRACKET_OPEN, /* < */
+    JLT_SYM_ANGLE_BRACKET_CLOSE, /* > */
+    JLT_SYM_EXCALMATION, /* ! */
+    JLT_SYM_TILDE, /* ~ */
+    JLT_SYM_PLUS, /* + */
+    JLT_SYM_MINUS, /* - */
+    JLT_SYM_ASTERISK, /* * */
+    JLT_SYM_FORWARD_SLASH, /* / */
+    JLT_SYM_AMPERSAND, /* & */
+    JLT_SYM_PIPE, /* | */
+    JLT_SYM_CARET, /* ^ */
+    JLT_SYM_PERCENT, /* % */
+    JLT_SYM_PARENTHESIS_OPEN, /* ( */
+    JLT_SYM_PARENTHESIS_CLOSE, /* ) */
+    JLT_SYM_BRACE_OPEN, /* { */
+    JLT_SYM_BRACE_CLOSE, /* } */
+    JLT_SYM_BRACKET_OPEN, /* [ */
+    JLT_SYM_BRACKET_CLOSE, /* ] */
+    JLT_SYM_SEMICOLON, /* ; */
+    JLT_SYM_COMMA, /* , */
+    JLT_SYM_AT, /* @ */
+    JLT_SYM_QUESTION, /* ? */
+    JLT_SYM_COLON, /* : */
+    JLT_SYM_DOT, /* . */
 
-    RWID_CONST, // not valid in language, but reserved
-    RWID_GOTO, // not valid in language, but reserved
+    // symbol sequences specifically for Java
+    JLT_SYM_METHOD_REFERENCE, /* :: */
+    JLT_SYM_VARIADIC, /* ... */
+    JLT_SYM_ARROW, /* -> */
+    JLT_SYM_RELATIONAL_EQUAL, /* == */
+    JLT_SYM_LESS_EQUAL, /* <= */
+    JLT_SYM_GREATER_EQUAL, /* >= */
+    JLT_SYM_NOT_EQUAL, /* != */
+    JLT_SYM_LOGIC_AND, /* && */
+    JLT_SYM_LOGIC_OR, /* || */
+    JLT_SYM_INCREMENT, /* ++ */
+    JLT_SYM_DECREMENT, /* -- */
+    JLT_SYM_LEFT_SHIFT, /* << */
+    JLT_SYM_RIGHT_SHIFT, /* >> */
+    JLT_SYM_RIGHT_SHIFT_UNSIGNED, /* >>> */
+    JLT_SYM_ADD_ASSIGNMENT, /* += */
+    JLT_SYM_SUBTRACT_ASSIGNMENT, /* -= */
+    JLT_SYM_MULTIPLY_ASSIGNMENT, /* *= */
+    JLT_SYM_DIVIDE_ASSIGNMENT, /* /= */
+    JLT_SYM_BIT_AND_ASSIGNMENT, /* &= */
+    JLT_SYM_BIT_OR_ASSIGNMENT, /* |= */
+    JLT_SYM_BIT_XOR_ASSIGNMENT, /* ^= */
+    JLT_SYM_MODULO_ASSIGNMENT, /* %= */
+    JLT_SYM_LEFT_SHIFT_ASSIGNMENT, /* <<= */
+    JLT_SYM_RIGHT_SHIFT_ASSIGNMENT, /* >>= */
+    JLT_SYM_RIGHT_SHIFT_UNSIGNED_ASSIGNMENT, /* >>>= */
 
-    RWID_TRUE,
-    RWID_FALSE,
-    RWID_NULL,
+    // literals
+    JLT_LTR_NUMBER,
+    JLT_LTR_CHARACTER,
+    JLT_LTR_STRING,
 
-    /* MAX is always at the end represents the bound */
-    RWID_MAX,
-} rwid;
-
-/**
- * operators
-*/
-typedef enum
-{
-    JT_OP_ASN, /* = */
-    JT_OP_GT, /* > */
-    JT_OP_LT, /* < */
-    JT_OP_NEG, /* ! */
-    JT_OP_CPM, /* ~ */
-    JT_OP_AWR, /* -> */
-    JT_OP_EQ, /* == */
-    JT_OP_LE, /* <= */
-    JT_OP_GE, /* >= */
-    JT_OP_NE, /* != */
-    JT_OP_LAND, /* && */
-    JT_OP_LOR, /* || */
-    JT_OP_INC, /* ++ */
-    JT_OP_DEC, /* -- */
-    JT_OP_ADD, /* + */
-    JT_OP_SUB, /* - */
-    JT_OP_MUL, /* * */
-    JT_OP_DIV, /* / */
-    JT_OP_AND, /* & */
-    JT_OP_OR, /* | */
-    JT_OP_XOR, /* ^ */
-    JT_OP_MOD, /* % */
-    JT_OP_LS, /* << */
-    JT_OP_RS, /* >> */
-    JT_OP_ZFRS, /* >>> */
-    JT_OP_ADDASN, /* += */
-    JT_OP_SUBASN, /* -= */
-    JT_OP_MULASN, /* *= */
-    JT_OP_DIVASN, /* /= */
-    JT_OP_ANDASN, /* &= */
-    JT_OP_ORASN, /* |= */
-    JT_OP_XORASN, /* ^= */
-    JT_OP_MODASN, /* %= */
-    JT_OP_LSASN, /* <<= */
-    JT_OP_RSASN, /* >>= */
-    JT_OP_ZFRSASN, /* >>>= */
-
-    /* not an op */
-    JT_OP_NONE,
-} java_operator_type;
-
-/**
- * separators
- *
- * should notice that QST(?) and CL(:)
- * combined are operator, but we keep them
- * here because individually they serve other purposes
- * (QST will serve other purposes in future Java version)
-*/
-typedef enum
-{
-    JT_SP_PL, /* ( */
-    JT_SP_PR, /* ) */
-    JT_SP_BL, /* { */
-    JT_SP_BR, /* } */
-    JT_SP_SL, /* [ */
-    JT_SP_SR, /* ] */
-    JT_SP_SC, /* ; */
-    JT_SP_CM, /* , */
-    JT_SP_AT, /* @ */
-    JT_SP_QST, /* ? */
-    JT_SP_CL, /* : */
-    JT_SP_CC, /* :: */
-    JT_SP_DOT, /* . */
-    JT_SP_DDD, /* ... */
-
-    /* not a sp */
-    JT_SP_NONE,
-} java_separator_type;
-
-typedef enum
-{
-    JT_LI_NUM,
-    JT_LI_CHAR,
-    JT_LI_STR,
-
-    /* not a sp */
-    JT_LI_NONE,
-} java_literal_type;
+    // comments
+    JLT_CMT_SINGLE_LINE,
+    JLT_CMT_MULTI_LINE,
+} java_lexeme_type;
 
 /**
  * Java reserved word
@@ -215,7 +193,7 @@ typedef struct _java_reserved_word
     /* word content */
     char* content;
     /* word id */
-    rwid id;
+    java_lexeme_type id;
     /* disable flag */
     bbit_flag disable;
     /* deprecation flag */

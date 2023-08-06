@@ -8,8 +8,9 @@
 #include "symtbl.h"
 
 /**
- * Top-level language lexeme type
- *  token JT_EOF will keep recurring once reaching end of file
+ * Token Classification
+ *
+ * token JT_EOF will keep recurring once reaching end of file
 */
 typedef enum
 {
@@ -20,32 +21,10 @@ typedef enum
     JT_COMMENT,
     JT_EOF,
     JT_ILLEGAL,
-} java_token_type;
-
-/**
- * ID context classification
-*/
-typedef enum
-{
-    /* general ID */
-    JT_ID_GENERIC,
-    /* type name */
-    JT_ID_TYPE,
-    /* package name */
-    JT_ID_PACKAGE,
-    /* (part of) import name */
-    JT_ID_IMPORT,
-    /* class name */
-    JT_ID_CLASS,
-    /* interface name */
-    JT_ID_INTERFACE,
-    /* not an ID */
-    JT_ID_NONE,
-} java_identifier_type;
+} java_token_class;
 
 /**
  * Java number literal type
- *
 */
 typedef enum
 {
@@ -71,36 +50,19 @@ typedef enum
 typedef enum
 {
     /* default bit size */
-    JT_NUM_BIT_LENGTH_NORMAL,
+    JT_NUM_BIT_LENGTH_NORMAL = 32,
     /* long bit size */
-    JT_NUM_BIT_LENGTH_LONG,
-    /* not a number */
-    JT_NUM_BIT_LENGTH_NONE,
+    JT_NUM_BIT_LENGTH_LONG = 64,
 } java_number_bit_length;
 
-typedef enum
+/**
+ * number literal aux info
+*/
+typedef struct
 {
-    /* single-line comment */
-    JT_CM_SINGLE_LINE,
-    /* multi-line comment */
-    JT_CM_MULTI_LINE,
-    /* not a cmment */
-    JT_CM_NONE,
-} java_comment_type;
-
-typedef union
-{
-    /* secondary type: operator */
-    java_operator_type op;
-    /* secondary type: separator */
-    java_separator_type sp;
-    /* secondary type: identifier */
-    java_identifier_type id;
-    /* secondary type: literal */
-    java_literal_type li;
-    /* secondary type: comment */
-    java_comment_type cm;
-} java_token_subtype;
+    java_number_type type;
+    java_number_bit_length bits;
+} java_number_info;
 
 /**
  * Language token model
@@ -111,19 +73,17 @@ typedef struct _java_token
     byte* from;
     byte* to;
 
-    /* main type */
-    java_token_type type;
-    /* secondary type */
-    java_token_subtype subtype;
+    /* main class */
+    java_token_class class;
+    /* lexeme type */
+    java_lexeme_type type;
 
     // aux info
 
-    /* keyword type id, RWID_MAX is set if not */
+    /* keyword info */
     java_reserved_word* keyword;
-    /* number type id, JT_NUM_NONE is set if not */
-    java_number_type number;
-    /* number data size */
-    java_number_bit_length number_bit_length;
+    /* number info */
+    java_number_info number;
 } java_token;
 
 void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* table);

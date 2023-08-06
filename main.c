@@ -36,7 +36,7 @@ int main(int argc, char* argv[])
 {
     parser_info parser;
 
-    init_compiler(&parser, "./test/literal.txt");
+    init_compiler(&parser, "./test/number.txt");
 
     // debug_print_reserved_words();
     // debug_file_buffer(&parser.reader);

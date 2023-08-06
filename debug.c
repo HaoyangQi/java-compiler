@@ -1,7 +1,6 @@
 #include <stdio.h>
 
 #include "file.h"
-#include "symtbl.h"
 #include "langspec.h"
 #include "token.h"
 
@@ -125,348 +124,318 @@ void debug_print_symbol_table(java_symbol_table* table)
         c, num_java_reserved_words);
 }
 
-void debug_print_reserved_word(rwid id)
+static void debug_print_lexeme_type(java_lexeme_type id)
 {
     switch (id)
     {
-        case RWID_PUBLIC:
-            printf("RWID_PUBLIC");
+        case JLT_RWD_PUBLIC:
+            printf("JLT_RWD_PUBLIC");
             break;
-        case RWID_PRIVATE:
-            printf("RWID_PRIVATE");
+        case JLT_RWD_PRIVATE:
+            printf("JLT_RWD_PRIVATE");
             break;
-        case RWID_PROTECTED:
-            printf("RWID_PROTECTED");
+        case JLT_RWD_PROTECTED:
+            printf("JLT_RWD_PROTECTED");
             break;
-        case RWID_FINAL:
-            printf("RWID_FINAL");
+        case JLT_RWD_FINAL:
+            printf("JLT_RWD_FINAL");
             break;
-        case RWID_STATIC:
-            printf("RWID_STATIC");
+        case JLT_RWD_STATIC:
+            printf("JLT_RWD_STATIC");
             break;
-        case RWID_ABSTRACT:
-            printf("RWID_ABSTRACT");
+        case JLT_RWD_ABSTRACT:
+            printf("JLT_RWD_ABSTRACT");
             break;
-        case RWID_TRANSIENT:
-            printf("RWID_TRANSIENT");
+        case JLT_RWD_TRANSIENT:
+            printf("JLT_RWD_TRANSIENT");
             break;
-        case RWID_SYNCHRONIZED:
-            printf("RWID_SYNCHRONIZED");
+        case JLT_RWD_SYNCHRONIZED:
+            printf("JLT_RWD_SYNCHRONIZED");
             break;
-        case RWID_VOLATILE:
-            printf("RWID_VOLATILE");
+        case JLT_RWD_VOLATILE:
+            printf("JLT_RWD_VOLATILE");
             break;
-        case RWID_DEFAULT:
-            printf("RWID_DEFAULT");
+        case JLT_RWD_DEFAULT:
+            printf("JLT_RWD_DEFAULT");
             break;
-        case RWID_IF:
-            printf("RWID_IF");
+        case JLT_RWD_IF:
+            printf("JLT_RWD_IF");
             break;
-        case RWID_THROW:
-            printf("RWID_THROW");
+        case JLT_RWD_THROW:
+            printf("JLT_RWD_THROW");
             break;
-        case RWID_BOOLEAN:
-            printf("RWID_BOOLEAN");
+        case JLT_RWD_BOOLEAN:
+            printf("JLT_RWD_BOOLEAN");
             break;
-        case RWID_DO:
-            printf("RWID_DO");
+        case JLT_RWD_DO:
+            printf("JLT_RWD_DO");
             break;
-        case RWID_IMPLEMENTS:
-            printf("RWID_IMPLEMENTS");
+        case JLT_RWD_IMPLEMENTS:
+            printf("JLT_RWD_IMPLEMENTS");
             break;
-        case RWID_THROWS:
-            printf("RWID_THROWS");
+        case JLT_RWD_THROWS:
+            printf("JLT_RWD_THROWS");
             break;
-        case RWID_BREAK:
-            printf("RWID_BREAK");
+        case JLT_RWD_BREAK:
+            printf("JLT_RWD_BREAK");
             break;
-        case RWID_DOUBLE:
-            printf("RWID_DOUBLE");
+        case JLT_RWD_DOUBLE:
+            printf("JLT_RWD_DOUBLE");
             break;
-        case RWID_IMPORT:
-            printf("RWID_IMPORT");
+        case JLT_RWD_IMPORT:
+            printf("JLT_RWD_IMPORT");
             break;
-        case RWID_BYTE:
-            printf("RWID_BYTE");
+        case JLT_RWD_BYTE:
+            printf("JLT_RWD_BYTE");
             break;
-        case RWID_ELSE:
-            printf("RWID_ELSE");
+        case JLT_RWD_ELSE:
+            printf("JLT_RWD_ELSE");
             break;
-        case RWID_INSTANCEOF:
-            printf("RWID_INSTANCEOF");
+        case JLT_RWD_INSTANCEOF:
+            printf("JLT_RWD_INSTANCEOF");
             break;
-        case RWID_RETURN:
-            printf("RWID_RETURN");
+        case JLT_RWD_RETURN:
+            printf("JLT_RWD_RETURN");
             break;
-        case RWID_TRY:
-            printf("RWID_TRY");
+        case JLT_RWD_TRY:
+            printf("JLT_RWD_TRY");
             break;
-        case RWID_CASE:
-            printf("RWID_CASE");
+        case JLT_RWD_CASE:
+            printf("JLT_RWD_CASE");
             break;
-        case RWID_EXTENDS:
-            printf("RWID_EXTENDS");
+        case JLT_RWD_EXTENDS:
+            printf("JLT_RWD_EXTENDS");
             break;
-        case RWID_INT:
-            printf("RWID_INT");
+        case JLT_RWD_INT:
+            printf("JLT_RWD_INT");
             break;
-        case RWID_SHORT:
-            printf("RWID_SHORT");
+        case JLT_RWD_SHORT:
+            printf("JLT_RWD_SHORT");
             break;
-        case RWID_VOID:
-            printf("RWID_VOID");
+        case JLT_RWD_VOID:
+            printf("JLT_RWD_VOID");
             break;
-        case RWID_CATCH:
-            printf("RWID_CATCH");
+        case JLT_RWD_CATCH:
+            printf("JLT_RWD_CATCH");
             break;
-        case RWID_INTERFACE:
-            printf("RWID_INTERFACE");
+        case JLT_RWD_INTERFACE:
+            printf("JLT_RWD_INTERFACE");
             break;
-        case RWID_CHAR:
-            printf("RWID_CHAR");
+        case JLT_RWD_CHAR:
+            printf("JLT_RWD_CHAR");
             break;
-        case RWID_FINALLY:
-            printf("RWID_FINALLY");
+        case JLT_RWD_FINALLY:
+            printf("JLT_RWD_FINALLY");
             break;
-        case RWID_LONG:
-            printf("RWID_LONG");
+        case JLT_RWD_LONG:
+            printf("JLT_RWD_LONG");
             break;
-        case RWID_SUPER:
-            printf("RWID_SUPER");
+        case JLT_RWD_SUPER:
+            printf("JLT_RWD_SUPER");
             break;
-        case RWID_WHILE:
-            printf("RWID_WHILE");
+        case JLT_RWD_WHILE:
+            printf("JLT_RWD_WHILE");
             break;
-        case RWID_CLASS:
-            printf("RWID_CLASS");
+        case JLT_RWD_CLASS:
+            printf("JLT_RWD_CLASS");
             break;
-        case RWID_FLOAT:
-            printf("RWID_FLOAT");
+        case JLT_RWD_FLOAT:
+            printf("JLT_RWD_FLOAT");
             break;
-        case RWID_NATIVE:
-            printf("RWID_NATIVE");
+        case JLT_RWD_NATIVE:
+            printf("JLT_RWD_NATIVE");
             break;
-        case RWID_SWITCH:
-            printf("RWID_SWITCH");
+        case JLT_RWD_SWITCH:
+            printf("JLT_RWD_SWITCH");
             break;
-        case RWID_FOR:
-            printf("RWID_FOR");
+        case JLT_RWD_FOR:
+            printf("JLT_RWD_FOR");
             break;
-        case RWID_NEW:
-            printf("RWID_NEW");
+        case JLT_RWD_NEW:
+            printf("JLT_RWD_NEW");
             break;
-        case RWID_CONTINUE:
-            printf("RWID_CONTINUE");
+        case JLT_RWD_CONTINUE:
+            printf("JLT_RWD_CONTINUE");
             break;
-        case RWID_PACKAGE:
-            printf("RWID_PACKAGE");
+        case JLT_RWD_PACKAGE:
+            printf("JLT_RWD_PACKAGE");
             break;
-        case RWID_THIS:
-            printf("RWID_THIS");
+        case JLT_RWD_THIS:
+            printf("JLT_RWD_THIS");
             break;
-        case RWID_CONST:
-            printf("RWID_CONST");
+        case JLT_RWD_CONST:
+            printf("JLT_RWD_CONST");
             break;
-        case RWID_GOTO:
-            printf("RWID_GOTO");
+        case JLT_RWD_GOTO:
+            printf("JLT_RWD_GOTO");
             break;
-        case RWID_TRUE:
-            printf("RWID_TRUE");
+        case JLT_RWD_TRUE:
+            printf("JLT_RWD_TRUE");
             break;
-        case RWID_FALSE:
-            printf("RWID_FALSE");
+        case JLT_RWD_FALSE:
+            printf("JLT_RWD_FALSE");
             break;
-        case RWID_NULL:
-            printf("RWID_NULL");
+        case JLT_RWD_NULL:
+            printf("JLT_RWD_NULL");
             break;
-        default:
-            printf("(UNKNOWN)");
-            break;
-    }
-}
-
-void debug_print_literal_type(java_literal_type li)
-{
-    switch (li)
-    {
-        case JT_LI_NUM:
+        case JLT_LTR_NUMBER:
             printf("Number");
             break;
-        case JT_LI_CHAR:
+        case JLT_LTR_CHARACTER:
             printf("Character");
             break;
-        case JT_LI_STR:
+        case JLT_LTR_STRING:
             printf("String");
             break;
-        default:
-            printf("(UNKNOWN)");
+        case JLT_SYM_EQUAL:
+            printf("JLT_SYM_EQUAL \"=\"");
             break;
-    }
-}
-
-void debug_print_operator_type(java_operator_type op)
-{
-    switch (op)
-    {
-        case JT_OP_ASN:
-            printf("JT_OP_ASN \"=\"");
+        case JLT_SYM_ANGLE_BRACKET_CLOSE:
+            printf("JLT_SYM_ANGLE_BRACKET_CLOSE \">\"");
             break;
-        case JT_OP_GT:
-            printf("JT_OP_GT \">\"");
+        case JLT_SYM_ANGLE_BRACKET_OPEN:
+            printf("JLT_SYM_ANGLE_BRACKET_OPEN \"<\"");
             break;
-        case JT_OP_LT:
-            printf("JT_OP_LT \"<\"");
+        case JLT_SYM_EXCALMATION:
+            printf("JLT_SYM_EXCALMATION \"!\"");
             break;
-        case JT_OP_NEG:
-            printf("JT_OP_NEG \"!\"");
+        case JLT_SYM_TILDE:
+            printf("JLT_SYM_TILDE \"~\"");
             break;
-        case JT_OP_CPM:
-            printf("JT_OP_CPM \"~\"");
+        case JLT_SYM_ARROW:
+            printf("JLT_SYM_ARROW \"->\"");
             break;
-        case JT_OP_AWR:
-            printf("JT_OP_AWR \"->\"");
+        case JLT_SYM_RELATIONAL_EQUAL:
+            printf("JLT_SYM_RELATIONAL_EQUAL \"==\"");
             break;
-        case JT_OP_EQ:
-            printf("JT_OP_EQ \"==\"");
+        case JLT_SYM_LESS_EQUAL:
+            printf("JLT_SYM_LESS_EQUAL \"<=\"");
             break;
-        case JT_OP_LE:
-            printf("JT_OP_LE \"<=\"");
+        case JLT_SYM_GREATER_EQUAL:
+            printf("JLT_SYM_GREATER_EQUAL \">=\"");
             break;
-        case JT_OP_GE:
-            printf("JT_OP_GE \">=\"");
+        case JLT_SYM_NOT_EQUAL:
+            printf("JLT_SYM_NOT_EQUAL \"!=\"");
             break;
-        case JT_OP_NE:
-            printf("JT_OP_NE \"!=\"");
+        case JLT_SYM_LOGIC_AND:
+            printf("JLT_SYM_LOGIC_AND \"&&\"");
             break;
-        case JT_OP_LAND:
-            printf("JT_OP_LAND \"&&\"");
+        case JLT_SYM_LOGIC_OR:
+            printf("JLT_SYM_LOGIC_OR \"||\"");
             break;
-        case JT_OP_LOR:
-            printf("JT_OP_LOR \"||\"");
+        case JLT_SYM_INCREMENT:
+            printf("JLT_SYM_INCREMENT \"++\"");
             break;
-        case JT_OP_INC:
-            printf("JT_OP_INC \"++\"");
+        case JLT_SYM_DECREMENT:
+            printf("JLT_SYM_DECREMENT \"--\"");
             break;
-        case JT_OP_DEC:
-            printf("JT_OP_DEC \"--\"");
+        case JLT_SYM_PLUS:
+            printf("JLT_SYM_PLUS \"+\"");
             break;
-        case JT_OP_ADD:
-            printf("JT_OP_ADD \"+\"");
+        case JLT_SYM_MINUS:
+            printf("JLT_SYM_MINUS \"-\"");
             break;
-        case JT_OP_SUB:
-            printf("JT_OP_SUB \"-\"");
+        case JLT_SYM_ASTERISK:
+            printf("JLT_SYM_ASTERISK \"*\"");
             break;
-        case JT_OP_MUL:
-            printf("JT_OP_MUL \"*\"");
+        case JLT_SYM_FORWARD_SLASH:
+            printf("JLT_SYM_FORWARD_SLASH \"/\"");
             break;
-        case JT_OP_DIV:
-            printf("JT_OP_DIV \"/\"");
+        case JLT_SYM_AMPERSAND:
+            printf("JLT_SYM_AMPERSAND \"&\"");
             break;
-        case JT_OP_AND:
-            printf("JT_OP_AND \"&\"");
+        case JLT_SYM_PIPE:
+            printf("JLT_SYM_PIPE \"|\"");
             break;
-        case JT_OP_OR:
-            printf("JT_OP_OR \"|\"");
+        case JLT_SYM_CARET:
+            printf("JLT_SYM_CARET \"^\"");
             break;
-        case JT_OP_XOR:
-            printf("JT_OP_XOR \"^\"");
+        case JLT_SYM_PERCENT:
+            printf("JLT_SYM_PERCENT \"%\"");
             break;
-        case JT_OP_MOD:
-            printf("JT_OP_MOD \"%\"");
+        case JLT_SYM_LEFT_SHIFT:
+            printf("JLT_SYM_LEFT_SHIFT \"<<\"");
             break;
-        case JT_OP_LS:
-            printf("JT_OP_LS \"<<\"");
+        case JLT_SYM_RIGHT_SHIFT:
+            printf("JLT_SYM_RIGHT_SHIFT \">>\"");
             break;
-        case JT_OP_RS:
-            printf("JT_OP_RS \">>\"");
+        case JLT_SYM_RIGHT_SHIFT_UNSIGNED:
+            printf("JLT_SYM_RIGHT_SHIFT_UNSIGNED \">>>\"");
             break;
-        case JT_OP_ZFRS:
-            printf("JT_OP_ZFRS \">>>\"");
+        case JLT_SYM_ADD_ASSIGNMENT:
+            printf("JLT_SYM_ADD_ASSIGNMENT \"+=\"");
             break;
-        case JT_OP_ADDASN:
-            printf("JT_OP_ADDASN \"+=\"");
+        case JLT_SYM_SUBTRACT_ASSIGNMENT:
+            printf("JLT_SYM_SUBTRACT_ASSIGNMENT \"-=\"");
             break;
-        case JT_OP_SUBASN:
-            printf("JT_OP_SUBASN \"-=\"");
+        case JLT_SYM_MULTIPLY_ASSIGNMENT:
+            printf("JLT_SYM_MULTIPLY_ASSIGNMENT \"*=\"");
             break;
-        case JT_OP_MULASN:
-            printf("JT_OP_MULASN \"*=\"");
+        case JLT_SYM_DIVIDE_ASSIGNMENT:
+            printf("JLT_SYM_DIVIDE_ASSIGNMENT \"/=\"");
             break;
-        case JT_OP_DIVASN:
-            printf("JT_OP_DIVASN \"/=\"");
+        case JLT_SYM_BIT_AND_ASSIGNMENT:
+            printf("JLT_SYM_BIT_AND_ASSIGNMENT \"&=\"");
             break;
-        case JT_OP_ANDASN:
-            printf("JT_OP_ANDASN \"&=\"");
+        case JLT_SYM_BIT_OR_ASSIGNMENT:
+            printf("JLT_SYM_BIT_OR_ASSIGNMENT \"|=\"");
             break;
-        case JT_OP_ORASN:
-            printf("JT_OP_ORASN \"|=\"");
+        case JLT_SYM_BIT_XOR_ASSIGNMENT:
+            printf("JLT_SYM_BIT_XOR_ASSIGNMENT \"^=\"");
             break;
-        case JT_OP_XORASN:
-            printf("JT_OP_XORASN \"^=\"");
+        case JLT_SYM_MODULO_ASSIGNMENT:
+            printf("JLT_SYM_MODULO_ASSIGNMENT \"%=\"");
             break;
-        case JT_OP_MODASN:
-            printf("JT_OP_MODASN \"%=\"");
+        case JLT_SYM_LEFT_SHIFT_ASSIGNMENT:
+            printf("JLT_SYM_LEFT_SHIFT_ASSIGNMENT \"<<=\"");
             break;
-        case JT_OP_LSASN:
-            printf("JT_OP_LSASN \"<<=\"");
+        case JLT_SYM_RIGHT_SHIFT_ASSIGNMENT:
+            printf("JLT_SYM_RIGHT_SHIFT_ASSIGNMENT \">>=\"");
             break;
-        case JT_OP_RSASN:
-            printf("JT_OP_RSASN \">>=\"");
+        case JLT_SYM_RIGHT_SHIFT_UNSIGNED_ASSIGNMENT:
+            printf("JLT_SYM_RIGHT_SHIFT_UNSIGNED_ASSIGNMENT \">>>=\"");
             break;
-        case JT_OP_ZFRSASN:
-            printf("JT_OP_ZFRSASN \">>>=\"");
+        case JLT_SYM_PARENTHESIS_OPEN:
+            printf("JLT_SYM_PARENTHESIS_OPEN \"(\"");
             break;
-        default:
-            printf("(UNKNOWN)");
+        case JLT_SYM_PARENTHESIS_CLOSE:
+            printf("JLT_SYM_PARENTHESIS_CLOSE \")\"");
             break;
-    }
-}
-
-void debug_print_separator_type(java_separator_type sp)
-{
-    switch (sp)
-    {
-        case JT_SP_PL:
-            printf("JT_SP_PL \"(\"");
+        case JLT_SYM_BRACE_OPEN:
+            printf("JLT_SYM_BRACE_OPEN \"{\"");
             break;
-        case JT_SP_PR:
-            printf("JT_SP_PR \")\"");
+        case JLT_SYM_BRACE_CLOSE:
+            printf("JLT_SYM_BRACE_CLOSE \"}\"");
             break;
-        case JT_SP_BL:
-            printf("JT_SP_BL \"{\"");
+        case JLT_SYM_BRACKET_OPEN:
+            printf("JLT_SYM_BRACKET_OPEN \"[\"");
             break;
-        case JT_SP_BR:
-            printf("JT_SP_BR \"}\"");
+        case JLT_SYM_BRACKET_CLOSE:
+            printf("JLT_SYM_BRACKET_CLOSE \"]\"");
             break;
-        case JT_SP_SL:
-            printf("JT_SP_SL \"[\"");
+        case JLT_SYM_SEMICOLON:
+            printf("JLT_SYM_SEMICOLON \";\"");
             break;
-        case JT_SP_SR:
-            printf("JT_SP_SR \"]\"");
+        case JLT_SYM_COMMA:
+            printf("JLT_SYM_COMMA \",\"");
             break;
-        case JT_SP_SC:
-            printf("JT_SP_SC \";\"");
+        case JLT_SYM_AT:
+            printf("JLT_SYM_AT \"@\"");
             break;
-        case JT_SP_CM:
-            printf("JT_SP_CM \",\"");
+        case JLT_SYM_QUESTION:
+            printf("JLT_SYM_QUESTION \"?\"");
             break;
-        case JT_SP_AT:
-            printf("JT_SP_AT \"@\"");
+        case JLT_SYM_COLON:
+            printf("JLT_SYM_COLON \":\"");
             break;
-        case JT_SP_QST:
-            printf("JT_SP_QST \"?\"");
+        case JLT_SYM_METHOD_REFERENCE:
+            printf("JLT_SYM_METHOD_REFERENCE \"::\"");
             break;
-        case JT_SP_CL:
-            printf("JT_SP_CL \":\"");
+        case JLT_SYM_DOT:
+            printf("JLT_SYM_DOT \".\"");
             break;
-        case JT_SP_CC:
-            printf("JT_SP_CC \"::\"");
-            break;
-        case JT_SP_DOT:
-            printf("JT_SP_DOT \".\"");
-            break;
-        case JT_SP_DDD:
-            printf("JT_SP_DDD \"...\"");
+        case JLT_SYM_VARIADIC:
+            printf("JLT_SYM_VARIADIC \"...\"");
             break;
         default:
             printf("(UNKNOWN)");
@@ -539,19 +508,19 @@ void debug_tokenize(file_buffer* buffer, java_symbol_table* table)
     {
         get_next_token(token, buffer, table);
 
-        if (token->type == JT_EOF)
+        if (token->class == JT_EOF)
         {
             break;
         }
 
-        switch (token->type)
+        switch (token->class)
         {
             case JT_IDENTIFIER:
                 printf("Name");
                 if (token->keyword)
                 {
                     printf(" Keyword: ");
-                    debug_print_reserved_word(token->keyword->id);
+                    debug_print_lexeme_type(token->keyword->id);
                 }
                 printf("\n");
                 debug_print_token_content(token);
@@ -559,13 +528,13 @@ void debug_tokenize(file_buffer* buffer, java_symbol_table* table)
                 break;
             case JT_LITERAL:
                 printf("Literal ");
-                debug_print_literal_type(token->subtype.li);
-                if (token->subtype.li == JT_LI_NUM)
+                debug_print_lexeme_type(token->type);
+                if (token->type == JLT_LTR_NUMBER)
                 {
                     printf(" ");
-                    debug_print_number_type(token->number);
+                    debug_print_number_type(token->number.type);
                     printf(" length: ");
-                    debug_print_number_bit_length(token->number_bit_length);
+                    debug_print_number_bit_length(token->number.bits);
                 }
                 printf("\n");
                 debug_print_token_content(token);
@@ -573,14 +542,14 @@ void debug_tokenize(file_buffer* buffer, java_symbol_table* table)
                 break;
             case JT_OPERATOR:
                 printf("Operator ");
-                debug_print_operator_type(token->subtype.op);
+                debug_print_lexeme_type(token->type);
                 printf("\n");
                 debug_print_token_content(token);
                 printf("\n");
                 break;
             case JT_SEPARATOR:
                 printf("Separator ");
-                debug_print_separator_type(token->subtype.sp);
+                debug_print_lexeme_type(token->type);
                 printf("\n");
                 debug_print_token_content(token);
                 printf("\n");
