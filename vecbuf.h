@@ -1,6 +1,6 @@
 #pragma once
-#ifndef __COMPILER_VECTOR_BUFFER_H__
-#define __COMPILER_VECTOR_BUFFER_H__
+#ifndef __COMPILER_UTIL_VECTOR_BUFFER_H__
+#define __COMPILER_UTIL_VECTOR_BUFFER_H__
 
 #include "types.h"
 

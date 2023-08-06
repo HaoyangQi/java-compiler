@@ -33,8 +33,7 @@ bool load_source_file(file_buffer* buffer, const char* name)
 
     if (buffer->size > 0)
     {
-        buffer->base = (byte*)malloc(buffer->size + 1);
-        ASSERT_ALLOCATION(buffer->base);
+        buffer->base = (byte*)malloc_assert(buffer->size + 1);
 
         // read 1 byte for *size* times in case of large files
         long read_size = fread(buffer->base, 1, buffer->size, fp);

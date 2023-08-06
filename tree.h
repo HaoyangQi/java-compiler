@@ -3,47 +3,44 @@
 #define __COMPILER_TREE_H__
 
 #include "types.h"
-#include "tree-node.h"
-#include "vecbuf.h"
+
+typedef void (*node_data_delete_callback)(int metadata, void* data);
 
 /**
- * ast node data query
+ * Left-Child, Right-Sibling (LCRS) Muti-Way Tree
  *
- * the type will help union determine which type
- * the data is binded to the tree node
-*/
-typedef enum
-{
-    /* package declaration */
-    JNT_PKG_DECL,
-    JNT_IMPORT_DECL,
-} java_node_query;
-
-/**
- * ast node data selector
+ * LCRS uses binary way to represent multi-way tree
+ * child: goes deeper in the tree and points to left-most child
+ * sibling: goes along same level and points to next sibling on same level
  *
- * to control size of the union, pointers are used
+ * e.g.
+ *        A
+ *       /
+ *      B -> C -> D -> E -> F
+ *     /         /         /
+ *    G         H->I->J   K->L
+ *
+ * A's children are: BCDEF, and child points to B
+ * B's sibling points to C points to D points E points F
+ * B's children are G, and child points to G
+ * same idea for D and F
 */
-typedef union
-{
-    java_tree_node_pkg_decl* pck_decl;
-    java_tree_node_import_decl* import_decl;
-} java_node_selector;
-
 typedef struct _tree_node
 {
-    /* query provides type so selector can fetch right field */
-    java_node_query query : 8;
-    /* node type collection for query */
-    java_node_selector selector;
-    /* tree_node children, not using vec to strongly type it */
-    struct _tree_node** children;
-    size_t num_children;
+    /* metadata describes type of data */
+    int metadata;
+    /* node data */
+    void* data;
+    /* binary way to represent multi-way tree */
+    struct _tree_node* first_child;
+    struct _tree_node* next_sibling;
+    /* aux info for sibling traversal and addition */
+    struct _tree_node* last_sibling;
 } tree_node;
 
-typedef struct _tree
-{
-    tree_node root;
-} tree;
+void init_tree_node(tree_node* node);
+void tree_node_attach(tree_node* node, int meta, void* data);
+void tree_node_add_child(tree_node* node, tree_node* child);
+void tree_node_delete(tree_node* node, node_data_delete_callback cb);
 
 #endif

@@ -521,8 +521,7 @@ void debug_print_number_type(java_number_type number)
 void debug_print_token_content(java_token* token)
 {
     size_t len = buffer_count(token->from, token->to);
-    char* content = (char*)malloc(sizeof(char) * (len + 1));
-    ASSERT_ALLOCATION(content);
+    char* content = (char*)malloc_assert(sizeof(char) * (len + 1));
 
     buffer_substring(content, token->from, len);
     printf(content);
@@ -534,8 +533,7 @@ void debug_tokenize(file_buffer* buffer, java_symbol_table* table)
 {
     printf("===== TOKENIZED BUFFER CONTENT =====\n");
 
-    java_token* token = (java_token*)malloc(sizeof(java_token));
-    ASSERT_ALLOCATION(token);
+    java_token* token = (java_token*)malloc_assert(sizeof(java_token));
 
     while (true)
     {

@@ -215,7 +215,7 @@ typedef struct _java_reserved_word
     /* word content */
     char* content;
     /* word id */
-    rwid id : 8;
+    rwid id;
     /* disable flag */
     bbit_flag disable;
     /* deprecation flag */

@@ -1,0 +1,23 @@
+'a' // regular
+
+'' // empty
+
+'abc dfe' // force enclosure
+
+'\'' // escape sequence
+
+/* multi-line force enclosure */
+'line1
+
+line end'
+
+// string
+"a"
+""
+"s s "
+"\""
+"line
+
+
+ end
+"

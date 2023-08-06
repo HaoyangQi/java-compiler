@@ -7,8 +7,7 @@ void init_vec(vec* v, size_t size)
 {
     v->size = size;
     v->length = 0;
-    v->buffer = malloc(sizeof(void*) * size);
-    ASSERT_ALLOCATION(v->buffer);
+    v->buffer = malloc_assert(sizeof(void*) * size);
 
     memset(v->buffer, 0, sizeof(void*) * size);
 }
