@@ -675,8 +675,28 @@ static void debug_print_ast_node(java_node_query query, void* data)
             printf("Compilation Unit");
             break;
         case JNT_NAME:
-            printf("Name: ");
-            debug_print_token_list_content(&((node_data_name*)data)->name, '/');
+            printf("Name");
+            break;
+        case JNT_NAME_UNIT:
+            printf("Unit: ");
+            debug_print_token_content(&((node_data_name_unit*)data)->id);
+            break;
+        case JNT_CLASS_TYPE:
+            printf("Class Type");
+            break;
+        case JNT_CLASS_TYPE_UNIT:
+            printf("Unit: ");
+            debug_print_token_content(&((node_data_class_type_unit*)data)->id);
+            break;
+        case JNT_INTERFACE_TYPE:
+            printf("Interface Type");
+            break;
+        case JNT_INTERFACE_TYPE_UNIT:
+            printf("Unit: ");
+            debug_print_token_content(&((node_data_interface_type_unit*)data)->id);
+            break;
+        case JNT_INTERFACE_TYPE_LIST:
+            printf("Interface Type List");
             break;
         case JNT_PKG_DECL:
             printf("Package Declaration");
@@ -696,6 +716,15 @@ static void debug_print_ast_node(java_node_query query, void* data)
         case JNT_INTERFACE_DECL:
             printf("Interface Declaration: ");
             debug_print_token_content(&((node_data_interface_declaration*)data)->id);
+            break;
+        case JNT_CLASS_EXTENDS:
+            printf("Class Extends");
+            break;
+        case JNT_CLASS_IMPLEMENTS:
+            printf("Class Implements");
+            break;
+        case JNT_CLASS_BODY:
+            printf("Class Body");
             break;
         default:
             printf("Unknown");

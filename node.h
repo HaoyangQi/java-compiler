@@ -15,39 +15,49 @@
 typedef enum
 {
     JNT_UNIT,
+    JNT_NAME_UNIT,
     JNT_NAME,
+    JNT_CLASS_TYPE_UNIT,
+    JNT_CLASS_TYPE,
+    JNT_INTERFACE_TYPE_UNIT,
+    JNT_INTERFACE_TYPE,
+    JNT_INTERFACE_TYPE_LIST,
     JNT_PKG_DECL,
     JNT_IMPORT_DECL,
     JNT_TOP_LEVEL,
     JNT_CLASS_DECL,
     JNT_INTERFACE_DECL,
+    JNT_CLASS_EXTENDS,
+    JNT_CLASS_IMPLEMENTS,
+    JNT_CLASS_BODY,
 } java_node_query;
 
 /**
- * Compilation Unit
+ * Name Unit
  *
- * not yet have any info on this level
-*/
-// typedef struct
-// {
-// } node_data_compilation_unit;
-
-/**
- * Name
+ * unit for Name sequence
+ * e.g. ID1.ID2.ID3
 */
 typedef struct
 {
-    linked_list name;
-} node_data_name;
+    java_token id;
+} node_data_name_unit;
 
 /**
- * Package Declaration
- *
- * not yet have any info on this level
+ * Class Type Unit
 */
-// typedef struct
-// {
-// } node_data_pkg_decl;
+typedef struct
+{
+    java_token id;
+} node_data_class_type_unit;
+
+/**
+ * Interface Type Unit
+*/
+typedef struct
+{
+    java_token id;
+} node_data_interface_type_unit;
 
 /**
  * Import Declaration

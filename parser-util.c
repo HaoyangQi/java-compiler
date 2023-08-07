@@ -1,7 +1,5 @@
 #include "parser.h"
 
-#include "ll.h"
-
 /**
  * peek a token, and load into buffer if not yet buffered
 */
@@ -75,32 +73,12 @@ bool peek_token_type_is(java_parser* parser, size_t idx, java_lexeme_type type)
 }
 
 /**
- * generates a new token memory to transfer lookahead to AST node
- *
- * NOTE: it does NOT check current pointer and assumes the memory will be referenced somewhere else
-*/
-java_token* new_token_buffer(java_parser* parser)
-{
-    parser->token_buffer = (java_token*)malloc_assert(sizeof(java_token));
-    return parser->token_buffer;
-}
-
-/**
  * ast node data deletion util
 */
 void parser_ast_node_data_deleter(int metadata, void* data)
 {
     switch (metadata)
     {
-        case JNT_NAME:
-        {
-            linked_list* list = &((node_data_name*)data)->name;
-            while (!linked_list_empty(list))
-            {
-                free_token(linked_list_pop_front(list));
-            }
-            break;
-        }
         default:
             break;
     }

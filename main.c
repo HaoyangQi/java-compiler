@@ -86,16 +86,18 @@ void release_compiler(compiler* compiler)
 }
 
 static char* test_paths[] = {
-    "./test/pkg-decl-1.txt",
-    "./test/pkg-decl-2.txt",
-    "./test/pkg-decl-3.txt",
-    "./test/pkg-decl-4.txt",
-    "./test/pkg-decl-5.txt",
+    // "./test/pkg-decl-1.txt",
+    // "./test/pkg-decl-2.txt",
+    // "./test/pkg-decl-3.txt",
+    // "./test/pkg-decl-4.txt",
+    // "./test/pkg-decl-5.txt",
 
-    "./test/import-decl-1.txt",
-    "./test/import-decl-2.txt",
+    // "./test/import-decl-1.txt",
+    // "./test/import-decl-2.txt",
 
-    "./test/top-level-1.txt",
+    // "./test/top-level-1.txt",
+
+    "./test/class-decl-1.txt"
 };
 
 int main(int argc, char* argv[])

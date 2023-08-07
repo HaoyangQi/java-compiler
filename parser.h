@@ -38,9 +38,10 @@ java_token* token_peek(java_parser* parser, size_t idx);
 void consume_token(java_parser* parser, java_token* dest);
 bool peek_token_class_is(java_parser* parser, size_t idx, java_token_class class);
 bool peek_token_type_is(java_parser* parser, size_t idx, java_lexeme_type type);
-java_token* new_token_buffer(java_parser* parser);
 void parser_ast_node_data_deleter(int metadata, void* data);
 
-bool parser_trigger_name(java_parser* parser);
+bool parser_trigger_name(java_parser* parser, size_t peek_from);
+bool parser_trigger_class_type(java_parser* parser, size_t peek_from);
+bool parser_trigger_interface_type(java_parser* parser, size_t peek_from);
 
 #endif
