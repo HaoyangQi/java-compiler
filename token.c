@@ -153,6 +153,7 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
 
     token->from = buffer->cur;
     token->class = JT_EOF;
+    token->type = JLT_MAX;
     token->keyword = NULL;
     token->number.type = JT_NUM_NONE;
     token->number.bits = JT_NUM_BIT_LENGTH_NORMAL;
@@ -1085,4 +1086,12 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
             }
         }
     }
+}
+
+/**
+ * delete token memory and release all allocated content within
+*/
+void free_token(java_token* token)
+{
+    free(token);
 }

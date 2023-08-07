@@ -180,6 +180,9 @@ typedef enum
     // comments
     JLT_CMT_SINGLE_LINE,
     JLT_CMT_MULTI_LINE,
+
+    // Not valid
+    JLT_MAX,
 } java_lexeme_type;
 
 /**

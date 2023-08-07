@@ -29,4 +29,18 @@ typedef struct _java_parser
     java_token* token_buffer;
 } java_parser;
 
+void init_parser(java_parser* parser, file_buffer* buffer, java_symbol_table* rw);
+void release_parser(java_parser* parser);
+
+void parse(java_parser* parser);
+
+java_token* token_peek(java_parser* parser, size_t idx);
+void consume_token(java_parser* parser, java_token* dest);
+bool peek_token_class_is(java_parser* parser, size_t idx, java_token_class class);
+bool peek_token_type_is(java_parser* parser, size_t idx, java_lexeme_type type);
+java_token* new_token_buffer(java_parser* parser);
+void parser_ast_node_data_deleter(int metadata, void* data);
+
+bool parser_trigger_name(java_parser* parser);
+
 #endif

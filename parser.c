@@ -23,86 +23,8 @@
 #include "parser.h"
 
 /**
- * peek a token, and load into buffer if not yet buffered
+ * Initialize parser instance
 */
-static java_token* token_peek(java_parser* parser, size_t idx)
-{
-    // guard
-    if (idx >= 4)
-    {
-        return NULL;
-    }
-
-    // buffer it if not yet available
-    for (size_t i = parser->num_token_available; i <= idx; i++)
-    {
-        get_next_token(parser->tokens + i, parser->buffer, parser->reserved_words);
-    }
-
-    // update counter only when buffer loads new token
-    if (parser->num_token_available <= idx)
-    {
-        parser->num_token_available = idx + 1;
-    }
-
-    // return the queried peek
-    return parser->tokens + idx;
-}
-
-/**
- * consume first token in buffer, and write a copy to dest
- * if dest not specified, token will be dropped
- * if buffer is empty, it is no-op
-*/
-static void consume_token(java_parser* parser, java_token* dest)
-{
-    if (parser->num_token_available == 0)
-    {
-        return;
-    }
-
-    // save a copy to dest
-    if (dest)
-    {
-        memcpy(dest, parser->tokens, sizeof(java_token));
-    }
-
-    // shift buffer to left by 1 unit
-    for (size_t i = 1; i < parser->num_token_available; i++)
-    {
-        memcpy(parser->tokens + i - 1, parser->tokens + i, sizeof(java_token));
-    }
-
-    parser->num_token_available--;
-}
-
-static bool peek_token_class_is(java_parser* parser, size_t idx, java_token_class class)
-{
-    java_token* peek = token_peek(parser, idx);
-    return peek->class == class;
-}
-
-static bool peek_token_type_is(java_parser* parser, size_t idx, java_lexeme_type type)
-{
-    java_token* peek = token_peek(parser, idx);
-    return peek->type == type;
-}
-
-/**
- * generates a new token memory to transfer lookahead to AST node
- *
- * NOTE: it does NOT check current pointer and assumes the memory will be referenced somewhere else
-*/
-static java_token* new_token_buffer(java_parser* parser)
-{
-    parser->token_buffer = (java_token*)malloc_assert(sizeof(java_token));
-    return parser->token_buffer;
-}
-
-
-////////// PARSER IMPLEMENTATIONS //////////
-
-
 void init_parser(java_parser* parser, file_buffer* buffer, java_symbol_table* rw)
 {
     // tokens contains garbage data if not used
@@ -114,6 +36,14 @@ void init_parser(java_parser* parser, file_buffer* buffer, java_symbol_table* rw
     parser->ast_root = NULL;
 }
 
+/**
+ * Release parser instance
+*/
+void release_parser(java_parser* parser)
+{
+    tree_node_delete(parser->ast_root, &parser_ast_node_data_deleter);
+}
+
 /* FORWARD DECLARATIONS OF PARSER FUNCTIONS */
 
 static tree_node* parse_package_declaration(java_parser* parser);
@@ -122,14 +52,14 @@ static tree_node* parse_name(java_parser* parser);
 /**
  * parser entry point
 */
-void parse_compilation_unit(java_parser* parser)
+void parse(java_parser* parser)
 {
     parser->ast_root = ast_node_compilation_unit();
 
     // package declaration
     if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_RWD_PACKAGE))
     {
-        tree_node_add_child(parser->ast_root, parse_name(parser));
+        tree_node_add_child(parser->ast_root, parse_package_declaration(parser));
     }
 }
 
@@ -141,8 +71,6 @@ void parse_compilation_unit(java_parser* parser)
  *     Identifier
  * QualifiedName:
  *     Name . Identifier
- *
- * TODO: consume ID tokens
 */
 static tree_node* parse_name(java_parser* parser)
 {
@@ -177,9 +105,13 @@ static tree_node* parse_package_declaration(java_parser* parser)
     consume_token(parser, NULL);
 
     // Name
-    if (peek_token_class_is(parser, TOKEN_PEEK_1st, JT_IDENTIFIER))
+    if (parser_trigger_name(parser))
     {
         tree_node_add_child(node, parse_name(parser));
+    }
+    else
+    {
+        fprintf(stderr, "TODO error: expected name after package declaration\n");
     }
 
     if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_SEMICOLON))
