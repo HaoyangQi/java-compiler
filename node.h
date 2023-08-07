@@ -18,6 +18,9 @@ typedef enum
     JNT_NAME,
     JNT_PKG_DECL,
     JNT_IMPORT_DECL,
+    JNT_TOP_LEVEL,
+    JNT_CLASS_DECL,
+    JNT_INTERFACE_DECL,
 } java_node_query;
 
 /**
@@ -27,7 +30,7 @@ typedef enum
 */
 // typedef struct
 // {
-// } java_tree_node_compilation_unit;
+// } node_data_compilation_unit;
 
 /**
  * Name
@@ -35,7 +38,7 @@ typedef enum
 typedef struct
 {
     linked_list name;
-} java_tree_node_name;
+} node_data_name;
 
 /**
  * Package Declaration
@@ -44,7 +47,7 @@ typedef struct
 */
 // typedef struct
 // {
-// } java_tree_node_pkg_decl;
+// } node_data_pkg_decl;
 
 /**
  * Import Declaration
@@ -53,6 +56,33 @@ typedef struct
 {
     /* on demand import */
     bool on_demand;
-} java_tree_node_import_decl;
+} node_data_import_decl;
+
+/**
+ * Top Level
+*/
+typedef struct
+{
+    /* modifier data */
+    lbit_flag modifier;
+} node_data_top_level;
+
+/**
+ * Class Declaration
+*/
+typedef struct
+{
+    /* class name */
+    java_token id;
+} node_data_class_declaration;
+
+/**
+ * Interface Declaration
+*/
+typedef struct
+{
+    /* interface name */
+    java_token id;
+} node_data_interface_declaration;
 
 #endif

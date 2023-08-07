@@ -87,6 +87,7 @@ typedef struct _java_token
     java_number_info number;
 } java_token;
 
+void init_token(java_token* token);
 void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* table);
 void free_token(java_token* token);
 
