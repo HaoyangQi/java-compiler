@@ -1,1 +1,1 @@
-package path1.int.mypack;
+package path1.Int.mypack;

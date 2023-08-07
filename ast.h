@@ -9,5 +9,6 @@
 tree_node* ast_node_compilation_unit();
 tree_node* ast_node_name();
 tree_node* ast_node_package_declaration();
+tree_node* ast_node_import_declaration();
 
 #endif

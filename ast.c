@@ -52,3 +52,19 @@ tree_node* ast_node_package_declaration()
     tree_node_attach(node, JNT_PKG_DECL, NULL);
     return node;
 }
+
+/**
+ * AST node generator
+ *
+ * import declaration
+*/
+tree_node* ast_node_import_declaration()
+{
+    tree_node* node = ast_node_new();
+    java_tree_node_import_decl* data =
+        (java_tree_node_import_decl*)malloc_assert(sizeof(java_tree_node_import_decl));
+
+    data->on_demand = false;
+    tree_node_attach(node, JNT_IMPORT_DECL, data);
+    return node;
+}

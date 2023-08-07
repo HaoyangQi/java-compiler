@@ -15,6 +15,7 @@
 typedef enum
 {
     JT_IDENTIFIER,
+    JT_RESERVED_WORD,
     JT_LITERAL,
     JT_OPERATOR,
     JT_SEPARATOR,
