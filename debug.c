@@ -516,10 +516,14 @@ void debug_tokenize(file_buffer* buffer, java_symbol_table* table)
         switch (token->class)
         {
             case JT_IDENTIFIER:
-                printf("Name");
+                printf("Name\n");
+                debug_print_token_content(token);
+                printf("\n");
+                break;
+            case JT_RESERVED_WORD:
+                printf("Reserved Word: ");
                 if (token->keyword)
                 {
-                    printf(" Keyword: ");
                     debug_print_lexeme_type(token->keyword->id);
                 }
                 printf("\n");
@@ -576,6 +580,25 @@ void debug_tokenize(file_buffer* buffer, java_symbol_table* table)
     free_token(token);
 }
 
+static void debug_print_token_list_content(linked_list* list, const char sp)
+{
+    ll_item* item = list->first;
+    while (true)
+    {
+        debug_print_token_content(item->data);
+        item = item->next;
+
+        if (item)
+        {
+            printf("%c", sp);
+        }
+        else
+        {
+            break;
+        }
+    }
+}
+
 static void debug_print_ast_node(java_node_query query, void* data)
 {
     switch (query)
@@ -584,32 +607,15 @@ static void debug_print_ast_node(java_node_query query, void* data)
             printf("Compilation Unit");
             break;
         case JNT_NAME:
-        {
             printf("Name: ");
-
-            ll_item* item = ((java_tree_node_name*)data)->name.first;
-            while (true)
-            {
-                debug_print_token_content(item->data);
-                item = item->next;
-
-                if (item)
-                {
-                    printf("/");
-                }
-                else
-                {
-                    break;
-                }
-            }
-
+            debug_print_token_list_content(&((java_tree_node_name*)data)->name, '/');
             break;
-        }
         case JNT_PKG_DECL:
             printf("Package Declaration");
             break;
         case JNT_IMPORT_DECL:
-            printf("Import Declaration");
+            printf("Import Declaration (On-demand: %s)",
+                ((java_tree_node_import_decl*)data)->on_demand ? "true" : "false");
             break;
         default:
             printf("Unknown");
@@ -629,7 +635,7 @@ static void debug_print_ast(tree_node* node, int depth)
     {
         for (int i = 0; i < depth; i++)
         {
-            printf(" ");
+            printf("  ");
         }
 
         debug_print_ast_node(node->metadata, node->data);

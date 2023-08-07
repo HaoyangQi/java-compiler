@@ -17,6 +17,12 @@ java_token* token_peek(java_parser* parser, size_t idx)
     for (size_t i = parser->num_token_available; i <= idx; i++)
     {
         get_next_token(parser->tokens + i, parser->buffer, parser->reserved_words);
+
+        // discard comments
+        while (parser->tokens[i].class == JT_COMMENT)
+        {
+            get_next_token(parser->tokens + i, parser->buffer, parser->reserved_words);
+        }
     }
 
     // update counter only when buffer loads new token

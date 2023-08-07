@@ -46,8 +46,9 @@ void release_parser(java_parser* parser)
 
 /* FORWARD DECLARATIONS OF PARSER FUNCTIONS */
 
-static tree_node* parse_package_declaration(java_parser* parser);
 static tree_node* parse_name(java_parser* parser);
+static tree_node* parse_package_declaration(java_parser* parser);
+static tree_node* parse_import_declaration(java_parser* parser);
 
 /**
  * parser entry point
@@ -60,6 +61,12 @@ void parse(java_parser* parser)
     if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_RWD_PACKAGE))
     {
         tree_node_add_child(parser->ast_root, parse_package_declaration(parser));
+    }
+
+    // import declarations
+    while (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_RWD_IMPORT))
+    {
+        tree_node_add_child(parser->ast_root, parse_import_declaration(parser));
     }
 }
 
@@ -104,7 +111,7 @@ static tree_node* parse_package_declaration(java_parser* parser)
     // package
     consume_token(parser, NULL);
 
-    // Name
+    // Name, terminate if incomplete
     if (parser_trigger_name(parser))
     {
         tree_node_add_child(node, parse_name(parser));
@@ -112,6 +119,59 @@ static tree_node* parse_package_declaration(java_parser* parser)
     else
     {
         fprintf(stderr, "TODO error: expected name after package declaration\n");
+        return node;
+    }
+
+    if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_SEMICOLON))
+    {
+        consume_token(parser, NULL);
+    }
+    else
+    {
+        fprintf(stderr, "TODO error: expected ';'\n");
+    }
+
+    return node;
+}
+
+/**
+ * ImportDeclaration:
+ *     SingleTypeImportDeclaration
+ *     TypeImportOnDemandDeclaration
+ *
+ * SingleTypeImportDeclaration:
+ *     import Name ;
+ *
+ * TypeImportOnDemandDeclaration:
+ *     import Name . * ;
+*/
+static tree_node* parse_import_declaration(java_parser* parser)
+{
+    tree_node* node = ast_node_import_declaration();
+    java_tree_node_import_decl* data = (java_tree_node_import_decl*)(node->data);
+
+    // import
+    consume_token(parser, NULL);
+    data->on_demand = false;
+
+    // Name, terminate if incomplete
+    if (parser_trigger_name(parser))
+    {
+        tree_node_add_child(node, parse_name(parser));
+    }
+    else
+    {
+        fprintf(stderr, "TODO error: expected name after import declaration\n");
+        return node;
+    }
+
+    // [. *] on-demand sequence
+    if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_DOT) &&
+        peek_token_type_is(parser, TOKEN_PEEK_2nd, JLT_SYM_ASTERISK))
+    {
+        consume_token(parser, NULL);
+        consume_token(parser, NULL);
+        data->on_demand = true;
     }
 
     if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_SEMICOLON))

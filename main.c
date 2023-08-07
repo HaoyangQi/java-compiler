@@ -91,6 +91,9 @@ static char* test_paths[] = {
     "./test/pkg-decl-3.txt",
     "./test/pkg-decl-4.txt",
     "./test/pkg-decl-5.txt",
+
+    "./test/import-decl-1.txt",
+    "./test/import-decl-2.txt",
 };
 
 int main(int argc, char* argv[])

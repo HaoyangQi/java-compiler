@@ -1036,6 +1036,7 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
 
         if (sym)
         {
+            token->class = JT_RESERVED_WORD;
             token->type = sym->word->id;
             token->keyword = sym->word;
         }
