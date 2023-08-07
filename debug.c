@@ -1,8 +1,8 @@
-#include <stdio.h>
+#include "debug.h"
 
-#include "file.h"
 #include "langspec.h"
 #include "token.h"
+#include "node.h"
 
 #include "report.h"
 
@@ -573,5 +573,81 @@ void debug_tokenize(file_buffer* buffer, java_symbol_table* table)
         printf("\n");
     }
 
-    free(token);
+    free_token(token);
+}
+
+static void debug_print_ast_node(java_node_query query, void* data)
+{
+    switch (query)
+    {
+        case JNT_UNIT:
+            printf("Compilation Unit");
+            break;
+        case JNT_NAME:
+        {
+            printf("Name: ");
+
+            ll_item* item = ((java_tree_node_name*)data)->name.first;
+            while (true)
+            {
+                debug_print_token_content(item->data);
+                item = item->next;
+
+                if (item)
+                {
+                    printf("/");
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            break;
+        }
+        case JNT_PKG_DECL:
+            printf("Package Declaration");
+            break;
+        case JNT_IMPORT_DECL:
+            printf("Import Declaration");
+            break;
+        default:
+            printf("Unknown");
+            break;
+    }
+}
+
+static void debug_print_ast(tree_node* node, int depth)
+{
+    if (!node)
+    {
+        return;
+    }
+
+    // print current level first
+    while (node)
+    {
+        for (int i = 0; i < depth; i++)
+        {
+            printf(" ");
+        }
+
+        debug_print_ast_node(node->metadata, node->data);
+        printf("\n");
+
+        // go deeper first
+        if (node->first_child)
+        {
+            debug_print_ast(node->first_child, depth + 1);
+        }
+
+        // then go next sibling
+        node = node->next_sibling;
+    }
+}
+
+void debug_ast(tree_node* root)
+{
+    printf("===== ABSTRACT SYNTAX TREE =====\n");
+    debug_print_ast(root, 0);
 }
