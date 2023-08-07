@@ -59,19 +59,25 @@
  * JLT_SYM_*: all sequences made by non-letter symbols
  * JLT_LTR_*: literals
  * JLT_CMT_*: comments
+ *
+ * Modifier words stay on top for bit field data,
+ * the number represents which bit (from LSB) it occupies
+ * That means we can have at most 64 modifiers, if we
+ * have more than that in the future, we need to redesign
+ * this
 */
 typedef enum
 {
     // modifier words
     JLT_RWD_PUBLIC = 0,
-    JLT_RWD_PRIVATE,
-    JLT_RWD_PROTECTED,
-    JLT_RWD_FINAL,
-    JLT_RWD_STATIC,
-    JLT_RWD_ABSTRACT,
-    JLT_RWD_TRANSIENT,
-    JLT_RWD_SYNCHRONIZED,
-    JLT_RWD_VOLATILE,
+    JLT_RWD_PRIVATE = 1,
+    JLT_RWD_PROTECTED = 2,
+    JLT_RWD_FINAL = 3,
+    JLT_RWD_STATIC = 4,
+    JLT_RWD_ABSTRACT = 5,
+    JLT_RWD_TRANSIENT = 6,
+    JLT_RWD_SYNCHRONIZED = 7,
+    JLT_RWD_VOLATILE = 8,
     // keywords
     JLT_RWD_DEFAULT,
     JLT_RWD_IF,
@@ -184,6 +190,8 @@ typedef enum
     // Not valid
     JLT_MAX,
 } java_lexeme_type;
+
+#define JAVA_LEXEME_MODIFIER(type) ((type) <= JLT_RWD_VOLATILE)
 
 /**
  * Java reserved word

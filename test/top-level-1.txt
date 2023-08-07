@@ -1,0 +1,19 @@
+package name;
+
+import path.name;
+
+;
+
+class c1
+interface i1
+interface
+
+public class c2
+public // this line should NOT cause error
+synchronized interface i2
+
+public private protected final static abstract transient synchronized volatile
+class c3
+public private protected final static abstract transient synchronized volatile
+interface i3;
+;

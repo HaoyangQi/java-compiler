@@ -94,7 +94,7 @@ void parser_ast_node_data_deleter(int metadata, void* data)
     {
         case JNT_NAME:
         {
-            linked_list* list = &((java_tree_node_name*)data)->name;
+            linked_list* list = &((node_data_name*)data)->name;
             while (!linked_list_empty(list))
             {
                 free_token(linked_list_pop_front(list));

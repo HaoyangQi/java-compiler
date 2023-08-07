@@ -134,6 +134,19 @@ static void consume_spaces(file_buffer* buffer)
 }
 
 /**
+ * Toke Data Initializer
+*/
+void init_token(java_token* token)
+{
+    token->from = NULL;
+    token->class = JT_EOF;
+    token->type = JLT_MAX;
+    token->keyword = NULL;
+    token->number.type = JT_NUM_NONE;
+    token->number.bits = JT_NUM_BIT_LENGTH_NORMAL;
+}
+
+/**
  * tokenizer
  *
  * longest match will be returned, except for illegal characters,
@@ -151,12 +164,8 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
     */
     consume_spaces(buffer);
 
+    init_token(token);
     token->from = buffer->cur;
-    token->class = JT_EOF;
-    token->type = JLT_MAX;
-    token->keyword = NULL;
-    token->number.type = JT_NUM_NONE;
-    token->number.bits = JT_NUM_BIT_LENGTH_NORMAL;
 
     if (is_eof(buffer))
     {

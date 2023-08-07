@@ -489,6 +489,12 @@ void debug_print_number_type(java_number_type number)
 
 void debug_print_token_content(java_token* token)
 {
+    if (!token || !token->from || !token->to)
+    {
+        printf("(null)");
+        return;
+    }
+
     size_t len = buffer_count(token->from, token->to);
     char* content = (char*)malloc_assert(sizeof(char) * (len + 1));
 
@@ -599,6 +605,68 @@ static void debug_print_token_list_content(linked_list* list, const char sp)
     }
 }
 
+static void debug_print_modifier_bit_flag(lbit_flag modifiers)
+{
+    // although we have limited flags as of current,
+    // we still add robustness and check every bit
+    lbit_flag mask = 1;
+    bool space = false;
+    int bit_len = 8 * sizeof(lbit_flag);
+
+    if (modifiers == 0)
+    {
+        printf("N/A");
+        return;
+    }
+
+    for (int i = 0; i < bit_len; i++, mask <<= 1)
+    {
+        if (modifiers & mask)
+        {
+            if (space)
+            {
+                printf(" ");
+            }
+
+            space = true;
+            switch (i)
+            {
+                case JLT_RWD_PUBLIC:
+                    printf("public");
+                    break;
+                case JLT_RWD_PRIVATE:
+                    printf("private");
+                    break;
+                case JLT_RWD_PROTECTED:
+                    printf("protected");
+                    break;
+                case JLT_RWD_FINAL:
+                    printf("final");
+                    break;
+                case JLT_RWD_STATIC:
+                    printf("static");
+                    break;
+                case JLT_RWD_ABSTRACT:
+                    printf("abstract");
+                    break;
+                case JLT_RWD_TRANSIENT:
+                    printf("transient");
+                    break;
+                case JLT_RWD_SYNCHRONIZED:
+                    printf("synchronized");
+                    break;
+                case JLT_RWD_VOLATILE:
+                    printf("volatile");
+                    break;
+                default:
+                    printf("UNKNOWN");
+                    space = false;
+                    break;
+            }
+        }
+    }
+}
+
 static void debug_print_ast_node(java_node_query query, void* data)
 {
     switch (query)
@@ -608,14 +676,26 @@ static void debug_print_ast_node(java_node_query query, void* data)
             break;
         case JNT_NAME:
             printf("Name: ");
-            debug_print_token_list_content(&((java_tree_node_name*)data)->name, '/');
+            debug_print_token_list_content(&((node_data_name*)data)->name, '/');
             break;
         case JNT_PKG_DECL:
             printf("Package Declaration");
             break;
         case JNT_IMPORT_DECL:
             printf("Import Declaration (On-demand: %s)",
-                ((java_tree_node_import_decl*)data)->on_demand ? "true" : "false");
+                ((node_data_import_decl*)data)->on_demand ? "true" : "false");
+            break;
+        case JNT_TOP_LEVEL:
+            printf("Top Level: ");
+            debug_print_modifier_bit_flag(((node_data_top_level*)data)->modifier);
+            break;
+        case JNT_CLASS_DECL:
+            printf("Class Declaration: ");
+            debug_print_token_content(&((node_data_class_declaration*)data)->id);
+            break;
+        case JNT_INTERFACE_DECL:
+            printf("Interface Declaration: ");
+            debug_print_token_content(&((node_data_interface_declaration*)data)->id);
             break;
         default:
             printf("Unknown");

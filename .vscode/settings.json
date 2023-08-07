@@ -18,6 +18,7 @@
         "type_traits": "c",
         "xmemory": "c",
         "xstring": "c",
-        "xtr1common": "c"
+        "xtr1common": "c",
+        "types.h": "c"
     }
 }
