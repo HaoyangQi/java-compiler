@@ -97,7 +97,8 @@ static char* test_paths[] = {
 
     // "./test/top-level-1.txt",
 
-    "./test/class-decl-1.txt"
+    "./test/class-decl-1.txt",
+    "./test/interface-decl-1.txt",
 };
 
 int main(int argc, char* argv[])

@@ -1,0 +1,13 @@
+interface i1{}
+
+static interface i2
+{}
+
+interface error1
+interface
+
+interface i3 extends i1 {
+
+}
+
+interface i4 extends i1, i2 {}

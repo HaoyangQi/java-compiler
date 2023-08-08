@@ -58,6 +58,8 @@ static tree_node* parse_interface_declaration(java_parser* parser);
 static tree_node* parse_class_extends(java_parser* parser);
 static tree_node* parse_class_implements(java_parser* parser);
 static tree_node* parse_class_body(java_parser* parser);
+static tree_node* parse_interface_extends(java_parser* parser);
+static tree_node* parse_interface_body(java_parser* parser);
 
 /**
  * parser entry point
@@ -468,7 +470,7 @@ static tree_node* parse_class_declaration(java_parser* parser)
 
 /**
  * InterfaceDeclaration:
- *     interface Identifier [ExtendsInterfaces] InterfaceBody
+ *     interface Identifier [InterfaceExtends] InterfaceBody
 */
 static tree_node* parse_interface_declaration(java_parser* parser)
 {
@@ -478,7 +480,7 @@ static tree_node* parse_interface_declaration(java_parser* parser)
     // interface
     consume_token(parser, NULL);
 
-    // Name, terminate if incomplete
+    // ID, terminate if incomplete
     if (peek_token_class_is(parser, TOKEN_PEEK_1st, JT_IDENTIFIER))
     {
         consume_token(parser, &data->id);
@@ -489,9 +491,21 @@ static tree_node* parse_interface_declaration(java_parser* parser)
         return node;
     }
 
-    /**
-     * TODO:
-    */
+    // [Interface Extends]
+    if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_RWD_EXTENDS))
+    {
+        tree_node_add_child(node, parse_interface_extends(parser));
+    }
+
+    // Interface Body
+    if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_BRACE_OPEN))
+    {
+        tree_node_add_child(node, parse_interface_body(parser));
+    }
+    else
+    {
+        fprintf(stderr, "TODO error: expected interface body in interface declaration\n");
+    }
 
     return node;
 }
@@ -521,7 +535,7 @@ static tree_node* parse_class_extends(java_parser* parser)
 }
 
 /**
- * Interfaces:
+ * ClassImplements:
  *     implements InterfaceTypeList
 */
 static tree_node* parse_class_implements(java_parser* parser)
@@ -606,6 +620,63 @@ static tree_node* parse_class_body(java_parser* parser)
     else
     {
         fprintf(stderr, "TODO error: expected '}' at the end of class body\n");
+    }
+
+    return node;
+}
+
+/**
+ * InterfaceExtends:
+ *     extends InterfaceTypeList
+*/
+static tree_node* parse_interface_extends(java_parser* parser)
+{
+    tree_node* node = ast_node_interface_extends();
+
+    // extends
+    consume_token(parser, NULL);
+
+    // interface type list
+    // triggered by interface type, so share same trigger with parse_interface_type
+    if (parser_trigger_interface_type(parser, TOKEN_PEEK_1st))
+    {
+        tree_node_add_child(node, parse_interface_type_list(parser));
+    }
+    else
+    {
+        fprintf(stderr, "TODO error: expected interface type list after \'extends\'\n");
+    }
+
+    return node;
+}
+
+/**
+ * InterfaceBody:
+ *     { [InterfaceMemberDeclarations] }
+ *
+ * InterfaceMemberDeclarations:
+ *     InterfaceMemberDeclaration
+ *     InterfaceMemberDeclarations InterfaceMemberDeclaration
+*/
+static tree_node* parse_interface_body(java_parser* parser)
+{
+    tree_node* node = ast_node_interface_body();
+
+    // {
+    consume_token(parser, NULL);
+
+    /**
+     * TODO:
+    */
+
+    // }
+    if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_BRACE_CLOSE))
+    {
+        consume_token(parser, NULL);
+    }
+    else
+    {
+        fprintf(stderr, "TODO error: expected '}' at the end of interface body\n");
     }
 
     return node;

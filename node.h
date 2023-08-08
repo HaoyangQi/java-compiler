@@ -4,7 +4,6 @@
 
 #include "types.h"
 #include "token.h"
-#include "ll.h"
 
 /**
  * ast node data query
@@ -30,6 +29,8 @@ typedef enum
     JNT_CLASS_EXTENDS,
     JNT_CLASS_IMPLEMENTS,
     JNT_CLASS_BODY,
+    JNT_INTERFACE_EXTENDS,
+    JNT_INTERFACE_BODY,
 } java_node_query;
 
 /**
