@@ -27,16 +27,100 @@ tree_node* ast_node_compilation_unit()
 /**
  * AST node generator
  *
+ * name unit
+*/
+tree_node* ast_node_name_unit()
+{
+    tree_node* node = ast_node_new();
+    node_data_name_unit* data =
+        (node_data_name_unit*)malloc_assert(sizeof(node_data_name_unit));
+
+    init_token(&data->id);
+    tree_node_attach(node, JNT_NAME_UNIT, data);
+    return node;
+}
+
+/**
+ * AST node generator
+ *
  * name
 */
 tree_node* ast_node_name()
 {
     tree_node* node = ast_node_new();
-    node_data_name* data =
-        (node_data_name*)malloc_assert(sizeof(node_data_name));
 
-    init_linked_list(&data->name);
-    tree_node_attach(node, JNT_NAME, data);
+    tree_node_attach(node, JNT_NAME, NULL);
+    return node;
+}
+
+/**
+ * AST node generator
+ *
+ * class type unit
+*/
+tree_node* ast_node_class_type_unit()
+{
+    tree_node* node = ast_node_new();
+    node_data_class_type_unit* data =
+        (node_data_class_type_unit*)malloc_assert(sizeof(node_data_class_type_unit));
+
+    init_token(&data->id);
+    tree_node_attach(node, JNT_CLASS_TYPE_UNIT, data);
+    return node;
+}
+
+/**
+ * AST node generator
+ *
+ * class type
+*/
+tree_node* ast_node_class_type()
+{
+    tree_node* node = ast_node_new();
+
+    tree_node_attach(node, JNT_CLASS_TYPE, NULL);
+    return node;
+}
+
+/**
+ * AST node generator
+ *
+ * interface type unit
+*/
+tree_node* ast_node_interface_type_unit()
+{
+    tree_node* node = ast_node_new();
+    node_data_interface_type_unit* data =
+        (node_data_interface_type_unit*)malloc_assert(sizeof(node_data_interface_type_unit));
+
+    init_token(&data->id);
+    tree_node_attach(node, JNT_INTERFACE_TYPE_UNIT, data);
+    return node;
+}
+
+/**
+ * AST node generator
+ *
+ * interface type
+*/
+tree_node* ast_node_interface_type()
+{
+    tree_node* node = ast_node_new();
+
+    tree_node_attach(node, JNT_INTERFACE_TYPE, NULL);
+    return node;
+}
+
+/**
+ * AST node generator
+ *
+ * interface type list
+*/
+tree_node* ast_node_interface_type_list()
+{
+    tree_node* node = ast_node_new();
+
+    tree_node_attach(node, JNT_INTERFACE_TYPE_LIST, NULL);
     return node;
 }
 
@@ -114,5 +198,44 @@ tree_node* ast_node_interface_declaration()
 
     init_token(&data->id);
     tree_node_attach(node, JNT_INTERFACE_DECL, data);
+    return node;
+}
+
+/**
+ * AST node generator
+ *
+ * class extends
+*/
+tree_node* ast_node_class_extends()
+{
+    tree_node* node = ast_node_new();
+
+    tree_node_attach(node, JNT_CLASS_EXTENDS, NULL);
+    return node;
+}
+
+/**
+ * AST node generator
+ *
+ * class implements
+*/
+tree_node* ast_node_class_implements()
+{
+    tree_node* node = ast_node_new();
+
+    tree_node_attach(node, JNT_CLASS_IMPLEMENTS, NULL);
+    return node;
+}
+
+/**
+ * AST node generator
+ *
+ * class body
+*/
+tree_node* ast_node_class_body()
+{
+    tree_node* node = ast_node_new();
+
+    tree_node_attach(node, JNT_CLASS_BODY, NULL);
     return node;
 }

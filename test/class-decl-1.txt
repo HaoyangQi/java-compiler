@@ -1,0 +1,23 @@
+package name;
+
+import path.name.*;
+
+class c1 {}
+
+class c2 extends c1{}
+
+static class 
+c3 extends c1 implements i1
+{
+
+}
+
+class error1 {
+
+class error2
+
+static class 
+c3 extends c1 implements i1, i2,
+i3, i4{
+    
+}
