@@ -22,5 +22,7 @@ tree_node* ast_node_interface_declaration();
 tree_node* ast_node_class_extends();
 tree_node* ast_node_class_implements();
 tree_node* ast_node_class_body();
+tree_node* ast_node_interface_extends();
+tree_node* ast_node_interface_body();
 
 #endif

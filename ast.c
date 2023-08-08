@@ -239,3 +239,29 @@ tree_node* ast_node_class_body()
     tree_node_attach(node, JNT_CLASS_BODY, NULL);
     return node;
 }
+
+/**
+ * AST node generator
+ *
+ * interface extends
+*/
+tree_node* ast_node_interface_extends()
+{
+    tree_node* node = ast_node_new();
+
+    tree_node_attach(node, JNT_INTERFACE_EXTENDS, NULL);
+    return node;
+}
+
+/**
+ * AST node generator
+ *
+ * interface body
+*/
+tree_node* ast_node_interface_body()
+{
+    tree_node* node = ast_node_new();
+
+    tree_node_attach(node, JNT_INTERFACE_BODY, NULL);
+    return node;
+}

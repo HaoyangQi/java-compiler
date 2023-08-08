@@ -586,25 +586,6 @@ void debug_tokenize(file_buffer* buffer, java_symbol_table* table)
     free_token(token);
 }
 
-static void debug_print_token_list_content(linked_list* list, const char sp)
-{
-    ll_item* item = list->first;
-    while (true)
-    {
-        debug_print_token_content(item->data);
-        item = item->next;
-
-        if (item)
-        {
-            printf("%c", sp);
-        }
-        else
-        {
-            break;
-        }
-    }
-}
-
 static void debug_print_modifier_bit_flag(lbit_flag modifiers)
 {
     // although we have limited flags as of current,
@@ -615,7 +596,7 @@ static void debug_print_modifier_bit_flag(lbit_flag modifiers)
 
     if (modifiers == 0)
     {
-        printf("N/A");
+        printf("No Modifier");
         return;
     }
 
@@ -725,6 +706,12 @@ static void debug_print_ast_node(java_node_query query, void* data)
             break;
         case JNT_CLASS_BODY:
             printf("Class Body");
+            break;
+        case JNT_INTERFACE_EXTENDS:
+            printf("Interface Extends");
+            break;
+        case JNT_INTERFACE_BODY:
+            printf("Interface Body");
             break;
         default:
             printf("Unknown");
