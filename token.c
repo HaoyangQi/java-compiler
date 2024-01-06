@@ -431,7 +431,6 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
                 isidchar(peeks[1])
                 || peeks[1] == '('
                 || peeks[1] == '[');
-        printf("==== reject check: %d %c %c %c\n", should_reject_suffix_trigger, peeks[0], c, peeks[1]);
 
         // triggers
         if (islongsuffix(c))

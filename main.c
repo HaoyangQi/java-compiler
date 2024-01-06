@@ -26,10 +26,10 @@ bool init_compiler(compiler* compiler)
 {
     compiler->tasked = false;
 
+    init_debug_report();
     init_file_buffer(&compiler->reader);
     init_symbol_table(&compiler->rw_lookup_table);
     init_expression(&compiler->expression);
-    init_debug_report();
 
     load_language_spec(&compiler->rw_lookup_table);
     init_parser(
@@ -59,6 +59,28 @@ bool detask_compiler(compiler* compiler)
     return false;
 }
 
+void format_file_loader_message(file_loader_status status)
+{
+    switch (status)
+    {
+        case FILE_OK:
+            fprintf(stderr, "File loading completed without errors.\n");
+            break;
+        case FILE_PATH_REQUIRED:
+            fprintf(stderr, "Required file path name.\n");
+            break;
+        case FILE_OPEN_FAILED:
+            fprintf(stderr, "File failed to open as it does not exist.\n");
+            break;
+        case FILE_SIZE_MISMATCHED:
+            fprintf(stderr, "File mapping results in incorrect size.\n");
+            break;
+        default:
+            fprintf(stderr, "(Unrecognized error code: %d)\n", status);
+            break;
+    }
+}
+
 /**
  * Retask compiler to a new source file
 */
@@ -66,12 +88,16 @@ bool retask_compiler(compiler* compiler, char* source_path)
 {
     detask_compiler(compiler);
 
-    compiler->source_file_name = source_path;
+    file_loader_status loader_status;
 
+    compiler->source_file_name = source_path;
     init_file_buffer(&compiler->reader);
-    if (!load_source_file(&compiler->reader, source_path))
+    loader_status = load_source_file(&compiler->reader, source_path);
+
+    if (loader_status != FILE_OK)
     {
-        fprintf(stderr, "File failed to load.");
+        fprintf(stderr, "ERROR: File failed to load.\n");
+        format_file_loader_message(loader_status);
         return false;
     }
 
@@ -111,8 +137,10 @@ static char* test_paths[] = {
 
     // "./test/top-level-1.txt",
 
-    "./test/class-decl-1.txt",
-    "./test/interface-decl-1.txt",
+    // "./test/class-decl-1.txt",
+    // "./test/interface-decl-1.txt",
+
+    "./test/general-no-block-and-statement.txt",
 };
 
 int main(int argc, char* argv[])
@@ -132,7 +160,12 @@ int main(int argc, char* argv[])
     {
         printf("\nFile %d: %s\n", i + 1, test_paths[i]);
 
-        retask_compiler(&compiler, test_paths[i]);
+        if (!retask_compiler(&compiler, test_paths[i]))
+        {
+            fprintf(stderr, "WARNING: File \"%s\" skipped.\n", test_paths[i]);
+            continue;
+        }
+
         parse(&compiler.context);
 
         // debug_file_buffer(&compiler.reader);
