@@ -15,9 +15,29 @@
  * before reduction occurs, it only manipulates lookahead buffer, which is
  * incremental if no consumption, so there is no backtrace
  *
- * all rpoduction parser functions are reduction of certain production rules,
- * meaning: once invoked, it implies that the rule is matched for reduction;
- * also meaning: look-ahead check will be made at call-site.
+ * IMPORTANT:
+ *
+ * All production parser functions are reduction of certain production rules.
+ *
+ * Meaning: once invoked, it implies that the rule is matched for reduction.
+ *
+ * Also meaning: look-ahead check will be made at call-site.
+ *
+ * Practice: for a production parse function, start parsing the following
+ * without any condition check:
+ * 1. start with terminal: all terminal tokens until the next is not
+ * 2. start with non-terminal: one reduction of first non-terminal
+ * After these, we need to peek before parsing for every single step
+ *
+ * Example (T is for terminal, N is for non-terminal):
+ *
+ * Rule1:
+ *     T1 T2 N ...
+ * Rule2:
+ *     N1 T N2 ...
+ *
+ * parse_Rule1() { parse_T1(); parse_T2(); if (N) ... }
+ * parse_Rule2() { parse_N1(); if (T) ... }
 */
 
 #include "parser.h"
@@ -25,7 +45,7 @@
 /**
  * Initialize parser instance
 */
-void init_parser(java_parser* parser, file_buffer* buffer, java_symbol_table* rw)
+void init_parser(java_parser* parser, file_buffer* buffer, java_symbol_table* rw, java_expression* expr)
 {
     // tokens contains garbage data if not used
     // so the counter is important
@@ -34,6 +54,7 @@ void init_parser(java_parser* parser, file_buffer* buffer, java_symbol_table* rw
     parser->buffer = buffer;
     parser->reserved_words = rw;
     parser->ast_root = NULL;
+    parser->expression = expr;
 }
 
 /**
@@ -60,6 +81,30 @@ static tree_node* parse_class_implements(java_parser* parser);
 static tree_node* parse_class_body(java_parser* parser);
 static tree_node* parse_interface_extends(java_parser* parser);
 static tree_node* parse_interface_body(java_parser* parser);
+static tree_node* parse_class_body_declaration(java_parser* parser);
+static tree_node* parse_static_initializer(java_parser* parser);
+static tree_node* parse_block(java_parser* parser);
+static tree_node* parse_constructor_declaration(java_parser* parser);
+static tree_node* parse_type(java_parser* parser);
+static tree_node* parse_method_declaration(java_parser* parser);
+static tree_node* parse_field_declaration(java_parser* parser);
+static tree_node* parse_formal_parameter_list(java_parser* parser);
+static tree_node* parse_formal_parameter(java_parser* parser);
+static tree_node* parse_throws(java_parser* parser);
+static tree_node* parse_constructor_body(java_parser* parser);
+static tree_node* parse_method_body(java_parser* parser);
+static tree_node* parse_variable_declarator(java_parser* parser);
+static tree_node* parse_array_initializer(java_parser* parser);
+static tree_node* parse_primary_simple(java_parser* parser);
+static tree_node* parse_primary_complex(java_parser* parser);
+static tree_node* parse_primary_creation(java_parser* parser);
+static tree_node* parse_primary_array_creation(java_parser* parser);
+static tree_node* parse_primary_class_instance_creation(java_parser* parser);
+static tree_node* parse_primary_method_invocation(java_parser* parser);
+static tree_node* parse_primary_array_access(java_parser* parser);
+static tree_node* parse_primary_class_literal(java_parser* parser);
+static tree_node* parse_primary(java_parser* parser);
+static tree_node* parse_expression(java_parser* parser);
 
 /**
  * parser entry point
@@ -85,9 +130,7 @@ void parse(java_parser* parser)
     loop_continue = true;
     while (loop_continue)
     {
-        java_lexeme_type type = token_peek(parser, TOKEN_PEEK_1st)->type;
-
-        switch (type)
+        switch (peek_token_type(parser, TOKEN_PEEK_1st))
         {
             case JLT_SYM_SEMICOLON: // empty
             case JLT_RWD_CLASS:     // keyword
@@ -381,10 +424,10 @@ static tree_node* parse_top_level(java_parser* parser)
     // {Modifier}
     while (true)
     {
-        type = token_peek(parser, TOKEN_PEEK_1st)->type;
+        type = peek_token_type(parser, TOKEN_PEEK_1st);
 
         // if not a modifier, we stop
-        if (!JAVA_LEXEME_MODIFIER(type))
+        if (!JAVA_LEXEME_MODIFIER_WORD(type))
         {
             break;
         }
@@ -393,7 +436,7 @@ static tree_node* parse_top_level(java_parser* parser)
         data->modifier |= ((lbit_flag)1 << type);
     }
 
-    type = token_peek(parser, TOKEN_PEEK_1st)->type;
+    type = peek_token_type(parser, TOKEN_PEEK_1st);
 
     // class...|interface...|;
     switch (type)
@@ -566,51 +609,27 @@ static tree_node* parse_class_implements(java_parser* parser)
  * ClassBodyDeclarations:
  *     ClassBodyDeclaration
  *     ClassBodyDeclarations ClassBodyDeclaration
- *
- * ClassBodyDeclaration:
- *     ClassMemberDeclaration
- *     StaticInitializer
- *     ConstructorDeclaration
- *
- * ClassMemberDeclaration:
- *     FieldDeclaration
- *     MethodDeclaration
- *
- * Peek Logic, on ClassBodyDeclaration level:
- *
- * 1. peek(2) = static {
- * reduce: StaticInitializer
- *
- * 2. peek(1) = modifier word
- * add: Modifiers (modifier reserved words)
- *
- * 3. peek(1) = type word|ID
- * add: Type (type reserved words, Name, with trailing {[ ]}*)
- *
- * 4.1 peek(1) = (
- * reduce: ConstructorDeclaration
- *
- * 4.2 peek(2) = ID (
- * reduce: MethodDeclaration
- *
- * 4.3 peek(2) = ID [|ID =|ID ,
- * reduce: FieldDeclaration
- *
- * Step 3 is ugly, but quite sufficient for parser
- * We'll sort things out when handling context
- * e.g. constructor name must be an ID but rule 3 accepts all Type
- * as valid name for the reduction
 */
 static tree_node* parse_class_body(java_parser* parser)
 {
     tree_node* node = ast_node_class_body();
+    java_token* peek;
 
     // {
     consume_token(parser, NULL);
 
-    /**
-     * TODO:
-    */
+    // {ClassBodyDeclaration}
+    while (true)
+    {
+        peek = token_peek(parser, TOKEN_PEEK_1st);
+
+        if (!(JAVA_LEXEME_MODIFIER_OR_TYPE_WORD(peek->type) || peek->class == JT_IDENTIFIER))
+        {
+            break;
+        }
+
+        tree_node_add_child(node, parse_class_body_declaration(parser));
+    }
 
     // }
     if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_BRACE_CLOSE))
@@ -678,6 +697,1273 @@ static tree_node* parse_interface_body(java_parser* parser)
     {
         fprintf(stderr, "TODO error: expected '}' at the end of interface body\n");
     }
+
+    return node;
+}
+
+/**
+ * ClassBodyDeclaration:
+ *     ClassMemberDeclaration
+ *     StaticInitializer
+ *     ConstructorDeclaration
+ *
+ * ClassMemberDeclaration:
+ *     FieldDeclaration
+ *     MethodDeclaration
+ *
+ * Peek Logic, on ClassBodyDeclaration level:
+ *
+ * 1. peek(2) = static {
+ * reduce: StaticInitializer
+ *
+ * 2. peek(1) = modifier word
+ * add: Modifiers (modifier reserved words)
+ *
+ * 3. peek(2) = ID (
+ * reduce: ConstructorDeclaration
+ *
+ * 4. peek(1) = type word|ID
+ * add: Type (type reserved words, Name, with trailing {[ ]}*)
+ *
+ * 5 peek(2) = ID (
+ * reduce: MethodDeclaration
+ *
+ * 6 peek(2) = ID [|ID =|ID ,
+ * reduce: FieldDeclaration
+*/
+static tree_node* parse_class_body_declaration(java_parser* parser)
+{
+    tree_node* node = ast_node_class_body_declaration();
+    node_data_class_body_declaration* data = (node_data_class_body_declaration*)(node->data);
+    java_lexeme_type type;
+
+    // StaticInitializer
+    //
+    // this has higher priority because trigger word "static" 
+    // is also part of modifier word
+    if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_RWD_STATIC) &&
+        peek_token_type_is(parser, TOKEN_PEEK_2nd, JLT_SYM_BRACE_OPEN))
+    {
+        tree_node_add_child(node, parse_static_initializer(parser));
+        return node;
+    }
+
+    // {Modifier}, still ambiguous
+    while (true)
+    {
+        type = peek_token_type(parser, TOKEN_PEEK_1st);
+
+        // if not a modifier, we stop
+        if (!JAVA_LEXEME_MODIFIER_WORD(type))
+        {
+            break;
+        }
+
+        consume_token(parser, NULL);
+        data->modifier |= ((lbit_flag)1 << type);
+    }
+
+    // ConstructorDeclaration: {Modifier} ID (
+    if (peek_token_class_is(parser, TOKEN_PEEK_1st, JT_IDENTIFIER) &&
+        peek_token_type_is(parser, TOKEN_PEEK_2nd, JLT_SYM_PARENTHESIS_OPEN))
+    {
+        tree_node_add_child(node, parse_constructor_declaration(parser));
+        return node;
+    }
+
+    // Type, still ambiguous
+    if (parser_trigger_type(parser, TOKEN_PEEK_1st))
+    {
+        tree_node_add_child(node, parse_type(parser));
+    }
+    else
+    {
+        fprintf(stderr, "TODO error: expected type name in the declaration\n");
+        return node;
+    }
+
+    // MethodDeclaration|FieldDeclaration
+    if (peek_token_class_is(parser, TOKEN_PEEK_1st, JT_IDENTIFIER))
+    {
+        switch (peek_token_type(parser, TOKEN_PEEK_2nd))
+        {
+            case JLT_SYM_PARENTHESIS_OPEN:
+                // MethodDeclaration: {Modifier} Type ID (
+                tree_node_add_child(node, parse_method_declaration(parser));
+                break;
+            case JLT_SYM_BRACKET_OPEN:
+            case JLT_SYM_EQUAL:
+            case JLT_SYM_COMMA:
+                // FieldDeclaration: {Modifier} Type ID [
+                // FieldDeclaration: {Modifier} Type ID =
+                // FieldDeclaration: {Modifier} Type ID ,
+                tree_node_add_child(node, parse_field_declaration(parser));
+                break;
+            default:
+                fprintf(stderr, "TODO error: ambiguous declaration\n");
+                break;
+        }
+    }
+    else
+    {
+        fprintf(stderr, "TODO error: expected a name in declaration\n");
+    }
+
+    return node;
+}
+
+/**
+ * StaticInitializer:
+ *     static Block
+*/
+static tree_node* parse_static_initializer(java_parser* parser)
+{
+    tree_node* node = ast_node_static_initializer();
+
+    // static
+    consume_token(parser, NULL);
+
+    // Block
+    if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_BRACE_OPEN))
+    {
+        tree_node_add_child(node, parse_block(parser));
+    }
+    else
+    {
+        fprintf(stderr, "TODO error: expected block in static initializer\n");
+    }
+
+    return node;
+}
+
+/**
+ * Block:
+ *     { [BlockStatements] }
+*/
+static tree_node* parse_block(java_parser* parser)
+{
+    tree_node* node = ast_node_block();
+
+    // {
+    consume_token(parser, NULL);
+
+    /**
+     * TODO:
+    */
+
+    // }
+    if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_BRACE_CLOSE))
+    {
+        consume_token(parser, NULL);
+    }
+    else
+    {
+        fprintf(stderr, "TODO error: expected '}' at the end of block\n");
+    }
+
+    return node;
+}
+
+/**
+ * ConstructorDeclaration:
+ *     ID ( [FormalParameterList] ) [Throws] ConstructorBody
+*/
+static tree_node* parse_constructor_declaration(java_parser* parser)
+{
+    tree_node* node = ast_node_constructor_declaration();
+    node_data_constructor_declaration* data = (node_data_constructor_declaration*)(node->data);
+
+    // ID (
+    consume_token(parser, &data->id);
+    consume_token(parser, NULL);
+
+    // [FormalParameterList]
+    if (parser_trigger_type(parser, TOKEN_PEEK_1st))
+    {
+        tree_node_add_child(node, parse_formal_parameter_list(parser));
+    }
+
+    // )
+    if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_PARENTHESIS_CLOSE))
+    {
+        consume_token(parser, NULL);
+    }
+    else
+    {
+        fprintf(stderr, "TODO error: expected ')' at constructor declaration\n");
+        return node;
+    }
+
+    // [Throws]
+    if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_RWD_THROWS))
+    {
+        tree_node_add_child(node, parse_throws(parser));
+    }
+
+    // ConstructorBody
+    if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_BRACE_OPEN))
+    {
+        tree_node_add_child(node, parse_constructor_body(parser));
+    }
+    else
+    {
+        fprintf(stderr, "TODO error: expected constructor body\n");
+    }
+
+    return node;
+}
+
+/**
+ * Type:
+ *     type reserved words {[ ]}
+ *     ClassType {[ ]}
+ *
+ * Here we have a conflict to resolve:
+ * Name, ClassType, and InterfaceType
+ *
+ * ClassType and InterfaceType are same (even at SE 20), but
+ * out of respect, we add a clause here
+ *
+ * Now, Name vs ClassType?
+ *
+ * obviously: all Name can be a valid ClassType;
+ * while ClassType may not be a Name
+ *
+ * The above statement is very true after introducing template,
+ * so we add that compatibility now.
+*/
+static tree_node* parse_type(java_parser* parser)
+{
+    tree_node* node = ast_node_type();
+    node_data_type* data = (node_data_type*)(node->data);
+
+    /**
+     * We need to directly accept without checking at the
+     * beginning, are we breaking the rule here?
+     *
+     * This part looks breaking the rule, but it is for
+     * different logic for each condition
+     *
+     * That is why we do not have 'else' clause here
+     * for error check
+    */
+    if (peek_token_is_type_word(parser, TOKEN_PEEK_1st))
+    {
+        data->primitive = peek_token_type(parser, TOKEN_PEEK_1st);
+        consume_token(parser, NULL);
+    }
+    else if (parser_trigger_class_type(parser, TOKEN_PEEK_1st))
+    {
+        tree_node_add_child(node, parse_class_type(parser));
+    }
+    else if (parser_trigger_interface_type(parser, TOKEN_PEEK_1st))
+    {
+        tree_node_add_child(node, parse_interface_type(parser));
+    }
+
+    // {[ ]}
+    while (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_BRACKET_OPEN))
+    {
+        // [
+        consume_token(parser, NULL);
+
+        // ]
+        if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_BRACKET_CLOSE))
+        {
+            consume_token(parser, NULL);
+        }
+        else
+        {
+            fprintf(stderr, "TODO error: expected ']'\n");
+            break;
+        }
+
+        // track dimensions
+        data->dimension++;
+    }
+
+    return node;
+}
+
+/**
+ * MethodDeclaration:
+ *     ID ( [FormalParameterList] ) {[ ]} [Throws] MethodBody
+*/
+static tree_node* parse_method_declaration(java_parser* parser)
+{
+    tree_node* node = ast_node_method_declaration();
+    node_data_method_declaration* data = (node_data_method_declaration*)(node->data);
+
+    // ID (
+    consume_token(parser, &data->id);
+    consume_token(parser, NULL);
+
+    // [FormalParameterList]
+    if (parser_trigger_type(parser, TOKEN_PEEK_1st))
+    {
+        tree_node_add_child(node, parse_formal_parameter_list(parser));
+    }
+
+    // )
+    if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_PARENTHESIS_CLOSE))
+    {
+        consume_token(parser, NULL);
+    }
+    else
+    {
+        fprintf(stderr, "TODO error: expected ')' at constructor declaration\n");
+        return node;
+    }
+
+    // [Throws]
+    if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_RWD_THROWS))
+    {
+        tree_node_add_child(node, parse_throws(parser));
+    }
+
+    // MethodBody
+    if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_BRACE_OPEN))
+    {
+        tree_node_add_child(node, parse_method_body(parser));
+    }
+    else
+    {
+        fprintf(stderr, "TODO error: expected method body\n");
+    }
+
+    return node;
+}
+
+/**
+ * FieldDeclaration:
+ *     VariableDeclarator {, VariableDeclarator} ;
+ *
+ * The modification here is: we do not include Type
+ * part at the beginning, because many things can
+ * start with Type, e.g. method declaration
+*/
+static tree_node* parse_field_declaration(java_parser* parser)
+{
+    tree_node* node = ast_node_field_declaration();
+
+    // VariableDeclarator
+    tree_node_add_child(node, parse_variable_declarator(parser));
+
+    // {, VariableDeclarator}
+    while (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_COMMA) &&
+        peek_token_class_is(parser, TOKEN_PEEK_2nd, JT_IDENTIFIER))
+    {
+        // ,
+        consume_token(parser, NULL);
+
+        // VariableDeclarator
+        tree_node_add_child(node, parse_variable_declarator(parser));
+    }
+
+    return node;
+}
+
+/**
+ * FormalParameterList:
+ *     FormalParameter
+ *     FormalParameterList , FormalParameter
+ *
+ * since the unit is not a simple non-terminal, so we cannot
+ * flatten this level
+*/
+static tree_node* parse_formal_parameter_list(java_parser* parser)
+{
+    tree_node* node = ast_node_formal_parameter_list();
+
+    // FormalParameter
+    tree_node_add_child(node, parse_formal_parameter(parser));
+
+    // {, FormalParameter}
+    while (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_COMMA) &&
+        parser_trigger_type(parser, TOKEN_PEEK_2nd))
+    {
+        // ,
+        consume_token(parser, NULL);
+
+        // FormalParameter
+        tree_node_add_child(node, parse_formal_parameter(parser));
+    }
+
+    return node;
+}
+
+/**
+ * FormalParameter:
+ *     Type VariableDeclaratorId
+ *
+ * VariableDeclaratorId:
+ *     ID {[ ]}
+ *
+ * we flatten VariableDeclaratorId here
+*/
+static tree_node* parse_formal_parameter(java_parser* parser)
+{
+    tree_node* node = ast_node_formal_parameter();
+    node_data_formal_parameter* data = (node_data_formal_parameter*)(node->data);
+
+    // Type
+    tree_node_add_child(node, parse_type(parser));
+
+    // VariableDeclaratorId => ID {[ ]}
+    if (peek_token_class_is(parser, TOKEN_PEEK_1st, JT_IDENTIFIER))
+    {
+        consume_token(parser, &data->id);
+
+        // {[ ]}
+        while (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_BRACKET_OPEN))
+        {
+            // [
+            consume_token(parser, NULL);
+
+            // ]
+            if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_BRACKET_CLOSE))
+            {
+                consume_token(parser, NULL);
+            }
+            else
+            {
+                fprintf(stderr, "TODO error: expected ']'\n");
+                break;
+            }
+
+            // track dimensions
+            data->dimension++;
+        }
+    }
+    else
+    {
+        fprintf(stderr, "TODO error: expected parameter name\n");
+    }
+
+    return node;
+}
+
+/**
+ * Throws:
+ *     throws ClassTypeList
+ *
+ * ClassTypeList:
+ *     ClassType
+ *     ClassTypeList , ClassType
+ *
+ * Since the class type list does not expand the unit ClassType any further
+ * so we can flatten the rule to reduce complexity of AST
+*/
+static tree_node* parse_throws(java_parser* parser)
+{
+    tree_node* node = ast_node_throws();
+
+    // throws
+    consume_token(parser, NULL);
+
+    if (parser_trigger_class_type(parser, TOKEN_PEEK_1st))
+    {
+        // ClassType
+        tree_node_add_child(node, parse_class_type(parser));
+
+        // {, ClassType}
+        while (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_COMMA) &&
+            parser_trigger_class_type(parser, TOKEN_PEEK_2nd))
+        {
+            // ,
+            consume_token(parser, NULL);
+
+            // ClassType
+            tree_node_add_child(node, parse_class_type(parser));
+        }
+    }
+    else
+    {
+        fprintf(stderr, "TODO error: expected class name\n");
+    }
+
+    return node;
+}
+
+/**
+ * ConstructorBody:
+ *     { [ExplicitConstructorInvocation] [BlockStatements] }
+*/
+static tree_node* parse_constructor_body(java_parser* parser)
+{
+    tree_node* node = ast_node_constructor_body();
+
+    // {
+    consume_token(parser, NULL);
+
+    /**
+     * TODO:
+    */
+
+    // }
+    if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_BRACE_CLOSE))
+    {
+        consume_token(parser, NULL);
+    }
+    else
+    {
+        fprintf(stderr, "TODO error: expected '}' at the end of block\n");
+    }
+
+    return node;
+}
+
+/**
+ * MethodBody:
+ *     Block
+ *     ;
+*/
+static tree_node* parse_method_body(java_parser* parser)
+{
+    tree_node* node = ast_node_method_body();
+
+    // Block
+    switch (peek_token_type(parser, TOKEN_PEEK_1st))
+    {
+        case JLT_SYM_BRACE_OPEN:
+            tree_node_add_child(node, parse_block(parser));
+            break;
+        case JLT_SYM_SEMICOLON:
+            consume_token(parser, NULL);
+            break;
+        default:
+            fprintf(stderr, "TODO error: expected block or ';'\n");
+            break;
+    }
+
+    return node;
+}
+
+/**
+ * VariableDeclarator:
+ *     VariableDeclaratorId [= VariableInitializer]
+ *
+ * VariableDeclaratorId:
+ *     ID {[ ]}
+ *
+ * VariableInitializer:
+ *     Expression
+ *     ArrayInitializer
+ *
+ * we flatten VariableDeclaratorId & VariableInitializer here
+*/
+static tree_node* parse_variable_declarator(java_parser* parser)
+{
+    tree_node* node = ast_node_variable_declarator();
+    node_data_variable_declarator* data = (node_data_variable_declarator*)(node->data);
+
+    // VariableDeclaratorId => ID {[ ]}
+    consume_token(parser, &data->id);
+
+    // {[ ]}
+    while (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_BRACKET_OPEN))
+    {
+        // [
+        consume_token(parser, NULL);
+
+        // ]
+        if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_BRACKET_CLOSE))
+        {
+            consume_token(parser, NULL);
+        }
+        else
+        {
+            fprintf(stderr, "TODO error: expected ']'\n");
+            return node;
+        }
+
+        // track dimensions
+        data->dimension++;
+    }
+
+    // [= VariableInitializer] => [= Expression|ArrayInitializer]
+    if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_EQUAL))
+    {
+        consume_token(parser, NULL);
+
+        if (parser_trigger_expression(parser, TOKEN_PEEK_1st))
+        {
+            // Expression
+            tree_node_add_child(node, parse_expression(parser));
+        }
+        else if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_BRACE_OPEN))
+        {
+            // ArrayInitializer
+            tree_node_add_child(node, parse_array_initializer(parser));
+        }
+        else
+        {
+            fprintf(stderr, "TODO error: expected initializer\n");
+        }
+    }
+
+    return node;
+}
+
+/**
+ * ArrayInitializer:
+ *     { [VariableInitializers] [,] }
+ *
+ * VariableInitializers:
+ *     VariableInitializer
+ *     VariableInitializers , VariableInitializer
+ *
+ * VariableInitializer:
+ *     Expression
+ *     ArrayInitializer
+ *
+ * flatten VariableInitializers and VariableInitializer
+ * since VariableInitializers is optional, so
+ * [VariableInitializers] is actually {VariableInitializers}
+ *
+ * the comma rule looks messy in here, but in code it looks
+ * more elegant
+*/
+static tree_node* parse_array_initializer(java_parser* parser)
+{
+    tree_node* node = ast_node_array_initializer();
+
+    // {
+    consume_token(parser, NULL);
+
+    // {Expression|ArrayInitializer ,}
+    // except: last comma in sequence is optional
+    while (true)
+    {
+        if (parser_trigger_expression(parser, TOKEN_PEEK_1st))
+        {
+            // Expression
+            tree_node_add_child(node, parse_expression(parser));
+        }
+        else if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_BRACE_OPEN))
+        {
+            // ArrayInitializer
+            // YOLO: recursion!
+            tree_node_add_child(node, parse_array_initializer(parser));
+        }
+        else
+        {
+            // stop at invalid token as an initializer
+            break;
+        }
+
+        // [,]
+        if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_COMMA))
+        {
+            consume_token(parser, NULL);
+        }
+        else
+        {
+            // it is only optional if no initializer remained and vice versa
+            // so if we do not detect a comma, it means initializer list
+            // must be done
+            break;
+        }
+    }
+
+    // }
+    if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_BRACE_CLOSE))
+    {
+        consume_token(parser, NULL);
+    }
+    else
+    {
+        // missing comma with dangling initializer also reaches here
+        fprintf(stderr, "TODO error: expected '}' at the end of array initializer\n");
+    }
+
+    return node;
+}
+
+/**
+ * PrimarySimple: primary that contains only token type info
+*/
+static tree_node* parse_primary_simple(java_parser* parser)
+{
+    tree_node* node = ast_node_primary_simple();
+
+    ((node_data_primary_simple*)(node->data))->type = peek_token_type(parser, TOKEN_PEEK_1st);
+    consume_token(parser, NULL);
+
+    return node;
+}
+
+/**
+ * PrimaryComplex: primary that contains needs token data
+*/
+static tree_node* parse_primary_complex(java_parser* parser)
+{
+    tree_node* node = ast_node_primary_complex();
+
+    consume_token(parser, &((node_data_primary_complex*)(node->data))->token);
+
+    return node;
+}
+
+/**
+ * PrimaryCreationExpression:
+ *     new Type PrimaryArrayCreation
+ *     new Type PrimaryClassInstanceCreation
+*/
+static tree_node* parse_primary_creation(java_parser* parser)
+{
+    tree_node* node = ast_node_primary_creation();
+
+    // new
+    consume_token(parser, NULL);
+
+    // Type
+    if (parser_trigger_type(parser, TOKEN_PEEK_1st))
+    {
+        tree_node_add_child(node, parse_type(parser));
+    }
+    else
+    {
+        fprintf(stderr, "TODO error: expected type at creation expression\n");
+        return node;
+    }
+
+    // PrimaryArrayCreation|PrimaryClassInstanceCreation
+    switch (peek_token_type(parser, TOKEN_PEEK_1st))
+    {
+        case JLT_SYM_BRACKET_OPEN:
+            tree_node_add_child(node, parse_primary_array_creation(parser));
+            break;
+        case JLT_SYM_PARENTHESIS_OPEN:
+            tree_node_add_child(node, parse_primary_class_instance_creation(parser));
+            break;
+        default:
+            fprintf(stderr, "TODO error: expected array or class instance creation\n");
+            break;
+    }
+
+    return node;
+}
+
+/**
+ * PrimaryArrayCreation:
+ *     [ Expression ] {[ Expression ]} {[ ]}
+ *     [ ] {[ ]} ArrayInitializer
+*/
+static tree_node* parse_primary_array_creation(java_parser* parser)
+{
+    tree_node* node = ast_node_primary_array_creation();
+    node_data_primary_array_creation* data = (node_data_primary_array_creation*)(node->data);
+    bool first_variadic = true;
+    bool accepting_variadic;
+
+    // [
+    consume_token(parser, NULL);
+
+    // first chunk: determin if it starts with variadic dimension
+    if (parser_trigger_expression(parser, TOKEN_PEEK_1st))
+    {
+        first_variadic = false;
+
+        // Expression
+        // YOLO: recursion!
+        tree_node_add_child(node, parse_expression(parser));
+    }
+
+    // first chunk enclosure
+    if (peek_token_type(parser, TOKEN_PEEK_1st) == JLT_SYM_BRACKET_CLOSE)
+    {
+        // ]
+        consume_token(parser, NULL);
+        data->dims_var++;
+    }
+    else
+    {
+        fprintf(stderr, "TODO error: expected ']'\n");
+        return node;
+    }
+
+    // {[ Expression ]} {[ ]}
+    accepting_variadic = first_variadic;
+    while (peek_token_type(parser, TOKEN_PEEK_1st) == JLT_SYM_BRACKET_OPEN)
+    {
+        // [
+        consume_token(parser, NULL);
+
+        if (!accepting_variadic && parser_trigger_expression(parser, TOKEN_PEEK_1st))
+        {
+            // Expression
+            // YOLO: recursion!
+            tree_node_add_child(node, parse_expression(parser));
+        }
+        else
+        {
+            // variadic dims must stay at the end
+            accepting_variadic = true;
+        }
+
+        // ]
+        if (peek_token_type(parser, TOKEN_PEEK_1st) == JLT_SYM_BRACKET_CLOSE)
+        {
+            consume_token(parser, NULL);
+        }
+        else
+        {
+            fprintf(stderr, "TODO error: expected ']'\n");
+            break;
+        }
+
+        data->dims_var++;
+    }
+
+    // ArrayInitializer
+    if (first_variadic)
+    {
+        if (peek_token_type(parser, TOKEN_PEEK_1st) == JLT_SYM_BRACE_OPEN)
+        {
+            tree_node_add_child(node, parse_array_initializer(parser));
+        }
+        else
+        {
+            fprintf(stderr, "TODO error: expected array initializer\n");
+        }
+    }
+
+    return node;
+}
+
+/**
+ * PrimaryClassInstanceCreation:
+ *     ( [ArgumentList] ) [ClassBody]
+ *
+ * ArgumentList:
+ *     Expression {, Expression}
+*/
+static tree_node* parse_primary_class_instance_creation(java_parser* parser)
+{
+    tree_node* node = ast_node_primary_class_instance_creation();
+
+    // (
+    consume_token(parser, NULL);
+
+    // [ArgumentList] => [Expression {, Expression}]
+    if (parser_trigger_expression(parser, TOKEN_PEEK_1st))
+    {
+        // Expression
+        tree_node_add_child(node, parse_expression(parser));
+
+        // {, Expression}
+        while (peek_token_type(parser, TOKEN_PEEK_1st) == JLT_SYM_COMMA)
+        {
+            // ,
+            consume_token(parser, NULL);
+
+            if (parser_trigger_expression(parser, TOKEN_PEEK_1st))
+            {
+                // Expression
+                tree_node_add_child(node, parse_expression(parser));
+            }
+            else
+            {
+                fprintf(stderr, "TODO error: expected expression\n");
+                break;
+            }
+        }
+    }
+
+    // )
+    if (peek_token_type(parser, TOKEN_PEEK_1st) == JLT_SYM_PARENTHESIS_CLOSE)
+    {
+        consume_token(parser, NULL);
+    }
+    else
+    {
+        fprintf(stderr, "TODO error: expected ')'\n");
+        return node;
+    }
+
+    // [ClassBody]
+    if (peek_token_type(parser, TOKEN_PEEK_1st) == JLT_SYM_BRACE_OPEN)
+    {
+        tree_node_add_child(node, parse_class_body(parser));
+    }
+
+    return node;
+}
+
+/**
+ * PrimaryMethodInvocation:
+ *     ( [ArgumentList] )
+ *
+ * ArgumentList:
+ *     Expression {, Expression}
+*/
+static tree_node* parse_primary_method_invocation(java_parser* parser)
+{
+    tree_node* node = ast_node_primary_method_invocation();
+
+    // (
+    consume_token(parser, NULL);
+
+    // [ArgumentList] => [Expression {, Expression}]
+    if (parser_trigger_expression(parser, TOKEN_PEEK_1st))
+    {
+        // Expression
+        tree_node_add_child(node, parse_expression(parser));
+
+        // {, Expression}
+        while (peek_token_type(parser, TOKEN_PEEK_1st) == JLT_SYM_COMMA)
+        {
+            // ,
+            consume_token(parser, NULL);
+
+            if (parser_trigger_expression(parser, TOKEN_PEEK_1st))
+            {
+                // Expression
+                tree_node_add_child(node, parse_expression(parser));
+            }
+            else
+            {
+                fprintf(stderr, "TODO error: expected expression\n");
+                break;
+            }
+        }
+    }
+
+    // )
+    if (peek_token_type(parser, TOKEN_PEEK_1st) == JLT_SYM_PARENTHESIS_CLOSE)
+    {
+        consume_token(parser, NULL);
+    }
+    else
+    {
+        fprintf(stderr, "TODO error: expected ')'\n");
+        return node;
+    }
+
+    return node;
+}
+
+/**
+ * PrimaryArrayAccess:
+ *     [ Expression ] {[ Expression ]}
+*/
+static tree_node* parse_primary_array_access(java_parser* parser)
+{
+    tree_node* node = ast_node_primary_array_access();
+
+    // based on our design rule:
+    // this loop is guaranteed to have at least 1 iteration
+    while (peek_token_type(parser, TOKEN_PEEK_1st) == JLT_SYM_BRACKET_OPEN)
+    {
+        // [
+        consume_token(parser, NULL);
+
+        if (parser_trigger_expression(parser, TOKEN_PEEK_1st))
+        {
+            // Expression
+            // YOLO: recursion!
+            tree_node_add_child(node, parse_expression(parser));
+        }
+        else
+        {
+            fprintf(stderr, "TODO error: expected expression\n");
+            break;
+        }
+
+        // ]
+        if (peek_token_type(parser, TOKEN_PEEK_1st) == JLT_SYM_BRACKET_CLOSE)
+        {
+            consume_token(parser, NULL);
+        }
+        else
+        {
+            fprintf(stderr, "TODO error: expected ']'\n");
+            break;
+        }
+    }
+
+    return node;
+}
+
+/**
+ * PrimaryClassLiteral: . class
+ *
+ * caller needs both tokens checked
+*/
+static tree_node* parse_primary_class_literal(java_parser* parser)
+{
+    tree_node* node = ast_node_primary_class_literal();
+
+    consume_token(parser, NULL);
+    consume_token(parser, NULL);
+
+    return node;
+}
+
+/**
+ * To understand Primary, we break it down into 2 parts
+ *
+ * 1. Simple Primary: building block of Complex Primary which is Primary
+ * including: literals, ID, this, new, and parenthesis expression: ( Expression )
+ * also includes trailing content: class literal (.class), array access ([]),
+ * and argument list (())
+ *
+ * 2. (Complex) Primary: on top level, we also have connectors,
+ * including: field access (.) and method reference (::)
+ *
+ * Now we need to figure out parser's job for those parts.
+ *
+ * In a nutshell: keep reading any part, if matched, we accept, terminate otherwise
+ *
+ * This will result something that does not make any sense,
+ * e.g. ....................a
+ * Should parser worry if it makes sense? NO!
+ * Parser always and only maximizes pattern matching, it does not make sense out of anything
+ *
+ * Another note about parenthesis expression: ( Expression )
+ * We must do it on Primary level to cover cases like the following:
+ * (a + 1).toString()
+ * also because the syntax of type casting, which is essentially consecutive parenthesis closures
+ * since we only match patterns without justification in parser so it implicitly accept sequence
+ * like (...)(...), which is the form of type casting
+ *
+ * Accepting ( Expression ) on this level also means:
+ * 1. Expression does not accept parenthesis, instead, it will dispatch it to Primary to handle
+ * 2. This supports the precendence meaning of parenthesis because parenthesized expression
+ *    will go deeper in the tree, hence higher precendence
+*/
+static tree_node* parse_primary(java_parser* parser)
+{
+    tree_node* node = ast_node_primary();
+    bool accepting = true;
+
+    while (accepting)
+    {
+        switch (peek_token_type(parser, TOKEN_PEEK_1st))
+        {
+            case JLT_SYM_PARENTHESIS_OPEN:
+                // ( Expression )
+                consume_token(parser, NULL);
+                tree_node_add_child(node, parse_expression(parser));
+                if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_PARENTHESIS_CLOSE))
+                {
+                    consume_token(parser, NULL);
+                }
+                else
+                {
+                    fprintf(stderr, "TODO error: expected ')'\n");
+                }
+                break;
+            case JLT_SYM_DOT:
+            case JLT_SYM_METHOD_REFERENCE:
+            case JLT_RWD_TRUE:
+            case JLT_RWD_FALSE:
+            case JLT_RWD_NULL:
+            case JLT_RWD_THIS:
+            case JLT_RWD_SUPER:
+                tree_node_add_child(node, parse_primary_simple(parser));
+                break;
+            case JLT_RWD_NEW:
+                tree_node_add_child(node, parse_primary_creation(parser));
+                break;
+            case JLT_LTR_NUMBER:
+            case JLT_LTR_CHARACTER:
+            case JLT_LTR_STRING:
+                tree_node_add_child(node, parse_primary_complex(parser));
+                break;
+            default:
+                if (peek_token_class_is(parser, TOKEN_PEEK_1st, JT_IDENTIFIER))
+                {
+                    tree_node_add_child(node, parse_primary_complex(parser));
+
+                    // now the trailing content
+                    // there could be many, so we keep it going until mismatched
+                    while (true)
+                    {
+                        // 2 look-ahead first, to buffer most #tokens
+                        if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_DOT) &&
+                            peek_token_type_is(parser, TOKEN_PEEK_2nd, JLT_RWD_CLASS))
+                        {
+                            tree_node_add_child(node, parse_primary_class_literal(parser));
+                        }
+                        else if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_PARENTHESIS_OPEN))
+                        {
+                            tree_node_add_child(node, parse_primary_method_invocation(parser));
+                        }
+                        else if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_BRACKET_OPEN))
+                        {
+                            tree_node_add_child(node, parse_primary_array_access(parser));
+                        }
+                        else
+                        {
+                            // terminate
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    // reject by default
+                    accepting = false;
+                }
+                break;
+        }
+    }
+
+    return node;
+}
+
+/**
+ * All Primary are Expression, but not all Expression are Primary
+ *
+ * Shunting Yard Algorithm:
+ * https://mathcenter.oxford.emory.edu/site/cs171/shuntingYardAlgorithm/
+ *
+ * 1. If the incoming symbols is an operand, print it..
+ * 2. If the incoming symbol is a left parenthesis, push it on the stack.
+ * 3. If the incoming symbol is a right parenthesis: discard the right parenthesis,
+ *    pop and print the stack symbols until you see a left parenthesis.
+ *    Pop the left parenthesis and discard it.
+ * 4. If the incoming symbol is an operator and the stack is empty or contains a
+ *    left parenthesis on top, push the incoming operator onto the stack.
+ * 5. If the incoming symbol is an operator and has either higher precedence than
+ *    the operator on the top of the stack, or has the same precedence as the
+ *    operator on the top of the stack and is right associative -- push it on the stack.
+ * 6. If the incoming symbol is an operator and has either lower precedence than the operator
+ *    on the top of the stack, or has the same precedence as the operator on the top of the
+ *    stack and is left associative -- continue to pop the stack until this is not true.
+ *    Then, push the incoming operator.
+ * 7. At the end of the expression, pop and print all operators on the stack.
+ *    (No parentheses should remain.)
+ *
+ * But in actual implementation, parenthesis is handled in Primary, so Expression will dispatch
+ * it to Primary and does deeper in the tree, hence supports precedence
+ * Meaning: Step 2 and 3 are not necessary
+*/
+static tree_node* parse_expression(java_parser* parser)
+{
+    tree_node* node = ast_node_expression();
+    java_expression_worker worker;
+    java_lexeme_type token_type;
+    java_operator op_type;
+    bool next_is_operator;
+
+    // get worker ready
+    init_expression_worker(&worker);
+
+    while (true)
+    {
+        token_type = peek_token_type(parser, TOKEN_PEEK_1st);
+        op_type = parser->expression->op_map[token_type];
+        next_is_operator = true;
+
+        // token-operator preprocessing: 1-1 mapping
+        switch (token_type)
+        {
+            case JLT_SYM_EQUAL:
+            case JLT_SYM_ANGLE_BRACKET_OPEN:
+            case JLT_SYM_ANGLE_BRACKET_CLOSE:
+            case JLT_SYM_EXCALMATION:
+            case JLT_SYM_TILDE:
+            case JLT_SYM_ASTERISK:
+            case JLT_SYM_FORWARD_SLASH:
+            case JLT_SYM_AMPERSAND:
+            case JLT_SYM_PIPE:
+            case JLT_SYM_CARET:
+            case JLT_SYM_PERCENT:
+            case JLT_SYM_QUESTION:
+            case JLT_SYM_COLON:
+            case JLT_SYM_ARROW:
+            case JLT_SYM_RELATIONAL_EQUAL:
+            case JLT_SYM_LESS_EQUAL:
+            case JLT_SYM_GREATER_EQUAL:
+            case JLT_SYM_NOT_EQUAL:
+            case JLT_SYM_LOGIC_AND:
+            case JLT_SYM_LOGIC_OR:
+            case JLT_SYM_LEFT_SHIFT:
+            case JLT_SYM_RIGHT_SHIFT:
+            case JLT_SYM_RIGHT_SHIFT_UNSIGNED:
+            case JLT_SYM_ADD_ASSIGNMENT:
+            case JLT_SYM_SUBTRACT_ASSIGNMENT:
+            case JLT_SYM_MULTIPLY_ASSIGNMENT:
+            case JLT_SYM_DIVIDE_ASSIGNMENT:
+            case JLT_SYM_BIT_AND_ASSIGNMENT:
+            case JLT_SYM_BIT_OR_ASSIGNMENT:
+            case JLT_SYM_BIT_XOR_ASSIGNMENT:
+            case JLT_SYM_MODULO_ASSIGNMENT:
+            case JLT_SYM_LEFT_SHIFT_ASSIGNMENT:
+            case JLT_SYM_RIGHT_SHIFT_ASSIGNMENT:
+            case JLT_SYM_RIGHT_SHIFT_UNSIGNED_ASSIGNMENT:
+                // no-op as the mapped type is correct
+                break;
+            case JLT_SYM_PLUS:
+                // handle ambiguity
+                if (!worker.last_push_operand)
+                {
+                    op_type = parser->expression->definition[OPID_SIGN_POS];
+                }
+                break;
+            case JLT_SYM_MINUS:
+                // handle ambiguity
+                if (!worker.last_push_operand)
+                {
+                    op_type = parser->expression->definition[OPID_SIGN_NEG];
+                }
+                break;
+            case JLT_SYM_INCREMENT:
+                // handle ambiguity
+                if (!worker.last_push_operand)
+                {
+                    op_type = parser->expression->definition[OPID_PRE_INC];
+                }
+                break;
+            case JLT_SYM_DECREMENT:
+                // handle ambiguity
+                if (!worker.last_push_operand)
+                {
+                    op_type = parser->expression->definition[OPID_PRE_DEC];
+                }
+                break;
+            default:
+                next_is_operator = false;
+                break;
+        }
+
+        // acceptance
+        if (next_is_operator)
+        {
+            // now we need to consume the token for sure
+            consume_token(parser, NULL);
+
+            // precedence validation
+            while (expression_stack_pop_required(&worker, op_type))
+            {
+                tree_node_add_child(node, expression_stack_parse_top(&worker));
+            }
+
+            expression_stack_push(&worker, op_type);
+        }
+        else if (parser_trigger_primary(parser, TOKEN_PEEK_1st))
+        {
+            tree_node_add_child(node, parse_primary(parser));
+            expression_stack_push(&worker, OPID_UNDEFINED);
+        }
+        else
+        {
+            // terminator
+            break;
+        }
+    }
+
+    // pop all operators and push them in sequence
+    while (!expression_stack_empty(&worker))
+    {
+        tree_node_add_child(node, expression_stack_parse_top(&worker));
+    }
+
+    // cleanup
+    release_expression_worker(&worker);
 
     return node;
 }

@@ -19,6 +19,8 @@
         "xmemory": "c",
         "xstring": "c",
         "xtr1common": "c",
-        "types.h": "c"
+        "types.h": "c",
+        "tree.h": "c",
+        "vecbuf.h": "c"
     }
 }

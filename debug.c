@@ -3,6 +3,7 @@
 #include "langspec.h"
 #include "token.h"
 #include "node.h"
+#include "expression.h"
 
 #include "report.h"
 
@@ -443,6 +444,145 @@ static void debug_print_lexeme_type(java_lexeme_type id)
     }
 }
 
+void debug_print_operator(operator_id id)
+{
+    switch (id)
+    {
+        case OPID_POST_INC:
+            printf("++");
+            break;
+        case OPID_POST_DEC:
+            printf("--");
+            break;
+        case OPID_SIGN_POS:
+            printf("+");
+            break;
+        case OPID_SIGN_NEG:
+            printf("-");
+            break;
+        case OPID_LOGIC_NOT:
+            printf("!");
+            break;
+        case OPID_BIT_NOT:
+            printf("~");
+            break;
+        case OPID_PRE_INC:
+            printf("++");
+            break;
+        case OPID_PRE_DEC:
+            printf("--");
+            break;
+        case OPID_MUL:
+            printf("*");
+            break;
+        case OPID_DIV:
+            printf("/");
+            break;
+        case OPID_MOD:
+            printf("%");
+            break;
+        case OPID_ADD:
+            printf("+");
+            break;
+        case OPID_SUB:
+            printf("-");
+            break;
+        case OPID_SHIFT_L:
+            printf("<<");
+            break;
+        case OPID_SHIFT_R:
+            printf(">>");
+            break;
+        case OPID_SHIFT_UR:
+            printf(">>>");
+            break;
+        case OPID_LESS:
+            printf("<");
+            break;
+        case OPID_LESS_EQ:
+            printf("<=");
+            break;
+        case OPID_GREAT:
+            printf(">");
+            break;
+        case OPID_GREAT_EQ:
+            printf(">=");
+            break;
+        case OPID_INSTANCE_OF:
+            printf("instanceof");
+            break;
+        case OPID_EQ:
+            printf("==");
+            break;
+        case OPID_NOT_EQ:
+            printf("!=");
+            break;
+        case OPID_BIT_AND:
+            printf("&");
+            break;
+        case OPID_BIT_XOR:
+            printf("^");
+            break;
+        case OPID_BIT_OR:
+            printf("|");
+            break;
+        case OPID_LOGIC_AND:
+            printf("&&");
+            break;
+        case OPID_LOGIC_OR:
+            printf("||");
+            break;
+        case OPID_TERNARY_1:
+            printf("?");
+            break;
+        case OPID_TERNARY_2:
+            printf(":");
+            break;
+        case OPID_ASN:
+            printf("=");
+            break;
+        case OPID_ADD_ASN:
+            printf("+=");
+            break;
+        case OPID_SUB_ASN:
+            printf("-=");
+            break;
+        case OPID_MUL_ASN:
+            printf("*=");
+            break;
+        case OPID_DIV_ASN:
+            printf("/=");
+            break;
+        case OPID_MOD_ASN:
+            printf("%=");
+            break;
+        case OPID_AND_ASN:
+            printf("&=");
+            break;
+        case OPID_XOR_ASN:
+            printf("^=");
+            break;
+        case OPID_OR_ASN:
+            printf("|=");
+            break;
+        case OPID_SHIFT_L_ASN:
+            printf("<<=");
+            break;
+        case OPID_SHIFT_R_ASN:
+            printf(">>=");
+            break;
+        case OPID_SHIFT_UR_ASN:
+            printf(">>>=");
+            break;
+        case OPID_LAMBDA:
+            printf("->");
+            break;
+        default:
+            printf("(undefined: %d)", id);
+            break;
+    }
+}
+
 void debug_print_number_bit_length(java_number_bit_length l)
 {
     switch (l)
@@ -713,6 +853,128 @@ static void debug_print_ast_node(java_node_query query, void* data)
         case JNT_INTERFACE_BODY:
             printf("Interface Body");
             break;
+        case JNT_STATIC_INIT:
+            printf("Static Initializer");
+            break;
+        case JNT_BLOCK:
+            printf("Block");
+            break;
+        case JNT_CTOR_DECL:
+            printf("Constructor Declaration");
+            break;
+        case JNT_TYPE:
+        {
+            printf("Type: ");
+
+            node_data_type* d = (node_data_type*)data;
+            if (d->primitive == JLT_MAX)
+            {
+                printf("(Complex Type)");
+            }
+            else
+            {
+                debug_print_lexeme_type(d->primitive);
+            }
+
+            break;
+        }
+        case JNT_METHOD_DECL:
+            printf("Method Declaration");
+            break;
+        case JNT_FIELD_DECL:
+            printf("Field Declaration");
+            break;
+        case JNT_FORMAL_PARAM_LIST:
+            printf("Formal Parameter List");
+            break;
+        case JNT_FORMAL_PARAM:
+        {
+            printf("Formal Parameter: ");
+
+            node_data_formal_parameter* d = (node_data_formal_parameter*)data;
+            debug_print_token_content(&d->id);
+            if (d->dimension)
+            {
+                printf(" (dim: %zd)", d->dimension);
+            }
+
+            break;
+        }
+        case JNT_CTOR_BODY:
+            printf("Constructor Body");
+            break;
+        case JNT_METHOD_BODY:
+            printf("Method Body");
+            break;
+        case JNT_VAR_DECL:
+        {
+            printf("Variable Declarator");
+
+            node_data_variable_declarator* d = (node_data_variable_declarator*)data;
+            debug_print_token_content(&d->id);
+            if (d->dimension)
+            {
+                printf(" (dim: %zd)", d->dimension);
+            }
+
+            break;
+        }
+        case JNT_ARRAY_INIT:
+            printf("Array Initializer");
+            break;
+        case JNT_PRIMARY:
+            printf("Primary");
+            break;
+        case JNT_PRIMARY_SIMPLE:
+        {
+            node_data_primary_simple* d = (node_data_primary_simple*)data;
+            debug_print_lexeme_type(d->type);
+
+            break;
+        }
+        case JNT_PRIMARY_COMPLEX:
+        {
+            node_data_primary_complex* d = (node_data_primary_complex*)data;
+            debug_print_token_content(&d->token);
+
+            break;
+        }
+        case JNT_PRIMARY_CREATION:
+            printf("Object Creation");
+            break;
+        case JNT_PRIMARY_ARR_CREATION:
+        {
+            printf("Array Creation:");
+
+            node_data_primary_array_creation* d = (node_data_primary_array_creation*)data;
+            printf(" (dim: %zd)", d->dims_var);
+
+            break;
+        }
+        case JNT_PRIMARY_CLS_CREATION:
+            printf("Class Creation");
+            break;
+        case JNT_PRIMARY_METHOD_INVOKE:
+            printf("Method Call");
+            break;
+        case JNT_PRIMARY_ARR_ACCESS:
+            printf("Array Access");
+            break;
+        case JNT_PRIMARY_CLS_LITERAL:
+            printf("Class Literal");
+            break;
+        case JNT_EXPRESSION:
+            printf("Expression");
+            break;
+        case JNT_OPERATOR:
+        {
+            printf("OP: ");
+
+            node_data_operator* d = (node_data_operator*)data;
+            debug_print_operator(d->op);
+
+            break;
+        }
         default:
             printf("Unknown");
             break;

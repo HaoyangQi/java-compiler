@@ -11,6 +11,12 @@ java_token* token_peek(java_parser* parser, size_t idx)
         return NULL;
     }
 
+    // access
+    if (idx + 1 <= parser->num_token_available)
+    {
+        return parser->tokens + idx;
+    }
+
     // buffer it if not yet available
     for (size_t i = parser->num_token_available; i <= idx; i++)
     {
@@ -60,6 +66,16 @@ void consume_token(java_parser* parser, java_token* dest)
     parser->num_token_available--;
 }
 
+java_token_class peek_token_class(java_parser* parser, size_t idx)
+{
+    return token_peek(parser, idx)->class;
+}
+
+java_lexeme_type peek_token_type(java_parser* parser, size_t idx)
+{
+    return token_peek(parser, idx)->type;
+}
+
 bool peek_token_class_is(java_parser* parser, size_t idx, java_token_class class)
 {
     java_token* peek = token_peek(parser, idx);
@@ -70,6 +86,12 @@ bool peek_token_type_is(java_parser* parser, size_t idx, java_lexeme_type type)
 {
     java_token* peek = token_peek(parser, idx);
     return peek->type == type;
+}
+
+bool peek_token_is_type_word(java_parser* parser, size_t idx)
+{
+    java_lexeme_type type = peek_token_type(parser, idx);
+    return type >= JLT_RWD_BOOLEAN && type <= JLT_RWD_FLOAT;
 }
 
 /**

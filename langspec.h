@@ -78,36 +78,37 @@ typedef enum
     JLT_RWD_TRANSIENT = 6,
     JLT_RWD_SYNCHRONIZED = 7,
     JLT_RWD_VOLATILE = 8,
+    // type words
+    JLT_RWD_BOOLEAN,
+    JLT_RWD_DOUBLE,
+    JLT_RWD_BYTE,
+    JLT_RWD_INT,
+    JLT_RWD_SHORT,
+    JLT_RWD_VOID,
+    JLT_RWD_CHAR,
+    JLT_RWD_LONG,
+    JLT_RWD_FLOAT,
     // keywords
     JLT_RWD_DEFAULT,
     JLT_RWD_IF,
     JLT_RWD_THROW,
-    JLT_RWD_BOOLEAN,
     JLT_RWD_DO,
     JLT_RWD_IMPLEMENTS,
     JLT_RWD_THROWS,
     JLT_RWD_BREAK,
-    JLT_RWD_DOUBLE,
     JLT_RWD_IMPORT,
-    JLT_RWD_BYTE,
     JLT_RWD_ELSE,
     JLT_RWD_INSTANCEOF,
     JLT_RWD_RETURN,
     JLT_RWD_TRY,
     JLT_RWD_CASE,
     JLT_RWD_EXTENDS,
-    JLT_RWD_INT,
-    JLT_RWD_SHORT,
-    JLT_RWD_VOID,
     JLT_RWD_CATCH,
     JLT_RWD_INTERFACE,
-    JLT_RWD_CHAR,
     JLT_RWD_FINALLY,
-    JLT_RWD_LONG,
     JLT_RWD_SUPER,
     JLT_RWD_WHILE,
     JLT_RWD_CLASS,
-    JLT_RWD_FLOAT,
     JLT_RWD_NATIVE,
     JLT_RWD_SWITCH,
     JLT_RWD_FOR,
@@ -191,7 +192,15 @@ typedef enum
     JLT_MAX,
 } java_lexeme_type;
 
-#define JAVA_LEXEME_MODIFIER(type) ((type) <= JLT_RWD_VOLATILE)
+/**
+ * NOTE: do NOT write macros below for types with >= 2 bounds,
+ * because it might be misused and impact performance
+ *
+ * write them as a function in parser-util.c
+*/
+
+#define JAVA_LEXEME_MODIFIER_WORD(type) ((type) <= JLT_RWD_VOLATILE)
+#define JAVA_LEXEME_MODIFIER_OR_TYPE_WORD(type) ((type) <= JLT_RWD_FLOAT)
 
 /**
  * Java reserved word
