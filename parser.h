@@ -7,12 +7,22 @@
 #include "file.h"
 #include "symtbl.h"
 #include "ast.h"
+#include "expression.h"
+
+/**
+ * Token Peek Index
+ *
+ * 4 look-aheads maximum
+*/
 
 #define TOKEN_PEEK_1st 0
 #define TOKEN_PEEK_2nd 1
 #define TOKEN_PEEK_3rd 2
 #define TOKEN_PEEK_4th 3
 
+/**
+ * Parser Info
+*/
 typedef struct _java_parser
 {
     /* 4 look-ahead tokens */
@@ -27,15 +37,19 @@ typedef struct _java_parser
     tree_node* ast_root;
     /* token buffer for acceptance */
     java_token* token_buffer;
+    /* expression definition */
+    java_expression* expression;
 } java_parser;
 
-void init_parser(java_parser* parser, file_buffer* buffer, java_symbol_table* rw);
+void init_parser(java_parser* parser, file_buffer* buffer, java_symbol_table* rw, java_expression* expr);
 void release_parser(java_parser* parser);
 
 void parse(java_parser* parser);
 
 java_token* token_peek(java_parser* parser, size_t idx);
 void consume_token(java_parser* parser, java_token* dest);
+java_token_class peek_token_class(java_parser* parser, size_t idx);
+java_lexeme_type peek_token_type(java_parser* parser, size_t idx);
 bool peek_token_class_is(java_parser* parser, size_t idx, java_token_class class);
 bool peek_token_type_is(java_parser* parser, size_t idx, java_lexeme_type type);
 void parser_ast_node_data_deleter(int metadata, void* data);
@@ -43,5 +57,8 @@ void parser_ast_node_data_deleter(int metadata, void* data);
 bool parser_trigger_name(java_parser* parser, size_t peek_from);
 bool parser_trigger_class_type(java_parser* parser, size_t peek_from);
 bool parser_trigger_interface_type(java_parser* parser, size_t peek_from);
+bool parser_trigger_type(java_parser* parser, size_t peek_from);
+bool parser_trigger_expression(java_parser* parser, size_t peek_from);
+bool parser_trigger_primary(java_parser* parser, size_t peek_from);
 
 #endif

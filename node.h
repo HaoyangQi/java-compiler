@@ -4,6 +4,7 @@
 
 #include "types.h"
 #include "token.h"
+#include "expression.h"
 
 /**
  * ast node data query
@@ -31,6 +32,31 @@ typedef enum
     JNT_CLASS_BODY,
     JNT_INTERFACE_EXTENDS,
     JNT_INTERFACE_BODY,
+    JNT_CLASS_BODY_DECL,
+    JNT_STATIC_INIT,
+    JNT_BLOCK,
+    JNT_CTOR_DECL,
+    JNT_TYPE,
+    JNT_METHOD_DECL,
+    JNT_FIELD_DECL,
+    JNT_FORMAL_PARAM_LIST,
+    JNT_FORMAL_PARAM,
+    JNT_THROWS,
+    JNT_CTOR_BODY,
+    JNT_METHOD_BODY,
+    JNT_VAR_DECL,
+    JNT_ARRAY_INIT,
+    JNT_PRIMARY,
+    JNT_PRIMARY_SIMPLE,
+    JNT_PRIMARY_COMPLEX,
+    JNT_PRIMARY_CREATION,
+    JNT_PRIMARY_ARR_CREATION,
+    JNT_PRIMARY_CLS_CREATION,
+    JNT_PRIMARY_METHOD_INVOKE,
+    JNT_PRIMARY_ARR_ACCESS,
+    JNT_PRIMARY_CLS_LITERAL,
+    JNT_EXPRESSION,
+    JNT_OPERATOR,
 } java_node_query;
 
 /**
@@ -95,5 +121,100 @@ typedef struct
     /* interface name */
     java_token id;
 } node_data_interface_declaration;
+
+/**
+ * Class Body Declaration
+*/
+typedef struct
+{
+    /* modifier data */
+    lbit_flag modifier;
+} node_data_class_body_declaration;
+
+/**
+ * Constructor Declaration
+*/
+typedef struct
+{
+    /* constructor name */
+    java_token id;
+} node_data_constructor_declaration;
+
+/**
+ * Type
+*/
+typedef struct
+{
+    /* primitive type, JLT_MAX if not */
+    java_lexeme_type primitive;
+    /* array dimension */
+    size_t dimension;
+} node_data_type;
+
+/**
+ * Formal Parameter
+*/
+typedef struct
+{
+    /* parameter name */
+    java_token id;
+    /* array dimension */
+    size_t dimension;
+} node_data_formal_parameter;
+
+/**
+ * Method Declaration
+*/
+typedef struct
+{
+    /* method name */
+    java_token id;
+} node_data_method_declaration;
+
+/**
+ * Variable Declarator
+*/
+typedef struct
+{
+    /* parameter name */
+    java_token id;
+    /* array dimension */
+    size_t dimension;
+} node_data_variable_declarator;
+
+/**
+ * Primary: Simple
+*/
+typedef struct
+{
+    /* primary type */
+    java_lexeme_type type;
+} node_data_primary_simple;
+
+/**
+ * Primary: Field Access
+*/
+typedef struct
+{
+    /* token content */
+    java_token token;
+} node_data_primary_complex;
+
+/**
+ * Primary: Field Access
+*/
+typedef struct
+{
+    /* variadic length dimension count */
+    size_t dims_var;
+} node_data_primary_array_creation;
+
+/**
+ * Expression: Operator
+*/
+typedef struct
+{
+    operator_id op;
+} node_data_operator;
 
 #endif

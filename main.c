@@ -3,6 +3,7 @@
 #include "file.h"
 #include "symtbl.h"
 #include "parser.h"
+#include "expression.h"
 
 #include "debug.h"
 #include "report.h"
@@ -14,6 +15,7 @@ typedef struct
     char* source_file_name;
     file_buffer reader;
     java_symbol_table rw_lookup_table;
+    java_expression expression;
     java_parser context;
 } compiler;
 
@@ -26,10 +28,16 @@ bool init_compiler(compiler* compiler)
 
     init_file_buffer(&compiler->reader);
     init_symbol_table(&compiler->rw_lookup_table);
+    init_expression(&compiler->expression);
     init_debug_report();
 
     load_language_spec(&compiler->rw_lookup_table);
-    init_parser(&compiler->context, &compiler->reader, &compiler->rw_lookup_table);
+    init_parser(
+        &compiler->context,
+        &compiler->reader,
+        &compiler->rw_lookup_table,
+        &compiler->expression
+    );
 
     return true;
 }
@@ -67,7 +75,12 @@ bool retask_compiler(compiler* compiler, char* source_path)
         return false;
     }
 
-    init_parser(&compiler->context, &compiler->reader, &compiler->rw_lookup_table);
+    init_parser(
+        &compiler->context,
+        &compiler->reader,
+        &compiler->rw_lookup_table,
+        &compiler->expression
+    );
 
     compiler->tasked = true;
     return true;
@@ -82,6 +95,7 @@ void release_compiler(compiler* compiler)
 
     release_file_buffer(&compiler->reader);
     release_symbol_table(&compiler->rw_lookup_table);
+    release_expression(&compiler->expression);
     release_parser(&compiler->context);
 }
 
@@ -106,6 +120,8 @@ int main(int argc, char* argv[])
     compiler compiler;
     int num_source_files = ARRAY_SIZE(test_paths);
 
+    // this is heavy, initialize once and retask
+    // compiler for every input file
     init_compiler(&compiler);
 
     debug_format_report(REPORT_INTERNAL | REPORT_GENERAL);
