@@ -22,9 +22,20 @@ typedef struct _file_buffer
     byte* cur;
 } file_buffer;
 
+/**
+ * source file loader status flag
+*/
+typedef enum
+{
+    FILE_OK,
+    FILE_PATH_REQUIRED,
+    FILE_OPEN_FAILED,
+    FILE_SIZE_MISMATCHED,
+} file_loader_status;
+
 void init_file_buffer(file_buffer* buffer);
 void release_file_buffer(file_buffer* buffer);
-bool load_source_file(file_buffer* buffer, const char* name);
+file_loader_status load_source_file(file_buffer* buffer, const char* name);
 
 bool is_eof(file_buffer* buffer);
 bool buffer_ptr_safe_move(file_buffer* buffer);

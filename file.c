@@ -13,18 +13,18 @@ void release_file_buffer(file_buffer* buffer)
     free(buffer->base);
 }
 
-bool load_source_file(file_buffer* buffer, const char* name)
+file_loader_status load_source_file(file_buffer* buffer, const char* name)
 {
     if (!name)
     {
-        return false;
+        return FILE_PATH_REQUIRED;
     }
 
     FILE* fp = fopen(name, "rb");
 
     if (!fp)
     {
-        return false;
+        return FILE_OPEN_FAILED;
     }
 
     fseek(fp, 0, SEEK_END);
@@ -42,7 +42,7 @@ bool load_source_file(file_buffer* buffer, const char* name)
         {
             free(buffer->base);
             buffer->base = NULL;
-            return false;
+            return FILE_SIZE_MISMATCHED;
         }
 
         buffer->base[buffer->size] = 0x00;
@@ -52,7 +52,7 @@ bool load_source_file(file_buffer* buffer, const char* name)
     buffer->limit = buffer->base + buffer->size;
 
     fclose(fp);
-    return true;
+    return FILE_OK;
 }
 
 inline bool is_eof(file_buffer* buffer)

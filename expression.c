@@ -1,6 +1,7 @@
 #include "expression.h"
 #include "node.h"
 #include "ast.h"
+#include "report.h"
 
 /**
  * Expression Worker Initialization
@@ -9,12 +10,17 @@
 */
 void init_expression(java_expression* expression)
 {
-    expression->definition = (java_operator*)malloc_assert(sizeof(java_operator) * OPID_MAX);
-    expression->op_map = (java_operator*)malloc_assert(sizeof(java_operator) * JLT_MAX);
+    size_t definition_size = sizeof(java_operator) * OPID_MAX;
+    size_t map_size = sizeof(java_operator) * JLT_MAX;
+
+    expression->definition = (java_operator*)malloc_assert(definition_size);
+    expression->op_map = (java_operator*)malloc_assert(map_size);
 
     // set default because OPID_UNDEFINED = 0
-    memset(expression->definition, 0, sizeof(java_operator) * OPID_MAX);
-    memset(expression->op_map, 0, sizeof(java_operator) * JLT_MAX);
+    memset(expression->definition, 0, definition_size);
+    memset(expression->op_map, 0, map_size);
+
+    report_expression_static_data_size(definition_size + map_size);
 
     /**
      * operator definition initialization

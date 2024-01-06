@@ -794,9 +794,11 @@ static tree_node* parse_class_body_declaration(java_parser* parser)
             case JLT_SYM_BRACKET_OPEN:
             case JLT_SYM_EQUAL:
             case JLT_SYM_COMMA:
+            case JLT_SYM_SEMICOLON:
                 // FieldDeclaration: {Modifier} Type ID [
                 // FieldDeclaration: {Modifier} Type ID =
                 // FieldDeclaration: {Modifier} Type ID ,
+                // FieldDeclaration: {Modifier} Type ID ;
                 tree_node_add_child(node, parse_field_declaration(parser));
                 break;
             default:
@@ -1058,6 +1060,15 @@ static tree_node* parse_field_declaration(java_parser* parser)
 
         // VariableDeclarator
         tree_node_add_child(node, parse_variable_declarator(parser));
+    }
+
+    if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_SEMICOLON))
+    {
+        consume_token(parser, NULL);
+    }
+    else
+    {
+        fprintf(stderr, "TODO error: expected ';'\n");
     }
 
     return node;
