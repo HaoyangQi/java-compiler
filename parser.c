@@ -1527,11 +1527,86 @@ static tree_node* parse_try_statement(java_parser* parser)
 }
 
 /**
- * TODO: if
+ * IfStatement:
+ *     if ( Expression ) Statement [else Statement]
+ *
+ * Dangling else ambiguity?
+ * Solve it by attaching else to nearby if statement
+ * This solution is implicitly supported by recursive parsing
 */
 static tree_node* parse_if_statement(java_parser* parser)
 {
-    ;
+    tree_node* node = ast_node_statement();
+
+    // if
+    tree_node_mutate(node, JNT_STATEMENT_IF);
+    consume_token(parser, NULL);
+
+    // (
+    if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_PARENTHESIS_OPEN))
+    {
+        consume_token(parser, NULL);
+    }
+    else
+    {
+        fprintf(stderr, "TODO error: expected '(' in if statement.\n");
+        return node;
+    }
+
+    // Expression
+    if (parser_trigger_expression(parser, TOKEN_PEEK_1st))
+    {
+        tree_node_add_child(node, parse_expression(parser));
+    }
+    else
+    {
+        fprintf(stderr, "TODO error: expected expression in if statement.\n");
+        return node;
+    }
+
+    // )
+    if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_PARENTHESIS_CLOSE))
+    {
+        consume_token(parser, NULL);
+    }
+    else
+    {
+        fprintf(stderr, "TODO error: expected ')' in if statement.\n");
+        return node;
+    }
+
+    // Statement
+    // only statement in block allows variable declarations
+    if (parser_trigger_statement(parser, TOKEN_PEEK_1st))
+    {
+        tree_node_add_child(node, parse_statement(parser, false));
+    }
+    else
+    {
+        fprintf(stderr, "TODO error: expected statement in if clause.\n");
+        return node;
+    }
+
+    // [else Statement]
+    if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_RWD_ELSE))
+    {
+        // else
+        consume_token(parser, NULL);
+
+        // Statement
+        // only statement in block allows variable declarations
+        if (parser_trigger_statement(parser, TOKEN_PEEK_1st))
+        {
+            tree_node_add_child(node, parse_statement(parser, false));
+        }
+        else
+        {
+            fprintf(stderr, "TODO error: expected statement in else clause.\n");
+            return node;
+        }
+    }
+
+    return node;
 }
 
 /**
