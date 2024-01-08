@@ -13,6 +13,14 @@ void init_tree_node(tree_node* node)
 }
 
 /**
+ * Mutate tree node type into another
+*/
+void tree_node_mutate(tree_node* node, int meta)
+{
+    node->metadata = meta;
+}
+
+/**
  * attach data to a tree node
 */
 void tree_node_attach(tree_node* node, int meta, void* data)

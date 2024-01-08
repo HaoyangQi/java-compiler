@@ -417,6 +417,19 @@ tree_node* ast_node_throws()
 /**
  * AST node generator
  *
+ * argument list
+*/
+tree_node* ast_node_argument_list()
+{
+    tree_node* node = ast_node_new();
+
+    tree_node_attach(node, JNT_ARGUMENT_LIST, NULL);
+    return node;
+}
+
+/**
+ * AST node generator
+ *
  * constructor body
 */
 tree_node* ast_node_constructor_body()
@@ -644,5 +657,82 @@ tree_node* ast_node_operator()
 
     data->op = 0;
     tree_node_attach(node, JNT_OPERATOR, data);
+    return node;
+}
+
+/**
+ * AST node generator
+ *
+ * statement
+ *
+ * JNT_STATEMENT is an abstract type, which does not represent any statement
+ * if it exists in AST, it means this node is invalid
+ * valid type names have form: JNT_STATEMENT_*
+*/
+tree_node* ast_node_statement()
+{
+    tree_node* node = ast_node_new();
+    node_data_statement* data = (node_data_statement*)malloc_assert(sizeof(node_data_statement));
+
+    init_token(&data->id);
+    tree_node_attach(node, JNT_STATEMENT, data);
+    return node;
+}
+
+/**
+ * AST node generator
+ *
+ * constructor invocation
+*/
+tree_node* ast_node_constructor_invocation()
+{
+    tree_node* node = ast_node_new();
+    node_data_constructor_invoke* data =
+        (node_data_constructor_invoke*)malloc_assert(sizeof(node_data_constructor_invoke));
+
+    data->is_super = false;
+    tree_node_attach(node, JNT_CTOR_INVOCATION, data);
+    return node;
+}
+
+/**
+ * AST node generator
+ *
+ * switch label
+*/
+tree_node* ast_node_switch_label()
+{
+    tree_node* node = ast_node_new();
+    node_data_switch_label* data =
+        (node_data_switch_label*)malloc_assert(sizeof(node_data_switch_label));
+
+    data->is_default = false;
+    tree_node_attach(node, JNT_SWITCH_LABEL, data);
+    return node;
+}
+
+/**
+ * AST node generator
+ *
+ * for-loop initialization
+*/
+tree_node* ast_node_for_init()
+{
+    tree_node* node = ast_node_new();
+
+    tree_node_attach(node, JNT_FOR_INIT, NULL);
+    return node;
+}
+
+/**
+ * AST node generator
+ *
+ * for-loop update
+*/
+tree_node* ast_node_for_update()
+{
+    tree_node* node = ast_node_new();
+
+    tree_node_attach(node, JNT_FOR_UPDATE, NULL);
     return node;
 }

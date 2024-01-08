@@ -77,3 +77,37 @@ bool parser_trigger_expression(java_parser* parser, size_t peek_from)
             return parser_trigger_primary(parser, peek_from);
     }
 }
+
+/**
+ * (Block) Statement Trigger
+ *
+ * Block Statement is wrapped inside braces, and allow variable declaration
+ * Statement does not allow declaration
+ *
+ * Due to the parser design, it does not distinguish two cases with different
+ * parser functions, so we cover both cases and use function parameter to
+ * conditionally accept variable declaration
+*/
+bool parser_trigger_statement(java_parser* parser, size_t peek_from)
+{
+    switch (peek_token_type(parser, peek_from))
+    {
+        case JLT_SYM_SEMICOLON:
+        case JLT_SYM_BRACE_OPEN:
+        case JLT_RWD_SWITCH:
+        case JLT_RWD_DO:
+        case JLT_RWD_BREAK:
+        case JLT_RWD_CONTINUE:
+        case JLT_RWD_RETURN:
+        case JLT_RWD_SYNCHRONIZED:
+        case JLT_RWD_THROW:
+        case JLT_RWD_TRY:
+        case JLT_RWD_IF:
+        case JLT_RWD_WHILE:
+        case JLT_RWD_FOR:
+            return true;
+        default:
+            // expression will cover all cases that start with ID
+            return parser_trigger_expression(parser, peek_from);
+    }
+}

@@ -42,7 +42,9 @@ typedef enum
     JNT_FORMAL_PARAM_LIST,
     JNT_FORMAL_PARAM,
     JNT_THROWS,
+    JNT_ARGUMENT_LIST,
     JNT_CTOR_BODY,
+    JNT_CTOR_INVOCATION,
     JNT_METHOD_BODY,
     JNT_VAR_DECL,
     JNT_ARRAY_INIT,
@@ -57,6 +59,27 @@ typedef enum
     JNT_PRIMARY_CLS_LITERAL,
     JNT_EXPRESSION,
     JNT_OPERATOR,
+    JNT_STATEMENT,
+    JNT_STATEMENT_EMPTY,
+    JNT_STATEMENT_SWITCH,
+    JNT_STATEMENT_DO,
+    JNT_STATEMENT_BREAK,
+    JNT_STATEMENT_CONTINUE,
+    JNT_STATEMENT_RETURN,
+    JNT_STATEMENT_SYNCHRONIZED,
+    JNT_STATEMENT_THROW,
+    JNT_STATEMENT_TRY,
+    JNT_STATEMENT_IF,
+    JNT_STATEMENT_WHILE,
+    JNT_STATEMENT_FOR,
+    JNT_STATEMENT_LABEL,
+    JNT_STATEMENT_EXPRESSION,
+    JNT_STATEMENT_VAR_DECL,
+    JNT_STATEMENT_CATCH,
+    JNT_STATEMENT_FINALLY,
+    JNT_SWITCH_LABEL,
+    JNT_FOR_INIT,
+    JNT_FOR_UPDATE,
 } java_node_query;
 
 /**
@@ -216,5 +239,32 @@ typedef struct
 {
     operator_id op;
 } node_data_operator;
+
+/**
+ * Statement
+*/
+typedef struct
+{
+    /* ID, optional */
+    java_token id;
+} node_data_statement;
+
+/**
+ * Constructor Invocation
+*/
+typedef struct
+{
+    /* true if calling from super class, this class otherwise */
+    bool is_super;
+} node_data_constructor_invoke;
+
+/**
+ * Switch Label
+*/
+typedef struct
+{
+    /* true if default label, case label otherwise */
+    bool is_default;
+} node_data_switch_label;
 
 #endif
