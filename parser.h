@@ -60,5 +60,6 @@ bool parser_trigger_interface_type(java_parser* parser, size_t peek_from);
 bool parser_trigger_type(java_parser* parser, size_t peek_from);
 bool parser_trigger_expression(java_parser* parser, size_t peek_from);
 bool parser_trigger_primary(java_parser* parser, size_t peek_from);
+bool parser_trigger_statement(java_parser* parser, size_t peek_from);
 
 #endif

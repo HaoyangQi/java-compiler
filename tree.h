@@ -39,6 +39,7 @@ typedef struct _tree_node
 } tree_node;
 
 void init_tree_node(tree_node* node);
+void tree_node_mutate(tree_node* node, int meta);
 void tree_node_attach(tree_node* node, int meta, void* data);
 void tree_node_add_child(tree_node* node, tree_node* child);
 void tree_node_delete(tree_node* node, node_data_delete_callback cb);
