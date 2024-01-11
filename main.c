@@ -140,7 +140,9 @@ static char* test_paths[] = {
     // "./test/class-decl-1.txt",
     // "./test/interface-decl-1.txt",
 
-    "./test/general-no-block-and-statement.txt",
+    // "./test/general-no-block-and-statement.txt",
+
+    "./test/general-1.txt",
 };
 
 int main(int argc, char* argv[])

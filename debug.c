@@ -446,142 +446,15 @@ static void debug_print_lexeme_type(java_lexeme_type id)
     }
 }
 
-void debug_print_operator(operator_id id)
+void debug_print_operator(java_operator id)
 {
-    switch (id)
+    if (id == OP_INVALID)
     {
-        case OPID_POST_INC:
-            printf("++");
-            break;
-        case OPID_POST_DEC:
-            printf("--");
-            break;
-        case OPID_SIGN_POS:
-            printf("+");
-            break;
-        case OPID_SIGN_NEG:
-            printf("-");
-            break;
-        case OPID_LOGIC_NOT:
-            printf("!");
-            break;
-        case OPID_BIT_NOT:
-            printf("~");
-            break;
-        case OPID_PRE_INC:
-            printf("++");
-            break;
-        case OPID_PRE_DEC:
-            printf("--");
-            break;
-        case OPID_MUL:
-            printf("*");
-            break;
-        case OPID_DIV:
-            printf("/");
-            break;
-        case OPID_MOD:
-            printf("%");
-            break;
-        case OPID_ADD:
-            printf("+");
-            break;
-        case OPID_SUB:
-            printf("-");
-            break;
-        case OPID_SHIFT_L:
-            printf("<<");
-            break;
-        case OPID_SHIFT_R:
-            printf(">>");
-            break;
-        case OPID_SHIFT_UR:
-            printf(">>>");
-            break;
-        case OPID_LESS:
-            printf("<");
-            break;
-        case OPID_LESS_EQ:
-            printf("<=");
-            break;
-        case OPID_GREAT:
-            printf(">");
-            break;
-        case OPID_GREAT_EQ:
-            printf(">=");
-            break;
-        case OPID_INSTANCE_OF:
-            printf("instanceof");
-            break;
-        case OPID_EQ:
-            printf("==");
-            break;
-        case OPID_NOT_EQ:
-            printf("!=");
-            break;
-        case OPID_BIT_AND:
-            printf("&");
-            break;
-        case OPID_BIT_XOR:
-            printf("^");
-            break;
-        case OPID_BIT_OR:
-            printf("|");
-            break;
-        case OPID_LOGIC_AND:
-            printf("&&");
-            break;
-        case OPID_LOGIC_OR:
-            printf("||");
-            break;
-        case OPID_TERNARY_1:
-            printf("?");
-            break;
-        case OPID_TERNARY_2:
-            printf(":");
-            break;
-        case OPID_ASN:
-            printf("=");
-            break;
-        case OPID_ADD_ASN:
-            printf("+=");
-            break;
-        case OPID_SUB_ASN:
-            printf("-=");
-            break;
-        case OPID_MUL_ASN:
-            printf("*=");
-            break;
-        case OPID_DIV_ASN:
-            printf("/=");
-            break;
-        case OPID_MOD_ASN:
-            printf("%=");
-            break;
-        case OPID_AND_ASN:
-            printf("&=");
-            break;
-        case OPID_XOR_ASN:
-            printf("^=");
-            break;
-        case OPID_OR_ASN:
-            printf("|=");
-            break;
-        case OPID_SHIFT_L_ASN:
-            printf("<<=");
-            break;
-        case OPID_SHIFT_R_ASN:
-            printf(">>=");
-            break;
-        case OPID_SHIFT_UR_ASN:
-            printf(">>>=");
-            break;
-        case OPID_LAMBDA:
-            printf("->");
-            break;
-        default:
-            printf("(undefined: %d)", id);
-            break;
+        printf("(undefined: %d, token: %d)", id, OP_TOKEN(id));
+    }
+    else
+    {
+        debug_print_lexeme_type(OP_TOKEN(id));
     }
 }
 
@@ -900,6 +773,12 @@ static void debug_print_ast_node(java_node_query query, void* data)
         case JNT_FORMAL_PARAM_LIST:
             printf("Formal Parameter List");
             break;
+        case JNT_THROWS:
+            printf("Throws");
+            break;
+        case JNT_ARGUMENT_LIST:
+            printf("Argument List");
+            break;
         case JNT_FORMAL_PARAM:
         {
             printf("Formal Parameter: ");
@@ -916,6 +795,22 @@ static void debug_print_ast_node(java_node_query query, void* data)
         case JNT_CTOR_BODY:
             printf("Constructor Body");
             break;
+        case JNT_CTOR_INVOCATION:
+        {
+            printf("Constructor Invocation: ");
+
+            node_data_constructor_invoke* d = (node_data_constructor_invoke*)data;
+            if (d->is_super)
+            {
+                printf("super");
+            }
+            else
+            {
+                printf("this");
+            }
+
+            break;
+        }
         case JNT_METHOD_BODY:
             printf("Method Body");
             break;
@@ -988,8 +883,87 @@ static void debug_print_ast_node(java_node_query query, void* data)
 
             break;
         }
+        case JNT_STATEMENT:
+            printf("Statement (Invalid)");
+            break;
+        case JNT_STATEMENT_EMPTY:
+            printf("Empty Statement (Should not appear)");
+            break;
+        case JNT_STATEMENT_SWITCH:
+            printf("Switch Statement");
+            break;
+        case JNT_STATEMENT_DO:
+            printf("Do-While Statement");
+            break;
+        case JNT_STATEMENT_BREAK:
+            printf("Break Statement: ");
+            debug_print_token_content(&((node_data_statement*)data)->id);
+            break;
+        case JNT_STATEMENT_CONTINUE:
+            printf("Continue Statement: ");
+            debug_print_token_content(&((node_data_statement*)data)->id);
+            break;
+        case JNT_STATEMENT_RETURN:
+            printf("Return Statement");
+            break;
+        case JNT_STATEMENT_SYNCHRONIZED:
+            printf("Synchronized Statement");
+            break;
+        case JNT_STATEMENT_THROW:
+            printf("Throw Statement");
+            break;
+        case JNT_STATEMENT_TRY:
+            printf("Try Statement");
+            break;
+        case JNT_STATEMENT_IF:
+            printf("If Statement");
+            break;
+        case JNT_STATEMENT_WHILE:
+            printf("While Statement");
+            break;
+        case JNT_STATEMENT_FOR:
+            printf("For Statement");
+            break;
+        case JNT_STATEMENT_LABEL:
+            printf("Label Statement: ");
+            debug_print_token_content(&((node_data_statement*)data)->id);
+            break;
+        case JNT_STATEMENT_EXPRESSION:
+            printf("Expression Statement");
+            break;
+        case JNT_STATEMENT_VAR_DECL:
+            printf("Variable Declaration");
+            break;
+        case JNT_STATEMENT_CATCH:
+            printf("Catch Clause");
+            break;
+        case JNT_STATEMENT_FINALLY:
+            printf("Finally Clause");
+            break;
+        case JNT_SWITCH_LABEL:
+        {
+            printf("Switch Label: ");
+
+            node_data_switch_label* d = (node_data_switch_label*)data;
+            if (d->is_default)
+            {
+                printf("default");
+            }
+            else
+            {
+                printf("case");
+            }
+
+            break;
+        }
+        case JNT_FOR_INIT:
+            printf("For Initialization");
+            break;
+        case JNT_FOR_UPDATE:
+            printf("For Update");
+            break;
         default:
-            printf("Unknown");
+            printf("Unknown: %d", query);
             break;
     }
 }

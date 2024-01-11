@@ -1035,6 +1035,14 @@ static tree_node* parse_statement(java_parser* parser, bool allow_variable_decla
         tree_node_add_child(node, parse_expression(parser));
 
         // now we mutate as needed
+        /**
+         * TODO: this is wrong...
+         * 1. primitive type is not properly accepted
+         * 2. Type names have trailing content like [] (or template stuff)
+         * so this approach is NOT robust enough for future concerns (template),
+         * hence: we cannot use Expression to simulate Type (because case 2 will produce wrong errors)
+         * so we need a different approach here
+        */
         if (allow_variable_declaration && peek_token_class_is(parser, TOKEN_PEEK_1st, JT_IDENTIFIER))
         {
             tree_node_mutate(node, JNT_STATEMENT_VAR_DECL);
@@ -2369,7 +2377,7 @@ static tree_node* parse_argument_list(java_parser* parser)
 
 /**
  * ConstructorBody:
- *     { [ExplicitConstructorInvocation] [BlockStatements] }
+ *     { [ExplicitConstructorInvocation] {Statement} }
 */
 static tree_node* parse_constructor_body(java_parser* parser)
 {
@@ -2386,8 +2394,8 @@ static tree_node* parse_constructor_body(java_parser* parser)
         tree_node_add_child(node, parse_explicit_constructor_invocation(parser));
     }
 
-    // [BlockStatements]
-    if (parser_trigger_statement(parser, TOKEN_PEEK_1st))
+    // {Statement}
+    while (parser_trigger_statement(parser, TOKEN_PEEK_1st))
     {
         tree_node_add_child(node, parse_statement(parser, true));
     }
@@ -2399,7 +2407,7 @@ static tree_node* parse_constructor_body(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected '}' at the end of block\n");
+        fprintf(stderr, "TODO error: expected '}' at the end of constructor body\n");
     }
 
     return node;
@@ -3035,7 +3043,7 @@ static tree_node* parse_primary(java_parser* parser)
  *    (No parentheses should remain.)
  *
  * But in actual implementation, parenthesis is handled in Primary, so Expression will dispatch
- * it to Primary and does deeper in the tree, hence supports precedence
+ * it to Primary and goes deeper in the tree, hence supports precedence
  * Meaning: Step 2 and 3 are not necessary
 */
 static tree_node* parse_expression(java_parser* parser)
