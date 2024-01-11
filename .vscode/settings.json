@@ -21,6 +21,8 @@
         "xtr1common": "c",
         "types.h": "c",
         "tree.h": "c",
-        "vecbuf.h": "c"
+        "vecbuf.h": "c",
+        "ast.h": "c",
+        "parser.h": "c"
     }
 }

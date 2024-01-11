@@ -24,6 +24,8 @@ typedef void (*node_data_delete_callback)(int metadata, void* data);
  * B's sibling points to C points to D points E points F
  * B's children are G, and child points to G
  * same idea for D and F
+ *
+ * TODO: control valid and ambiguous field
 */
 typedef struct _tree_node
 {
@@ -31,6 +33,10 @@ typedef struct _tree_node
     int metadata;
     /* node data */
     void* data;
+    /* true if production completes */
+    bool valid;
+    /* false if production uniquely determines input */
+    bool ambiguous;
     /* binary way to represent multi-way tree */
     struct _tree_node* first_child;
     struct _tree_node* next_sibling;

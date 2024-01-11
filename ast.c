@@ -360,13 +360,13 @@ tree_node* ast_node_method_declaration()
 /**
  * AST node generator
  *
- * field declaration
+ * variable declarators
 */
-tree_node* ast_node_field_declaration()
+tree_node* ast_node_variable_declarators()
 {
     tree_node* node = ast_node_new();
 
-    tree_node_attach(node, JNT_FIELD_DECL, NULL);
+    tree_node_attach(node, JNT_VAR_DECLARATORS, NULL);
     return node;
 }
 
@@ -682,6 +682,19 @@ tree_node* ast_node_statement()
 /**
  * AST node generator
  *
+ * local variable declaration
+*/
+tree_node* ast_node_local_variable_declaration()
+{
+    tree_node* node = ast_node_new();
+
+    tree_node_attach(node, JNT_LOCAL_VAR_DECL, NULL);
+    return node;
+}
+
+/**
+ * AST node generator
+ *
  * constructor invocation
 */
 tree_node* ast_node_constructor_invocation()
@@ -734,5 +747,33 @@ tree_node* ast_node_for_update()
     tree_node* node = ast_node_new();
 
     tree_node_attach(node, JNT_FOR_UPDATE, NULL);
+    return node;
+}
+
+/**
+ * AST node generator
+ *
+ * ambiguous node
+ *
+ * each child represents a possible interpretation
+*/
+tree_node* ast_node_ambiguous()
+{
+    tree_node* node = ast_node_new();
+
+    tree_node_attach(node, JNT_AMBIGUOUS, NULL);
+    return node;
+}
+
+/**
+ * AST node generator
+ *
+ * expression list
+*/
+tree_node* ast_node_expression_list()
+{
+    tree_node* node = ast_node_new();
+
+    tree_node_attach(node, JNT_EXPRESSION_LIST, NULL);
     return node;
 }

@@ -30,7 +30,7 @@ tree_node* ast_node_block();
 tree_node* ast_node_constructor_declaration();
 tree_node* ast_node_type();
 tree_node* ast_node_method_declaration();
-tree_node* ast_node_field_declaration();
+tree_node* ast_node_variable_declarators();
 tree_node* ast_node_formal_parameter_list();
 tree_node* ast_node_formal_parameter();
 tree_node* ast_node_throws();
@@ -51,9 +51,12 @@ tree_node* ast_node_primary_class_literal();
 tree_node* ast_node_expression();
 tree_node* ast_node_operator();
 tree_node* ast_node_statement();
+tree_node* ast_node_local_variable_declaration();
 tree_node* ast_node_constructor_invocation();
 tree_node* ast_node_switch_label();
 tree_node* ast_node_for_init();
 tree_node* ast_node_for_update();
+tree_node* ast_node_ambiguous();
+tree_node* ast_node_expression_list();
 
 #endif

@@ -107,7 +107,6 @@ bool parser_trigger_statement(java_parser* parser, size_t peek_from)
         case JLT_RWD_FOR:
             return true;
         default:
-            // expression will cover all cases that start with ID
-            return parser_trigger_expression(parser, peek_from);
+            return parser_trigger_type(parser, peek_from) || parser_trigger_expression(parser, peek_from);
     }
 }

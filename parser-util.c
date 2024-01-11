@@ -93,15 +93,3 @@ bool peek_token_is_type_word(java_parser* parser, size_t idx)
     java_lexeme_type type = peek_token_type(parser, idx);
     return type >= JLT_RWD_BOOLEAN && type <= JLT_RWD_FLOAT;
 }
-
-/**
- * ast node data deletion util
-*/
-void parser_ast_node_data_deleter(int metadata, void* data)
-{
-    switch (metadata)
-    {
-        default:
-            break;
-    }
-}

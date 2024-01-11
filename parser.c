@@ -58,11 +58,189 @@ void init_parser(java_parser* parser, file_buffer* buffer, java_symbol_table* rw
 }
 
 /**
- * Release parser instance
+ * Copy parser instance
+ *
+ * a copy of parser instance has shallow copy of all static data,
+ * and does not copy AST
 */
-void release_parser(java_parser* parser)
+void copy_parser(java_parser* from, java_parser* to)
 {
-    tree_node_delete(parser->ast_root, &parser_ast_node_data_deleter);
+    memcpy(to, from, sizeof(java_parser));
+
+    /**
+     * a copy of parser insatnce should never affect current AST
+     *
+     * AST is complex, and should always manipulate only from
+     * the original reference
+    */
+    to->ast_root = NULL;
+
+    /**
+     * file buffer state needs to be isolated
+     *
+     * the content buffer though does not need deep copy because
+     * it is static
+    */
+    to->buffer = (file_buffer*)malloc_assert(sizeof(file_buffer));
+    memcpy(to->buffer, from->buffer, sizeof(file_buffer));
+}
+
+/**
+ * Swap Parser Instance
+ *
+ * Swap parser instance with a copy instance
+ *
+ * WARNING: the parser instance has shallow reference of data
+ * by definition, so during swap all pointer references must
+ * stay the same and perform deep copy as needed
+*/
+void swap_parser(java_parser* parser, java_parser* copy)
+{
+    // lookaheads: deep copy
+    memcpy(parser->tokens, copy->tokens, sizeof(java_token) * 4);
+    parser->num_token_available = copy->num_token_available;
+
+    // file buffer deep copy
+    // only cur pointer is isolated, others are static so no copy
+    parser->buffer->cur = copy->buffer->cur;
+
+    // reserved words and expression data are static, so no copy
+
+    // guard: copy instance should not have AST
+    if (copy->ast_root)
+    {
+        fprintf(stderr, "TODO error: internal error: compiler is trying to swap an ill-formed parser instance.\n");
+    }
+}
+
+/**
+ * Release parser instance
+ *
+ * if deleting a copy of parser instance, the AST data must be NULL
+*/
+void release_parser(java_parser* parser, bool is_copy)
+{
+    if (is_copy)
+    {
+        if (parser->ast_root)
+        {
+            fprintf(stderr, "TODO error: internal error: compiler is trying to delete an ill-formed parser instance.\n");
+        }
+
+        // a copy of instance has isolated file buffer
+        free(parser->buffer);
+    }
+    else
+    {
+        tree_node_delete(parser->ast_root, &node_data_deleter);
+    }
+}
+
+/* HELPER FUNCTIONS */
+
+/**
+ * Parser wrapper with ambiguity resolution
+ *
+ * WARNING: do NOT abuse this function due to its complexity and limitation
+ *
+ * ALWAYS: make sure both productions are terminated by same symbol, otherwise
+ * the result may cause incorrect behavior for future parsing
+ * if the terminator is included in both productions, use JLT_MAX as terminator
+ * if a production is not clearly bounded by a terminal, do NOT use it
+ *
+ * TODO: we probably need a clever way to propagate error messages
+*/
+typedef tree_node* (*parser_func)(java_parser*);
+static tree_node* parse_binary_ambiguity(
+    java_parser* parser,
+    parser_func f1,
+    parser_func f2,
+    java_lexeme_type terminator)
+{
+    tree_node* node = NULL;
+    tree_node* n1 = NULL;
+    tree_node* n2 = NULL;
+    bool n1_valid = false;
+    bool n2_valid = false;
+
+    // copy parser instance
+    java_parser* parser_copy = (java_parser*)malloc_assert(sizeof(java_parser));
+    copy_parser(parser, parser_copy);
+
+    // parse
+    n1 = (*f1)(parser);
+    n2 = (*f2)(parser_copy);
+
+    // verify terminator and determine final validity status
+    n1_valid = n1->valid &&
+        (terminator == JLT_MAX || peek_token_type_is(parser, TOKEN_PEEK_1st, terminator));
+    n2_valid = n2->valid &&
+        (terminator == JLT_MAX || peek_token_type_is(parser_copy, TOKEN_PEEK_1st, terminator));
+
+    if (n1_valid)
+    {
+        if (n2_valid)
+        {
+            // keep both
+            node = ast_node_ambiguous();
+            tree_node_add_child(node, n1);
+            tree_node_add_child(node, n2);
+
+            if (parser->buffer->cur != parser_copy->buffer->cur)
+            {
+                fprintf(stderr, "TODO error: internal error: ambiguity diverges: termination differs.\n");
+            }
+        }
+        else
+        {
+            // keep n1
+            node = n1;
+            tree_node_delete(n2, &node_data_deleter);
+        }
+    }
+    else if (n2_valid)
+    {
+        // keep n2, need parser state swap
+        node = n2;
+        tree_node_delete(n1, &node_data_deleter);
+        swap_parser(parser, parser_copy);
+    }
+    else if (!n1->ambiguous)
+    {
+        // no correct pathway but n1 is uniquely determined
+        // generate n1 error and keep n1
+        // TODO: retrive n1 error from node
+        node = n1;
+        tree_node_delete(n2, &node_data_deleter);
+        fprintf(stderr, "TODO error: n1 error\n");
+    }
+    else if (!n2->ambiguous)
+    {
+        // no correct pathway but n2 is uniquely determined
+        // generate n2 error and keep n2
+        // TODO: retrive n2 error from node
+        node = n2;
+        tree_node_delete(n1, &node_data_deleter);
+        swap_parser(parser, parser_copy);
+        fprintf(stderr, "TODO error: n2 error\n");
+    }
+    else
+    {
+        // no correct pathway and ambiguous
+        // keep randomly and move on
+        //
+        // save n1 to save some time
+        // TODO: error message
+        node = n1;
+        tree_node_delete(n2, &node_data_deleter);
+        fprintf(stderr, "TODO error: no correct pathway (n1 n2 ambiguous)\n");
+    }
+
+    // delete parser instance copy
+    release_parser(parser_copy, true);
+    free(parser_copy);
+
+    return node;
 }
 
 /* FORWARD DECLARATIONS OF PARSER FUNCTIONS */
@@ -84,7 +262,10 @@ static tree_node* parse_interface_body(java_parser* parser);
 static tree_node* parse_class_body_declaration(java_parser* parser);
 static tree_node* parse_static_initializer(java_parser* parser);
 static tree_node* parse_block(java_parser* parser);
-static tree_node* parse_statement(java_parser* parser, bool allow_variable_declaration);
+static tree_node* parse_statement(java_parser* parser);
+static tree_node* parse_expression_statement(java_parser* parser);
+static tree_node* parse_local_variable_declaration(java_parser* parser);
+static tree_node* parse_local_variable_declaration_statement(java_parser* parser);
 static tree_node* parse_switch_statement(java_parser* parser);
 static tree_node* parse_do_statement(java_parser* parser);
 static tree_node* parse_break_statement(java_parser* parser);
@@ -100,12 +281,13 @@ static tree_node* parse_label_statement(java_parser* parser);
 static tree_node* parse_catch_statement(java_parser* parser);
 static tree_node* parse_finally_statement(java_parser* parser);
 static tree_node* parse_switch_label(java_parser* parser);
+static tree_node* parse_expression_list(java_parser* parser);
 static tree_node* parse_for_init(java_parser* parser);
 static tree_node* parse_for_update(java_parser* parser);
 static tree_node* parse_constructor_declaration(java_parser* parser);
 static tree_node* parse_type(java_parser* parser);
 static tree_node* parse_method_declaration(java_parser* parser);
-static tree_node* parse_field_declaration(java_parser* parser);
+static tree_node* parse_variable_declarators(java_parser* parser);
 static tree_node* parse_formal_parameter_list(java_parser* parser);
 static tree_node* parse_formal_parameter(java_parser* parser);
 static tree_node* parse_throws(java_parser* parser);
@@ -818,7 +1000,17 @@ static tree_node* parse_class_body_declaration(java_parser* parser)
                 // FieldDeclaration: {Modifier} Type ID =
                 // FieldDeclaration: {Modifier} Type ID ,
                 // FieldDeclaration: {Modifier} Type ID ;
-                tree_node_add_child(node, parse_field_declaration(parser));
+                tree_node_add_child(node, parse_variable_declarators(parser));
+
+                // ;
+                if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_SEMICOLON))
+                {
+                    consume_token(parser, NULL);
+                }
+                else
+                {
+                    fprintf(stderr, "TODO error: expected ';'\n");
+                }
                 break;
             default:
                 fprintf(stderr, "TODO error: ambiguous declaration\n");
@@ -859,78 +1051,9 @@ static tree_node* parse_static_initializer(java_parser* parser)
 
 /**
  * Block:
- *     { [BlockStatements] }
+ *     { {Statement} }
  *
- * BlockStatements:
- *     BlockStatement
- *     BlockStatements BlockStatement
- *
- * BlockStatement:
- *     LocalVariableDeclarationStatement
- *     Statement
- *
- * LocalVariableDeclarationStatement:
- *     LocalVariableDeclaration ;
- * LocalVariableDeclaration:
- *     Type VariableDeclarators
- *
- * Statement:
- *     StatementWithoutTrailingSubstatement
- *     LabeledStatement
- *     IfThenStatement
- *     IfThenElseStatement
- *     WhileStatement
- *     ForStatement
- *
- * StatementWithoutTrailingSubstatement:
- *     Block
- *     EmptyStatement
- *     ExpressionStatement
- *     SwitchStatement
- *     DoStatement
- *     BreakStatement
- *     ContinueStatement
- *     ReturnStatement
- *     SynchronizedStatement
- *     ThrowStatement
- *     TryStatement
- *
- * Looking at those variants, we do not have to worry about those that start with
- * unique keyword terminal, so the ambiguity (with ID) includes:
- * 1. LocalVariableDeclaration: Starts with Type, hence Name, hence ID
- * 2. LabeledStatement: Must start with ID followed by a colon
- * 3. ExpressionStatement: May start with ID
- *
- * So we can see some cross-referencing happen between declaration and statement,
- * therefore we do NOT distinguish 2 types of statements, and all of them will
- * be discussed under same scope: BlockStatement, thus same node struct, different
- * node ID
- *
- * From 3 cases, we see 2 is the easist production, because the trigger is definite:
- * ID followed by a colon (:)
- * Therefore this one takes the highest priority to process with 2 lookaheads
- *
- * Both 1 and 3 can start with ID but with very complex trailing content within the
- * sub-node, so we need to mutate one into another that can cover both cases
- *
- * Observe that: Type is Name, Name is a kind of Primary, Primary is a kind of
- * Expression. So we say: Expression is a superset of Type
- *
- * Therefore, LocalVariableDeclaration will not be triggered by Type, instead, it will
- * parse an Expression first:
- * LocalVariableDeclaration:
- *     Expression VariableDeclarators
- * It does not make sense semantically, but parser should not care about it. In this
- * way, this production can cover only more cases, not less; so semantics check can
- * simply rule out those that do not make sense
- *
- * With this patch, case 3 takes 2nd place of priority, with trigger check as usual,
- * results in an Expression sub-node
- *
- * And finally, case 1 will then find trigger of VariableDeclarators, then look for
- * semicolon. If VariableDeclarators not triggered, then the statement is an
- * ExpressionStatement
- *
+ * Empty statement will be discarded
 */
 static tree_node* parse_block(java_parser* parser)
 {
@@ -943,12 +1066,12 @@ static tree_node* parse_block(java_parser* parser)
     // {Statement}
     while (parser_trigger_statement(parser, TOKEN_PEEK_1st))
     {
-        statement = parse_statement(parser, true);
+        statement = parse_statement(parser);
 
         if (statement->metadata == JNT_STATEMENT_EMPTY)
         {
             // prune empty statements
-            tree_node_delete(node, &parser_ast_node_data_deleter);
+            tree_node_delete(node, &node_data_deleter);
         }
         else
         {
@@ -971,14 +1094,56 @@ static tree_node* parse_block(java_parser* parser)
 }
 
 /**
- * Satement
+ * Statement:
+ *     LocalVariableDeclarationStatement
+ *     ExpressionStatement
+ *     LabeledStatement
+ *     IfThenStatement
+ *     IfThenElseStatement
+ *     WhileStatement
+ *     ForStatement
+ *     Block
+ *     EmptyStatement
+ *     SwitchStatement
+ *     DoStatement
+ *     BreakStatement
+ *     ContinueStatement
+ *     ReturnStatement
+ *     SynchronizedStatement
+ *     ThrowStatement
+ *     TryStatement
  *
- * See parser_block for more information
+ * AMBIGUITY: When trigger is ID, ambiguity occurs between:
+ * 1. LocalVariableDeclarationStatement
+ * 2. ExpressionStatement
  *
- * This is one of few special cases that requires extra parameters to
- * avoid code duplication
+ * As a solution, we are using parallel deduction approach here:
+ * reduce both simultaneously
+ *
+ * This approach works because both production end with same token:
+ * semicolon.
+ *
+ * Same terminator is very important when applying this approach,
+ * because it guarantees that successful reduction ends at same place,
+ * hence avoids avalanche effect in future parsing.
+ *
+ * If both succeeds, we keep both;
+ * If one succeeds, we keep it;
+ * Otherwise, we randomly choose one, and generate error message
+ *
+ * Why can't we use Expression to compensate the ambiguous part,
+ * in this case: Type?
+ * It is because there are contents Expression cannot handle
+ * e.g. array dimensions definition: String[] ss;
+ * also, in future version, generic type: T<A> B;
+ *
+ * One to note is that generic type syntax is more painful because
+ * it uses operator "<" and ">" as enclosure symbol, so it is
+ * impossible to distinguish this on Expression level
+ *
+ * So in conclusion, parallel deduction is the most robust way to go.
 */
-static tree_node* parse_statement(java_parser* parser, bool allow_variable_declaration)
+static tree_node* parse_statement(java_parser* parser)
 {
     // used conditionally, so no initialization here
     tree_node* node = NULL;
@@ -1015,50 +1180,58 @@ static tree_node* parse_statement(java_parser* parser, bool allow_variable_decla
             return parse_while_statement(parser);
         case JLT_RWD_FOR:
             return parse_for_statement(parser);
+        case JLT_RWD_BOOLEAN:
+        case JLT_RWD_DOUBLE:
+        case JLT_RWD_BYTE:
+        case JLT_RWD_INT:
+        case JLT_RWD_SHORT:
+        case JLT_RWD_VOID:
+        case JLT_RWD_CHAR:
+        case JLT_RWD_LONG:
+        case JLT_RWD_FLOAT:
+            // type words guarantees variable declaration
+            return parse_local_variable_declaration_statement(parser);
         default:
             // fall-through for remaining cases
             break;
     }
 
-    // order matters here
-    if (peek_token_class_is(parser, TOKEN_PEEK_1st, JT_IDENTIFIER) &&
-        peek_token_type_is(parser, TOKEN_PEEK_2nd, JLT_SYM_COLON))
+    /**
+     * ID trigger must be discussed separately due to potential ambiguity
+     *
+     * Expression trigger must stay behind ID trigger because it can also
+     * be triggered by ID
+    */
+    if (peek_token_class_is(parser, TOKEN_PEEK_1st, JT_IDENTIFIER))
     {
-        // LabelStatement
-        return parse_label_statement(parser);
-    }
-    else if (parser_trigger_expression(parser, TOKEN_PEEK_1st))
-    {
-        // first we parse as if it is an expression statement
-        node = ast_node_statement();
-        tree_node_mutate(node, JNT_STATEMENT_EXPRESSION);
-        tree_node_add_child(node, parse_expression(parser));
-
-        // now we mutate as needed
-        /**
-         * TODO: this is wrong...
-         * 1. primitive type is not properly accepted
-         * 2. Type names have trailing content like [] (or template stuff)
-         * so this approach is NOT robust enough for future concerns (template),
-         * hence: we cannot use Expression to simulate Type (because case 2 will produce wrong errors)
-         * so we need a different approach here
-        */
-        if (allow_variable_declaration && peek_token_class_is(parser, TOKEN_PEEK_1st, JT_IDENTIFIER))
+        // :
+        if (peek_token_type_is(parser, TOKEN_PEEK_2nd, JLT_SYM_COLON))
         {
-            tree_node_mutate(node, JNT_STATEMENT_VAR_DECL);
-            tree_node_add_child(node, parse_field_declaration(parser));
-        }
-        else if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_SEMICOLON))
-        {
-            // ;
-            consume_token(parser, NULL);
+            // LabelStatement
+            return parse_label_statement(parser);
         }
         else
         {
-            fprintf(stderr, "TODO error: expected ';' at the end of expression statement.\n");
+            /**
+             * here we have ambiguity:
+             * 1. Local variable declaration statement
+             * 2. Expression statement
+             *
+             * 1 starts with Type, which has form that makes it not ambiguous
+            */
+            return parse_binary_ambiguity(
+                parser,
+                &parse_local_variable_declaration_statement,
+                &parse_expression_statement,
+                JLT_MAX
+            );
         }
-
-        return node;
+    }
+    else if (parser_trigger_expression(parser, TOKEN_PEEK_1st))
+    {
+        // ExpressionStatement
+        // now it is triggered by non-ID
+        return parse_expression_statement(parser);
     }
     else
     {
@@ -1067,6 +1240,100 @@ static tree_node* parse_statement(java_parser* parser, bool allow_variable_decla
         // by default we return an ill-formed node
         return ast_node_statement();
     }
+}
+
+/**
+ * ExpressionStatement:
+ *     Expression ;
+ *
+ * This statement, without additional context, is ambiguous
+ * but it can be validated once terminated by semicolon
+ *
+ * NOTE: due to potential ambiguity, this parser function
+ * should not generate any error messages
+ * (or at least pending it before call site determines)
+*/
+static tree_node* parse_expression_statement(java_parser* parser)
+{
+    tree_node* node = ast_node_statement();
+    node_data_statement* data = (node_data_statement*)(node->data);
+
+    tree_node_mutate(node, JNT_STATEMENT_EXPRESSION);
+
+    // Expression
+    tree_node_add_child(node, parse_expression(parser));
+
+    // ;
+    if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_SEMICOLON))
+    {
+        consume_token(parser, NULL);
+        node->valid = true;
+    }
+    else
+    {
+        fprintf(stderr, "TODO error: expected ';' at the end of expression statement.\n");
+        node->valid = false;
+    }
+
+    return node;
+}
+
+/**
+ * LocalVariableDeclaration:
+ *     Type VariableDeclarators
+*/
+static tree_node* parse_local_variable_declaration(java_parser* parser)
+{
+    tree_node* node = ast_node_statement();
+    node_data_statement* data = (node_data_statement*)(node->data);
+
+    tree_node_mutate(node, JNT_LOCAL_VAR_DECL);
+
+    // Type
+    tree_node_add_child(node, parse_type(parser));
+
+    // VariableDeclarators
+    if (peek_token_class_is(parser, TOKEN_PEEK_1st, JT_IDENTIFIER))
+    {
+        tree_node_add_child(node, parse_variable_declarators(parser));
+        node->valid = true;
+    }
+    else
+    {
+        fprintf(stderr, "TODO error: expected variable declarator.\n");
+        node->valid = false;
+    }
+
+    return node;
+}
+
+/**
+ * LocalVariableDeclarationStatement:
+ *     LocalVariableDeclaration ;
+*/
+static tree_node* parse_local_variable_declaration_statement(java_parser* parser)
+{
+    tree_node* node = ast_node_statement();
+    node_data_statement* data = (node_data_statement*)(node->data);
+
+    tree_node_mutate(node, JNT_STATEMENT_VAR_DECL);
+
+    // LocalVariableDeclaration
+    tree_node_add_child(node, parse_local_variable_declaration(parser));
+
+    // ;
+    if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_SEMICOLON))
+    {
+        consume_token(parser, NULL);
+        node->valid = true;
+    }
+    else
+    {
+        fprintf(stderr, "TODO error: expected ';' at the end of local variable declaration statement.\n");
+        node->valid = false;
+    }
+
+    return node;
 }
 
 /**
@@ -1195,7 +1462,7 @@ static tree_node* parse_switch_statement(java_parser* parser)
         // {Statement}
         while (parser_trigger_statement(parser, TOKEN_PEEK_1st))
         {
-            tree_node_add_child(node, parse_statement(parser, true));
+            tree_node_add_child(node, parse_statement(parser));
         }
     }
 
@@ -1228,7 +1495,7 @@ static tree_node* parse_do_statement(java_parser* parser)
     // Statement
     if (parser_trigger_statement(parser, TOKEN_PEEK_1st))
     {
-        tree_node_add_child(node, parse_statement(parser, false));
+        tree_node_add_child(node, parse_statement(parser));
     }
     else
     {
@@ -1587,7 +1854,7 @@ static tree_node* parse_if_statement(java_parser* parser)
     // only statement in block allows variable declarations
     if (parser_trigger_statement(parser, TOKEN_PEEK_1st))
     {
-        tree_node_add_child(node, parse_statement(parser, false));
+        tree_node_add_child(node, parse_statement(parser));
     }
     else
     {
@@ -1605,7 +1872,7 @@ static tree_node* parse_if_statement(java_parser* parser)
         // only statement in block allows variable declarations
         if (parser_trigger_statement(parser, TOKEN_PEEK_1st))
         {
-            tree_node_add_child(node, parse_statement(parser, false));
+            tree_node_add_child(node, parse_statement(parser));
         }
         else
         {
@@ -1665,7 +1932,7 @@ static tree_node* parse_while_statement(java_parser* parser)
     // Statement
     if (parser_trigger_statement(parser, TOKEN_PEEK_1st))
     {
-        tree_node_add_child(node, parse_statement(parser, false));
+        tree_node_add_child(node, parse_statement(parser));
     }
     else
     {
@@ -1679,20 +1946,6 @@ static tree_node* parse_while_statement(java_parser* parser)
 /**
  * ForStatement:
  *     for ( [ForInit] ; [Expression] ; [ForUpdate] ) Statement
- *
- * ForInit:
- *     StatementExpressionList
- *     LocalVariableDeclaration
- *
- * ForUpdate:
- *     StatementExpressionList
- *
- * StatementExpressionList:
- *     StatementExpression
- *     StatementExpressionList , StatementExpression
- *
- * Same idea as the one applied in Statement, ForInit can be simplified as:
- * Statement (separated by comma) that can start with expression only
 */
 static tree_node* parse_for_statement(java_parser* parser)
 {
@@ -1714,7 +1967,7 @@ static tree_node* parse_for_statement(java_parser* parser)
     }
 
     // [ForInit]
-    if (parser_trigger_expression(parser, TOKEN_PEEK_1st))
+    if (parser_trigger_type(parser, TOKEN_PEEK_1st) || parser_trigger_expression(parser, TOKEN_PEEK_1st))
     {
         tree_node_add_child(node, parse_for_init(parser));
     }
@@ -1767,7 +2020,7 @@ static tree_node* parse_for_statement(java_parser* parser)
     // Statement
     if (parser_trigger_statement(parser, TOKEN_PEEK_1st))
     {
-        tree_node_add_child(node, parse_statement(parser, false));
+        tree_node_add_child(node, parse_statement(parser));
     }
     else
     {
@@ -1795,7 +2048,7 @@ static tree_node* parse_label_statement(java_parser* parser)
     // Statement
     if (parser_trigger_statement(parser, TOKEN_PEEK_1st))
     {
-        tree_node_add_child(node, parse_statement(parser, false));
+        tree_node_add_child(node, parse_statement(parser));
     }
     else
     {
@@ -1935,26 +2188,15 @@ static tree_node* parse_switch_label(java_parser* parser)
 }
 
 /**
- * ForInit:
- *     StatementExpressionList
- *     LocalVariableDeclaration
- *
  * StatementExpressionList:
- *     StatementExpression
- *     StatementExpressionList , StatementExpression
- *
- * Thanks to the idea of Statement, ForInit is StatementExpressionList
- * which is:
- *
- * StatementExpressionList:
- *     Statement(true) {, Statement(true)}
+ *     Expression {, Expression}
 */
-static tree_node* parse_for_init(java_parser* parser)
+static tree_node* parse_expression_list(java_parser* parser)
 {
-    tree_node* node = ast_node_for_init();
+    tree_node* node = ast_node_expression_list();
 
-    // must use Expression trigger for this (see below)
-    tree_node_add_child(node, parse_statement(parser, true));
+    // Expression
+    tree_node_add_child(node, parse_statement(parser));
 
     // {, Statement}
     while (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_COMMA))
@@ -1966,7 +2208,7 @@ static tree_node* parse_for_init(java_parser* parser)
         // here is expression instead of statement
         if (parser_trigger_expression(parser, TOKEN_PEEK_1st))
         {
-            tree_node_add_child(node, parse_statement(parser, true));
+            tree_node_add_child(node, parse_statement(parser));
         }
         else
         {
@@ -1979,36 +2221,43 @@ static tree_node* parse_for_init(java_parser* parser)
 }
 
 /**
+ * ForInit:
+ *     StatementExpressionList
+ *     LocalVariableDeclaration
+ *
+ * AMBIGUITY: both are terminated by semicolon on ForStatement level
+ * so we can use parallel deduction here
+*/
+static tree_node* parse_for_init(java_parser* parser)
+{
+    tree_node* node = ast_node_for_init();
+
+    // optimization: for some cases, trigger will not cause ambiguity
+    if (peek_token_is_type_word(parser, TOKEN_PEEK_1st))
+    {
+        // LocalVariableDeclaration
+        tree_node_add_child(node, parse_local_variable_declaration(parser));
+    }
+    else
+    {
+        tree_node_add_child(node,
+            parse_binary_ambiguity(
+                parser, &parse_local_variable_declaration, &parse_expression_list, JLT_SYM_SEMICOLON));
+    }
+
+    return node;
+}
+
+/**
  * ForUpdate:
  *     StatementExpressionList
- *
- * Different than ForInit, this list does not allow declarations
 */
 static tree_node* parse_for_update(java_parser* parser)
 {
     tree_node* node = ast_node_for_update();
 
-    // must use Expression trigger for this (see below)
-    tree_node_add_child(node, parse_statement(parser, false));
-
-    // {, Statement}
-    while (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_COMMA))
-    {
-        // ,
-        consume_token(parser, NULL);
-
-        // statement that can only start with expression, so trigger
-        // here is expression instead of statement
-        if (parser_trigger_expression(parser, TOKEN_PEEK_1st))
-        {
-            tree_node_add_child(node, parse_statement(parser, false));
-        }
-        else
-        {
-            fprintf(stderr, "TODO error: expected expression/declaration in for initialization.\n");
-            break;
-        }
-    }
+    // StatementExpressionList
+    tree_node_add_child(node, parse_expression_list(parser));
 
     return node;
 }
@@ -2098,6 +2347,8 @@ static tree_node* parse_type(java_parser* parser)
     */
     if (peek_token_is_type_word(parser, TOKEN_PEEK_1st))
     {
+        // primitive type word makes a Type uniquely produced
+        node->ambiguous = false;
         data->primitive = peek_token_type(parser, TOKEN_PEEK_1st);
         consume_token(parser, NULL);
     }
@@ -2130,6 +2381,9 @@ static tree_node* parse_type(java_parser* parser)
         // track dimensions
         data->dimension++;
     }
+
+    // array dimension makes a Type uniquely produced
+    node->ambiguous = node->ambiguous && data->dimension == 0;
 
     return node;
 }
@@ -2184,16 +2438,12 @@ static tree_node* parse_method_declaration(java_parser* parser)
 }
 
 /**
- * FieldDeclaration:
- *     VariableDeclarator {, VariableDeclarator} ;
- *
- * The modification here is: we do not include Type
- * part at the beginning, because many things can
- * start with Type, e.g. method declaration
+ * VariableDeclarators:
+ *     VariableDeclarator {, VariableDeclarator}
 */
-static tree_node* parse_field_declaration(java_parser* parser)
+static tree_node* parse_variable_declarators(java_parser* parser)
 {
-    tree_node* node = ast_node_field_declaration();
+    tree_node* node = ast_node_variable_declarators();
 
     // VariableDeclarator
     tree_node_add_child(node, parse_variable_declarator(parser));
@@ -2207,15 +2457,6 @@ static tree_node* parse_field_declaration(java_parser* parser)
 
         // VariableDeclarator
         tree_node_add_child(node, parse_variable_declarator(parser));
-    }
-
-    if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_SEMICOLON))
-    {
-        consume_token(parser, NULL);
-    }
-    else
-    {
-        fprintf(stderr, "TODO error: expected ';'\n");
     }
 
     return node;
@@ -2397,7 +2638,7 @@ static tree_node* parse_constructor_body(java_parser* parser)
     // {Statement}
     while (parser_trigger_statement(parser, TOKEN_PEEK_1st))
     {
-        tree_node_add_child(node, parse_statement(parser, true));
+        tree_node_add_child(node, parse_statement(parser));
     }
 
     // }
@@ -2925,6 +3166,7 @@ static tree_node* parse_primary_class_literal(java_parser* parser)
  * e.g. ....................a
  * Should parser worry if it makes sense? NO!
  * Parser always and only maximizes pattern matching, it does not make sense out of anything
+ * Due to type casting syntax, we have to do this (see below)
  *
  * Another note about parenthesis expression: ( Expression )
  * We must do it on Primary level to cover cases like the following:
@@ -2937,6 +3179,11 @@ static tree_node* parse_primary_class_literal(java_parser* parser)
  * 1. Expression does not accept parenthesis, instead, it will dispatch it to Primary to handle
  * 2. This supports the precendence meaning of parenthesis because parenthesized expression
  *    will go deeper in the tree, hence higher precendence
+ *
+ * AMBIGUITY: parenthesized expression may have 2 forms:
+ * 1. ( Expression )
+ * 2. ( Type )
+ * they are ambiguous, but they both terminate at ")" so we can use parallel deduction here
 */
 static tree_node* parse_primary(java_parser* parser)
 {
@@ -2949,8 +3196,23 @@ static tree_node* parse_primary(java_parser* parser)
         {
             case JLT_SYM_PARENTHESIS_OPEN:
                 // ( Expression )
+
+                // (
                 consume_token(parser, NULL);
-                tree_node_add_child(node, parse_expression(parser));
+
+                // optimization: for some cases, trigger will not cause ambiguity
+                if (peek_token_is_type_word(parser, TOKEN_PEEK_1st))
+                {
+                    // LocalVariableDeclaration
+                    tree_node_add_child(node, parse_type(parser));
+                }
+                else
+                {
+                    tree_node_add_child(node,
+                        parse_binary_ambiguity(parser, &parse_expression, &parse_type, JLT_SYM_PARENTHESIS_CLOSE));
+                }
+
+                // )
                 if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_PARENTHESIS_CLOSE))
                 {
                     consume_token(parser, NULL);

@@ -38,7 +38,7 @@ typedef enum
     JNT_CTOR_DECL,
     JNT_TYPE,
     JNT_METHOD_DECL,
-    JNT_FIELD_DECL,
+    JNT_VAR_DECLARATORS,
     JNT_FORMAL_PARAM_LIST,
     JNT_FORMAL_PARAM,
     JNT_THROWS,
@@ -78,8 +78,11 @@ typedef enum
     JNT_STATEMENT_CATCH,
     JNT_STATEMENT_FINALLY,
     JNT_SWITCH_LABEL,
+    JNT_EXPRESSION_LIST,
     JNT_FOR_INIT,
     JNT_FOR_UPDATE,
+    JNT_LOCAL_VAR_DECL,
+    JNT_AMBIGUOUS,
 } java_node_query;
 
 /**
@@ -266,5 +269,7 @@ typedef struct
     /* true if default label, case label otherwise */
     bool is_default;
 } node_data_switch_label;
+
+void node_data_deleter(int metadata, void* data);
 
 #endif

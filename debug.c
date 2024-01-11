@@ -767,8 +767,8 @@ static void debug_print_ast_node(java_node_query query, void* data)
             printf("Method Declaration: ");
             debug_print_token_content(&((node_data_method_declaration*)data)->id);
             break;
-        case JNT_FIELD_DECL:
-            printf("Field Declaration");
+        case JNT_VAR_DECLARATORS:
+            printf("Variable Declarators");
             break;
         case JNT_FORMAL_PARAM_LIST:
             printf("Formal Parameter List");
@@ -956,11 +956,20 @@ static void debug_print_ast_node(java_node_query query, void* data)
 
             break;
         }
+        case JNT_EXPRESSION_LIST:
+            printf("Expression List");
+            break;
         case JNT_FOR_INIT:
             printf("For Initialization");
             break;
         case JNT_FOR_UPDATE:
             printf("For Update");
+            break;
+        case JNT_LOCAL_VAR_DECL:
+            printf("Local Variable Declaration");
+            break;
+        case JNT_AMBIGUOUS:
+            printf("Ambiguous Node");
             break;
         default:
             printf("Unknown: %d", query);
