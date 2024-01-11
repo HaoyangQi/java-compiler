@@ -7,6 +7,8 @@ void init_tree_node(tree_node* node)
 {
     node->metadata = 0;
     node->data = NULL;
+    node->valid = true;
+    node->ambiguous = true;
     node->first_child = NULL;
     node->next_sibling = NULL;
     node->last_sibling = NULL;
@@ -44,6 +46,8 @@ void tree_node_add_child(tree_node* node, tree_node* child)
     }
 
     node->last_sibling = child;
+    node->valid = node->valid && child->valid;
+    node->ambiguous = node->ambiguous || child->ambiguous;
 }
 
 /**
@@ -53,6 +57,9 @@ void tree_node_add_child(tree_node* node, tree_node* child)
  * then delete data itself
  * the callback must be generic and handles every scenario for node data, because the
  * deletion is recursive
+ *
+ * NOTE: always try deletion subtree before attaching, otherwise it will cause avalanche
+ * effect
 */
 void tree_node_delete(tree_node* node, node_data_delete_callback cb)
 {

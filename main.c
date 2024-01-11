@@ -50,7 +50,7 @@ bool detask_compiler(compiler* compiler)
     if (compiler->tasked)
     {
         release_file_buffer(&compiler->reader);
-        release_parser(&compiler->context);
+        release_parser(&compiler->context, false);
         compiler->tasked = false;
 
         return true;
@@ -122,7 +122,7 @@ void release_compiler(compiler* compiler)
     release_file_buffer(&compiler->reader);
     release_symbol_table(&compiler->rw_lookup_table);
     release_expression(&compiler->expression);
-    release_parser(&compiler->context);
+    release_parser(&compiler->context, false);
 }
 
 static char* test_paths[] = {
@@ -142,7 +142,9 @@ static char* test_paths[] = {
 
     // "./test/general-no-block-and-statement.txt",
 
-    "./test/general-1.txt",
+    "./test/ambiguity-1.txt",
+
+    // "./test/general-1.txt",
 };
 
 int main(int argc, char* argv[])

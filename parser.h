@@ -35,14 +35,14 @@ typedef struct _java_parser
     java_symbol_table* reserved_words;
     /* AST */
     tree_node* ast_root;
-    /* token buffer for acceptance */
-    java_token* token_buffer;
     /* expression definition */
     java_expression* expression;
 } java_parser;
 
 void init_parser(java_parser* parser, file_buffer* buffer, java_symbol_table* rw, java_expression* expr);
-void release_parser(java_parser* parser);
+void copy_parser(java_parser* from, java_parser* to);
+void swap_parser(java_parser* parser, java_parser* copy);
+void release_parser(java_parser* parser, bool is_copy);
 
 void parse(java_parser* parser);
 
@@ -52,7 +52,7 @@ java_token_class peek_token_class(java_parser* parser, size_t idx);
 java_lexeme_type peek_token_type(java_parser* parser, size_t idx);
 bool peek_token_class_is(java_parser* parser, size_t idx, java_token_class class);
 bool peek_token_type_is(java_parser* parser, size_t idx, java_lexeme_type type);
-void parser_ast_node_data_deleter(int metadata, void* data);
+bool peek_token_is_type_word(java_parser* parser, size_t idx);
 
 bool parser_trigger_name(java_parser* parser, size_t peek_from);
 bool parser_trigger_class_type(java_parser* parser, size_t peek_from);
