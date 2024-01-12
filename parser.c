@@ -259,6 +259,7 @@ static tree_node* parse_class_implements(java_parser* parser);
 static tree_node* parse_class_body(java_parser* parser);
 static tree_node* parse_interface_extends(java_parser* parser);
 static tree_node* parse_interface_body(java_parser* parser);
+static tree_node* parse_interface_body_declaration(java_parser* parser);
 static tree_node* parse_class_body_declaration(java_parser* parser);
 static tree_node* parse_static_initializer(java_parser* parser);
 static tree_node* parse_block(java_parser* parser);
@@ -286,6 +287,7 @@ static tree_node* parse_for_init(java_parser* parser);
 static tree_node* parse_for_update(java_parser* parser);
 static tree_node* parse_constructor_declaration(java_parser* parser);
 static tree_node* parse_type(java_parser* parser);
+static tree_node* parse_method_header(java_parser* parser);
 static tree_node* parse_method_declaration(java_parser* parser);
 static tree_node* parse_variable_declarators(java_parser* parser);
 static tree_node* parse_formal_parameter_list(java_parser* parser);
@@ -872,22 +874,28 @@ static tree_node* parse_interface_extends(java_parser* parser)
 
 /**
  * InterfaceBody:
- *     { [InterfaceMemberDeclarations] }
- *
- * InterfaceMemberDeclarations:
- *     InterfaceMemberDeclaration
- *     InterfaceMemberDeclarations InterfaceMemberDeclaration
+ *     { {InterfaceMemberDeclaration} }
 */
 static tree_node* parse_interface_body(java_parser* parser)
 {
     tree_node* node = ast_node_interface_body();
+    java_token* peek;
 
     // {
     consume_token(parser, NULL);
 
-    /**
-     * TODO: [InterfaceMemberDeclarations]
-    */
+    // {InterfaceMemberDeclaration}
+    while (true)
+    {
+        peek = token_peek(parser, TOKEN_PEEK_1st);
+
+        if (!(JAVA_LEXEME_MODIFIER_OR_TYPE_WORD(peek->type) || peek->class == JT_IDENTIFIER))
+        {
+            break;
+        }
+
+        tree_node_add_child(node, parse_interface_body_declaration(parser));
+    }
 
     // }
     if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_BRACE_CLOSE))
@@ -897,6 +905,113 @@ static tree_node* parse_interface_body(java_parser* parser)
     else
     {
         fprintf(stderr, "TODO error: expected '}' at the end of interface body\n");
+    }
+
+    return node;
+}
+
+/**
+ * InterfaceMemberDeclaration:
+ *     ConstantDeclaration
+ *     AbstractMethodDeclaration
+ *
+ * ConstantDeclaration:
+ *     FieldDeclaration
+ *
+ * AbstractMethodDeclaration:
+ *     MethodHeader ;
+ *
+ * FieldDeclaration:
+ *     [FieldModifiers] Type VariableDeclarators ;
+ *
+ * MethodHeader:
+ *     [Modifiers] Type MethodDeclarator [Throws]
+ *
+ * Just like what we did for class body declaration, we discuss the following:
+ * 1. [Modifiers] Type VariableDeclarators ;
+ * 2. [Modifiers] Type MethodDeclarator [Throws]
+ *
+ * Approach is similar, so we do not repeat here.
+*/
+static tree_node* parse_interface_body_declaration(java_parser* parser)
+{
+    tree_node* node = ast_node_interface_body_declaration();
+    node_data_interface_body_declaration* data = (node_data_interface_body_declaration*)(node->data);
+    java_lexeme_type type;
+
+    // {Modifier}, still ambiguous
+    while (true)
+    {
+        type = peek_token_type(parser, TOKEN_PEEK_1st);
+
+        // if not a modifier, we stop
+        if (!JAVA_LEXEME_MODIFIER_WORD(type))
+        {
+            break;
+        }
+
+        consume_token(parser, NULL);
+        data->modifier |= ((lbit_flag)1 << type);
+    }
+
+    // Type, still ambiguous
+    if (parser_trigger_type(parser, TOKEN_PEEK_1st))
+    {
+        tree_node_add_child(node, parse_type(parser));
+    }
+    else
+    {
+        fprintf(stderr, "TODO error: expected type name in the declaration\n");
+        return node;
+    }
+
+    // AbstractMethodDeclaration|FieldDeclaration
+    if (peek_token_class_is(parser, TOKEN_PEEK_1st, JT_IDENTIFIER))
+    {
+        switch (peek_token_type(parser, TOKEN_PEEK_2nd))
+        {
+            case JLT_SYM_PARENTHESIS_OPEN:
+                // AbstractMethodDeclaration: {Modifier} Type ID (
+                tree_node_add_child(node, parse_method_header(parser));
+
+                // ;
+                if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_SEMICOLON))
+                {
+                    consume_token(parser, NULL);
+                }
+                else
+                {
+                    fprintf(stderr, "TODO error: expected ';'\n");
+                }
+                break;
+            case JLT_SYM_BRACKET_OPEN:
+            case JLT_SYM_EQUAL:
+            case JLT_SYM_COMMA:
+            case JLT_SYM_SEMICOLON:
+                // FieldDeclaration: {Modifier} Type ID [
+                // FieldDeclaration: {Modifier} Type ID =
+                // FieldDeclaration: {Modifier} Type ID ,
+                // FieldDeclaration: {Modifier} Type ID ;
+                tree_node_add_child(node, parse_variable_declarators(parser));
+
+                // ;
+                if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_SEMICOLON))
+                {
+                    consume_token(parser, NULL);
+                }
+                else
+                {
+                    fprintf(stderr, "TODO error: expected ';'\n");
+                }
+                break;
+            default:
+                fprintf(stderr, "TODO error: ambiguous declaration\n");
+                break;
+        }
+    }
+    else
+    {
+        fprintf(stderr, "TODO error: expected a name in declaration\n");
     }
 
     return node;
@@ -929,7 +1044,7 @@ static tree_node* parse_interface_body(java_parser* parser)
  * 5 peek(2) = ID (
  * reduce: MethodDeclaration
  *
- * 6 peek(2) = ID [|ID =|ID ,
+ * 6 peek(2) = ID [|ID =|ID ,|ID ;
  * reduce: FieldDeclaration
 */
 static tree_node* parse_class_body_declaration(java_parser* parser)
@@ -2389,13 +2504,17 @@ static tree_node* parse_type(java_parser* parser)
 }
 
 /**
- * MethodDeclaration:
- *     ID ( [FormalParameterList] ) {[ ]} [Throws] MethodBody
+ * MethodHeader:
+ *     ID ( [FormalParameterList] ) {[ ]} [Throws]
+ *
+ * the {[ ]} is legacy syntax that marks return value as "array type";
+ * and this syntax has been deprecated and should not be supported in
+ * newer versions
 */
-static tree_node* parse_method_declaration(java_parser* parser)
+static tree_node* parse_method_header(java_parser* parser)
 {
-    tree_node* node = ast_node_method_declaration();
-    node_data_method_declaration* data = (node_data_method_declaration*)(node->data);
+    tree_node* node = ast_node_method_header();
+    node_data_method_header* data = (node_data_method_header*)(node->data);
 
     // ID (
     consume_token(parser, &data->id);
@@ -2418,11 +2537,46 @@ static tree_node* parse_method_declaration(java_parser* parser)
         return node;
     }
 
+    // {[ ]}
+    while (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_BRACKET_OPEN))
+    {
+        // [
+        consume_token(parser, NULL);
+
+        // ]
+        if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_BRACKET_CLOSE))
+        {
+            consume_token(parser, NULL);
+        }
+        else
+        {
+            fprintf(stderr, "TODO error: expected ']'\n");
+            break;
+        }
+
+        // track dimensions
+        data->dimension++;
+    }
+
     // [Throws]
     if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_RWD_THROWS))
     {
         tree_node_add_child(node, parse_throws(parser));
     }
+
+    return node;
+}
+
+/**
+ * MethodDeclaration:
+ *     MethodHeader MethodBody
+*/
+static tree_node* parse_method_declaration(java_parser* parser)
+{
+    tree_node* node = ast_node_method_declaration();
+
+    // MethodHeader
+    tree_node_add_child(node, parse_method_header(parser));
 
     // MethodBody
     if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_BRACE_OPEN))

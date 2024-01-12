@@ -32,11 +32,13 @@ typedef enum
     JNT_CLASS_BODY,
     JNT_INTERFACE_EXTENDS,
     JNT_INTERFACE_BODY,
+    JNT_INTERFACE_BODY_DECL,
     JNT_CLASS_BODY_DECL,
     JNT_STATIC_INIT,
     JNT_BLOCK,
     JNT_CTOR_DECL,
     JNT_TYPE,
+    JNT_METHOD_HEADER,
     JNT_METHOD_DECL,
     JNT_VAR_DECLARATORS,
     JNT_FORMAL_PARAM_LIST,
@@ -149,6 +151,15 @@ typedef struct
 } node_data_interface_declaration;
 
 /**
+ * Interface Body Declaration
+*/
+typedef struct
+{
+    /* modifier data */
+    lbit_flag modifier;
+} node_data_interface_body_declaration;
+
+/**
  * Class Body Declaration
 */
 typedef struct
@@ -189,13 +200,15 @@ typedef struct
 } node_data_formal_parameter;
 
 /**
- * Method Declaration
+ * Method Header
 */
 typedef struct
 {
     /* method name */
     java_token id;
-} node_data_method_declaration;
+    /* array dimension */
+    size_t dimension;
+} node_data_method_header;
 
 /**
  * Variable Declarator
