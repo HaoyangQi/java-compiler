@@ -722,6 +722,10 @@ static void debug_print_ast_node(java_node_query query, void* data)
         case JNT_CLASS_BODY:
             printf("Class Body");
             break;
+        case JNT_INTERFACE_BODY_DECL:
+            printf("Interface Body Declaration: ");
+            debug_print_modifier_bit_flag(((node_data_interface_body_declaration*)data)->modifier);
+            break;
         case JNT_CLASS_BODY_DECL:
             printf("Class Body Declaration: ");
             debug_print_modifier_bit_flag(((node_data_class_body_declaration*)data)->modifier);
@@ -763,9 +767,22 @@ static void debug_print_ast_node(java_node_query query, void* data)
 
             break;
         }
+        case JNT_METHOD_HEADER:
+        {
+            node_data_method_header* d = (node_data_method_header*)data;
+
+            printf("Method Header: ");
+            debug_print_token_content(&d->id);
+
+            if (d->dimension > 0)
+            {
+                printf(" (return array dim: %zd)", d->dimension);
+            }
+
+            break;
+        }
         case JNT_METHOD_DECL:
-            printf("Method Declaration: ");
-            debug_print_token_content(&((node_data_method_declaration*)data)->id);
+            printf("Method Declaration");
             break;
         case JNT_VAR_DECLARATORS:
             printf("Variable Declarators");

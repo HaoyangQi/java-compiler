@@ -295,6 +295,22 @@ tree_node* ast_node_block()
 /**
  * AST node generator
  *
+ * interface body declaration
+*/
+tree_node* ast_node_interface_body_declaration()
+{
+    tree_node* node = ast_node_new();
+    node_data_interface_body_declaration* data = (node_data_interface_body_declaration*)
+        malloc_assert(sizeof(node_data_interface_body_declaration));
+
+    data->modifier = 0;
+    tree_node_attach(node, JNT_INTERFACE_BODY_DECL, data);
+    return node;
+}
+
+/**
+ * AST node generator
+ *
  * class body declaration
 */
 tree_node* ast_node_class_body_declaration()
@@ -344,16 +360,30 @@ tree_node* ast_node_type()
 /**
  * AST node generator
  *
+ * method header
+*/
+tree_node* ast_node_method_header()
+{
+    tree_node* node = ast_node_new();
+    node_data_method_header* data = (node_data_method_header*)
+        malloc_assert(sizeof(node_data_method_header));
+
+    init_token(&data->id);
+    data->dimension = 0;
+    tree_node_attach(node, JNT_METHOD_HEADER, data);
+    return node;
+}
+
+/**
+ * AST node generator
+ *
  * method declaration
 */
 tree_node* ast_node_method_declaration()
 {
     tree_node* node = ast_node_new();
-    node_data_method_declaration* data = (node_data_method_declaration*)
-        malloc_assert(sizeof(node_data_method_declaration));
 
-    init_token(&data->id);
-    tree_node_attach(node, JNT_METHOD_DECL, data);
+    tree_node_attach(node, JNT_METHOD_DECL, NULL);
     return node;
 }
 
