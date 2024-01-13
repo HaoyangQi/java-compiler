@@ -143,6 +143,7 @@ static char* test_paths[] = {
     // "./test/general-no-block-and-statement.txt",
 
     "./test/ambiguity-1.txt",
+    // "./test/ambiguity-2.txt",
 
     // "./test/general-1.txt",
 };
