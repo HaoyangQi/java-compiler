@@ -3314,20 +3314,16 @@ static tree_node* parse_primary_class_literal(java_parser* parser)
  *
  * Now we need to figure out parser's job for those parts.
  *
- * In a nutshell: keep reading any part, if matched, we accept, terminate otherwise
+ * Top-Level rules
+ * 1. separators cannot stay consecutively
+ * 2. ( Expression ) can be followed by anything, thus type casting
+ * 3. other valid Primary form can only be followed by separators
  *
- * This will result something that does not make any sense,
- * e.g. ....................a
- * Should parser worry if it makes sense? NO!
- * Parser always and only maximizes pattern matching, it does not make sense out of anything
- * Due to type casting syntax, we have to do this (see below)
- *
- * Another note about parenthesis expression: ( Expression )
- * We must do it on Primary level to cover cases like the following:
- * (a + 1).toString()
- * also because the syntax of type casting, which is essentially consecutive parenthesis closures
- * since we only match patterns without justification in parser so it implicitly accept sequence
- * like (...)(...), which is the form of type casting
+ * and we need another trick for trailing content of ID trigger:
+ * 1. array access
+ * 2. method call
+ * 3. class literal (. class)
+ * so that they will be separately accepted and stay isolated from top-level rules
  *
  * Accepting ( Expression ) on this level also means:
  * 1. Expression does not accept parenthesis, instead, it will dispatch it to Primary to handle
@@ -3338,18 +3334,47 @@ static tree_node* parse_primary_class_literal(java_parser* parser)
  * 1. ( Expression )
  * 2. ( Type )
  * they are ambiguous, but they both terminate at ")" so we can use parallel deduction here
+ * both may result in same tree, but we still need to keep the mechanism here because Type
+ * may have form that is not accepted by Expression
+ * e.g. (int[])a
+ * is a valid expression but "int[]" part has unique interpretation, which is Type
 */
 static tree_node* parse_primary(java_parser* parser)
 {
     tree_node* node = ast_node_primary();
+    java_lexeme_type peek;
     bool accepting = true;
+    bool last_separator = false;
+    bool allow_all = true;
+    bool is_separator;
 
     while (accepting)
     {
-        switch (peek_token_type(parser, TOKEN_PEEK_1st))
+        peek = peek_token_type(parser, TOKEN_PEEK_1st);
+        is_separator = peek == JLT_SYM_DOT || peek == JLT_SYM_METHOD_REFERENCE;
+
+        /**
+         * Guards
+         *
+         * 1. if last is parenthesized expression: allow everything
+         * 2. if last is separator (.|::): block separator
+         * 3. if last is other: allow separator only
+         *
+         * condition 1 allows forms of type casting
+        */
+        if ((last_separator && is_separator) || (!allow_all && !last_separator && !is_separator))
+        {
+            break;
+        }
+
+        last_separator = false;
+        allow_all = false;
+
+        switch (peek)
         {
             case JLT_SYM_PARENTHESIS_OPEN:
                 // ( Expression )
+                allow_all = true;
 
                 // (
                 consume_token(parser, NULL);
@@ -3377,7 +3402,15 @@ static tree_node* parse_primary(java_parser* parser)
                 }
                 break;
             case JLT_SYM_DOT:
+                last_separator = true;
+                consume_token(parser, NULL);
+                break;
             case JLT_SYM_METHOD_REFERENCE:
+                // here we keep the token because we need to distinguish it from DOT
+                // :: is more rarely used than DOT so we log :: to save some memory
+                last_separator = true;
+                tree_node_add_child(node, parse_primary_simple(parser));
+                break;
             case JLT_RWD_TRUE:
             case JLT_RWD_FALSE:
             case JLT_RWD_NULL:
@@ -3461,6 +3494,10 @@ static tree_node* parse_primary(java_parser* parser)
  * But in actual implementation, parenthesis is handled in Primary, so Expression will dispatch
  * it to Primary and goes deeper in the tree, hence supports precedence
  * Meaning: Step 2 and 3 are not necessary
+ *
+ * To prune some dumb cases, we have following rules:
+ * Two Primary cannot stay consecutively in a valid Expression;
+ * Suprisingly, operators can, for example: unary operators
 */
 static tree_node* parse_expression(java_parser* parser)
 {
@@ -3469,6 +3506,7 @@ static tree_node* parse_expression(java_parser* parser)
     java_lexeme_type token_type;
     java_operator op_type;
     bool next_is_operator;
+    bool allow_primary = true; // allow in 1st iteration
 
     // get worker ready
     init_expression_worker(&worker);
@@ -3564,11 +3602,15 @@ static tree_node* parse_expression(java_parser* parser)
             }
 
             expression_stack_push(&worker, op_type);
+            allow_primary = true;
         }
-        else if (parser_trigger_primary(parser, TOKEN_PEEK_1st))
+        else if (allow_primary && parser_trigger_primary(parser, TOKEN_PEEK_1st))
         {
             tree_node_add_child(node, parse_primary(parser));
             expression_stack_push(&worker, OPID_UNDEFINED);
+
+            // 2 primary cannot stay consecutively
+            allow_primary = false;
         }
         else
         {
