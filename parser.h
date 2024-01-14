@@ -8,6 +8,7 @@
 #include "symtbl.h"
 #include "ast.h"
 #include "expression.h"
+#include "error.h"
 
 /**
  * Token Peek Index
@@ -22,6 +23,9 @@
 
 /**
  * Parser Info
+ *
+ * All data structures that contain static data are referenced
+ * from compiler level
 */
 typedef struct _java_parser
 {
@@ -37,9 +41,17 @@ typedef struct _java_parser
     tree_node* ast_root;
     /* expression definition */
     java_expression* expression;
+    /* error data */
+    java_error* error;
 } java_parser;
 
-void init_parser(java_parser* parser, file_buffer* buffer, java_symbol_table* rw, java_expression* expr);
+void init_parser(
+    java_parser* parser,
+    file_buffer* buffer,
+    java_symbol_table* rw,
+    java_expression* expr,
+    java_error* err
+);
 void copy_parser(java_parser* from, java_parser* to);
 void swap_parser(java_parser* parser, java_parser* copy);
 void release_parser(java_parser* parser, bool is_copy);
@@ -61,5 +73,8 @@ bool parser_trigger_type(java_parser* parser, size_t peek_from);
 bool parser_trigger_expression(java_parser* parser, size_t peek_from);
 bool parser_trigger_primary(java_parser* parser, size_t peek_from);
 bool parser_trigger_statement(java_parser* parser, size_t peek_from);
+
+void parser_error(java_parser* parser, java_error_id id);
+void parser_recovery_dispatch(java_parser* parser, java_error_id id);
 
 #endif

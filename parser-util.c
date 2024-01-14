@@ -93,3 +93,14 @@ bool peek_token_is_type_word(java_parser* parser, size_t idx)
     java_lexeme_type type = peek_token_type(parser, idx);
     return type >= JLT_RWD_BOOLEAN && type <= JLT_RWD_FLOAT;
 }
+
+/**
+ * Error Logger
+ *
+ * TODO: we need a clever way to get line info from java_parser instance
+*/
+void parser_error(java_parser* parser, java_error_id id)
+{
+    error_log(parser->error, id, 0, 0);
+    parser_recovery_dispatch(parser, id);
+}

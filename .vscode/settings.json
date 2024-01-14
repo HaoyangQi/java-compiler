@@ -23,6 +23,7 @@
         "tree.h": "c",
         "vecbuf.h": "c",
         "ast.h": "c",
-        "parser.h": "c"
+        "parser.h": "c",
+        "report.h": "c"
     }
 }

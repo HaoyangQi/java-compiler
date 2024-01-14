@@ -45,7 +45,13 @@
 /**
  * Initialize parser instance
 */
-void init_parser(java_parser* parser, file_buffer* buffer, java_symbol_table* rw, java_expression* expr)
+void init_parser(
+    java_parser* parser,
+    file_buffer* buffer,
+    java_symbol_table* rw,
+    java_expression* expr,
+    java_error* err
+)
 {
     // tokens contains garbage data if not used
     // so the counter is important
@@ -55,6 +61,7 @@ void init_parser(java_parser* parser, file_buffer* buffer, java_symbol_table* rw
     parser->reserved_words = rw;
     parser->ast_root = NULL;
     parser->expression = expr;
+    parser->error = err;
 }
 
 /**
@@ -336,6 +343,9 @@ void parse(java_parser* parser)
         switch (peek_token_type(parser, TOKEN_PEEK_1st))
         {
             case JLT_SYM_SEMICOLON: // empty
+                // standalone semicolon on top level can be safely ignored
+                consume_token(parser, NULL);
+                break;
             case JLT_RWD_CLASS:     // keyword
             case JLT_RWD_INTERFACE:
             case JLT_RWD_PUBLIC:    // modifier
@@ -353,6 +363,11 @@ void parse(java_parser* parser)
                 loop_continue = false;
                 break;
         }
+    }
+
+    if (!peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_MAX))
+    {
+        parser_error(parser, JAVA_E_TRAILING_CONTENT);
     }
 }
 
@@ -540,7 +555,7 @@ static tree_node* parse_package_declaration(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected name after package declaration\n");
+        parser_error(parser, JAVA_E_PKG_DECL_NO_NAME);
         return node;
     }
 
@@ -550,7 +565,7 @@ static tree_node* parse_package_declaration(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected ';'\n");
+        parser_error(parser, JAVA_E_PKG_DECL_NO_SEMICOLON);
     }
 
     return node;

@@ -20,6 +20,10 @@
     max(compiler_debug_report.internal.reserved_words_longest_probing, (n))
 #define report_expression_static_data_size(n) \
     compiler_debug_report.internal.expression_static_data_size = (n)
+#define report_error_definition_size(n) \
+    compiler_debug_report.internal.error_definition_size = (n)
+#define report_error_message_size(n) \
+    compiler_debug_report.internal.error_message_size = (n)
 
 #else
 
@@ -28,6 +32,8 @@
 #define report_reserved_words_hash_collisions(n)
 #define report_reserved_words_longest_probing(n)
 #define report_expression_static_data_size(n)
+#define report_error_definition_size(n)
+#define report_error_message_size(n)
 
 #endif
 
@@ -49,6 +55,10 @@ typedef struct _debug_report_internal
     size_t reserved_words_longest_probing;
     /* expression static data size */
     size_t expression_static_data_size;
+    /* error definition static data size */
+    size_t error_definition_size;
+    /* error message static data size */
+    size_t error_message_size;
 } debug_report_internal;
 
 /**
