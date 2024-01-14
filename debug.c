@@ -59,13 +59,13 @@ void debug_format_report(byte report_type)
     if (report_type & REPORT_INTERNAL)
     {
         printf("Internal:\n");
-        printf("    Number of reserved words of compiled Java: %zd bytes\n",
+        printf("    Number of reserved words of compiled Java: %zd\n",
             compiler_debug_report.internal.reserved_words_count);
         printf("    Lookup table size of reserved words: %zd bytes\n",
             compiler_debug_report.internal.reserved_words_lookup_table_size);
-        printf("    Number of collisions during table creation: %zd bytes\n",
+        printf("    Number of collisions during table creation: %zd\n",
             compiler_debug_report.internal.reserved_words_hash_collisions);
-        printf("    Longest probing of reserved word lookup: %zd bytes\n",
+        printf("    Longest probing of reserved word lookup: %zd\n",
             compiler_debug_report.internal.reserved_words_longest_probing);
         printf("    Expression static data size: %zd bytes\n",
             compiler_debug_report.internal.expression_static_data_size);
