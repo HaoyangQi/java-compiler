@@ -4,6 +4,7 @@
 #include "symtbl.h"
 #include "parser.h"
 #include "expression.h"
+#include "error.h"
 
 #include "debug.h"
 #include "report.h"
@@ -17,6 +18,7 @@ typedef struct
     java_symbol_table rw_lookup_table;
     java_expression expression;
     java_parser context;
+    java_error error;
 } compiler;
 
 /**
@@ -30,13 +32,15 @@ bool init_compiler(compiler* compiler)
     init_file_buffer(&compiler->reader);
     init_symbol_table(&compiler->rw_lookup_table);
     init_expression(&compiler->expression);
+    init_error(&compiler->error);
 
     load_language_spec(&compiler->rw_lookup_table);
     init_parser(
         &compiler->context,
         &compiler->reader,
         &compiler->rw_lookup_table,
-        &compiler->expression
+        &compiler->expression,
+        &compiler->error
     );
 
     return true;
@@ -50,6 +54,7 @@ bool detask_compiler(compiler* compiler)
     if (compiler->tasked)
     {
         release_file_buffer(&compiler->reader);
+        clear_error(&compiler->error);
         release_parser(&compiler->context, false);
         compiler->tasked = false;
 
@@ -105,7 +110,8 @@ bool retask_compiler(compiler* compiler, char* source_path)
         &compiler->context,
         &compiler->reader,
         &compiler->rw_lookup_table,
-        &compiler->expression
+        &compiler->expression,
+        &compiler->error
     );
 
     compiler->tasked = true;
@@ -122,7 +128,87 @@ void release_compiler(compiler* compiler)
     release_file_buffer(&compiler->reader);
     release_symbol_table(&compiler->rw_lookup_table);
     release_expression(&compiler->expression);
+    release_error(&compiler->error);
     release_parser(&compiler->context, false);
+}
+
+/**
+ * Print error stack
+ *
+ * TODO: format?
+ * MSVC: <file path>(<ln>,<col>): <error level> <error code>: <error message>
+ * GCC: <file name>:<ln>:<col>: <error level>: <error message> <snap shot>
+ * JAVA: <file name>:<ln> <error level>: <error message> <snap shot>
+*/
+void compiler_error_format_print(compiler* compiler)
+{
+    java_error* error = &compiler->error;
+    java_error_entry* cur = error->data;
+    error_definiton def;
+
+    while (cur)
+    {
+        def = error->definition[cur->id];
+
+        // file path:
+        fprintf(stderr, "%s:%zd:%zd: ", compiler->source_file_name, cur->ln, cur->col);
+
+        // print error level
+        switch (def & ERR_DEF_MASK_LEVEL)
+        {
+            case JEL_INFORMATION:
+                fprintf(stderr, "info");
+                break;
+            case JEL_WARNING:
+                fprintf(stderr, "warning");
+                break;
+            case JEL_ERROR:
+                fprintf(stderr, "error");
+                break;
+            default:
+                fprintf(stderr, "(unknown error level)");
+                break;
+        }
+
+        fprintf(stderr, " ");
+
+        // print error code header
+        switch (def & ERR_DEF_MASK_SCOPE)
+        {
+            case JES_INTERNAL:
+                fprintf(stderr, "IN");
+                break;
+            case JES_RUNTIME:
+                fprintf(stderr, "RU");
+                break;
+            case JES_LEXICAL:
+                fprintf(stderr, "LE");
+                break;
+            case JES_SYNTAX:
+                fprintf(stderr, "SY");
+                break;
+            case JES_CONTEXT:
+                fprintf(stderr, "CO");
+                break;
+            case JES_OPTIMIZATION:
+                fprintf(stderr, "OP");
+                break;
+            case JES_LINKER:
+                fprintf(stderr, "LI");
+                break;
+            case JES_BUILD:
+                fprintf(stderr, "BU");
+                break;
+        }
+
+        // print error code
+        fprintf(stderr, "%04d: ", cur->id);
+
+        // message
+        fprintf(stderr, "%s\n", error->message[cur->id]);
+
+        cur = cur->next;
+    }
 }
 
 static char* test_paths[] = {
@@ -142,10 +228,14 @@ static char* test_paths[] = {
 
     // "./test/general-no-block-and-statement.txt",
 
-    "./test/ambiguity-1.txt",
+    // "./test/ambiguity-1.txt",
     // "./test/ambiguity-2.txt",
 
     // "./test/general-1.txt",
+
+    "./test/recovery/pkg-decl-1.txt",
+    "./test/recovery/pkg-decl-2.txt",
+    "./test/recovery/pkg-decl-3.txt",
 };
 
 int main(int argc, char* argv[])
@@ -176,6 +266,7 @@ int main(int argc, char* argv[])
         // debug_file_buffer(&compiler.reader);
         // debug_tokenize(&compiler.reader, &compiler.rw_lookup_table);
         debug_ast(compiler.context.ast_root);
+        compiler_error_format_print(&compiler);
     }
 
     release_compiler(&compiler);
