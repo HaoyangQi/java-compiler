@@ -7,35 +7,38 @@
 /**
  * Error Definition
  *
- * 0000 0000 0000 0000
+ * 0000 0000
  * ____
- * |    ______________
+ * |    ____
  * |    |
- * |    Scope (12 bits)
+ * |    Scope (4 bits)
  * Type (4 bits)
+ *
+ * both parts are described as integer index value,
+ * numbered from 0 to 15 (0xF) consecutively
 */
-typedef unsigned short error_definiton;
+typedef unsigned char error_definiton;
 
 /**
  * Definition Mask
 */
-#define ERR_DEF_MASK_LEVEL ((error_definiton)(0xF000))
-#define ERR_DEF_MASK_SCOPE ((error_definiton)(0x0FFF))
+#define ERR_DEF_MASK_LEVEL ((error_definiton)(0xF0))
+#define ERR_DEF_MASK_SCOPE ((error_definiton)(0x0F))
 
 /**
  * Error Type
  *
- * Bit flag
+ * index value
 */
 #define JEL_UNDEFINED 0
-#define JEL_INFORMATION ((error_definiton)(0x1000))
-#define JEL_WARNING ((error_definiton)(0x2000))
-#define JEL_ERROR ((error_definiton)(0x4000))
+#define JEL_INFORMATION ((error_definiton)(0x10))
+#define JEL_WARNING ((error_definiton)(0x20))
+#define JEL_ERROR ((error_definiton)(0x30))
 
 /**
  * Error Scope
  *
- * Bit flag
+ * index value
  *
  * INTERNAL: error in compiler logic
  * RUNTIME: memory failure, I/O error, etc
@@ -47,21 +50,22 @@ typedef unsigned short error_definiton;
  * BUILD: error from building process
 */
 #define JES_UNDEFINED 0
-#define JES_INTERNAL ((error_definiton)(0x0001))
-#define JES_RUNTIME ((error_definiton)(0x0002))
-#define JES_LEXICAL ((error_definiton)(0x0004))
-#define JES_SYNTAX ((error_definiton)(0x0008))
-#define JES_CONTEXT ((error_definiton)(0x0010))
-#define JES_OPTIMIZATION ((error_definiton)(0x0020))
-#define JES_LINKER ((error_definiton)(0x0040))
-#define JES_BUILD ((error_definiton)(0x0080))
+#define JES_INTERNAL ((error_definiton)(0x01))
+#define JES_RUNTIME ((error_definiton)(0x02))
+#define JES_LEXICAL ((error_definiton)(0x03))
+#define JES_SYNTAX ((error_definiton)(0x04))
+#define JES_CONTEXT ((error_definiton)(0x05))
+#define JES_OPTIMIZATION ((error_definiton)(0x06))
+#define JES_LINKER ((error_definiton)(0x07))
+#define JES_BUILD ((error_definiton)(0x08))
 
 /**
  * Definition helpers
 */
 #define DEFINE_ERROR(l, s) ((l) | (s))
+#define JEL_TO_INDEX(l) (((error_definiton)(l)) >> 4)
 #define DEFINE_RESERVED_ERROR 0
-#define DEFINE_SYNTAX_ERROR ((error_definiton)(0x4008))
+#define DEFINE_SYNTAX_ERROR ((error_definiton)(0x34))
 
 /**
  * Error Message ID
