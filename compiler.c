@@ -3,6 +3,27 @@
 #include "debug.h"
 #include "report.h"
 
+// JEL_* translation
+static const char* error_level_map[] = {
+    "(undefine)",
+    "note",
+    "warning",
+    "error",
+};
+
+// JES_* translation
+static const char* error_scope_map[] = {
+    "(UNDEFINED)",
+    "IN",
+    "RU",
+    "LE",
+    "SY",
+    "CO",
+    "OP",
+    "LI",
+    "BU",
+};
+
 /**
  * Full initialization of compiler instance
 */
@@ -135,62 +156,15 @@ void compiler_error_format_print(compiler* compiler)
     {
         def = error->definition[cur->id];
 
-        // file path:
-        fprintf(stderr, "%s:%zd:%zd: ", compiler->source_file_name, cur->ln, cur->col);
-
-        // print error level
-        switch (def & ERR_DEF_MASK_LEVEL)
-        {
-            case JEL_INFORMATION:
-                fprintf(stderr, "info");
-                break;
-            case JEL_WARNING:
-                fprintf(stderr, "warning");
-                break;
-            case JEL_ERROR:
-                fprintf(stderr, "error");
-                break;
-            default:
-                fprintf(stderr, "(unknown error level)");
-                break;
-        }
-
-        fprintf(stderr, " ");
-
-        // print error code header
-        switch (def & ERR_DEF_MASK_SCOPE)
-        {
-            case JES_INTERNAL:
-                fprintf(stderr, "IN");
-                break;
-            case JES_RUNTIME:
-                fprintf(stderr, "RU");
-                break;
-            case JES_LEXICAL:
-                fprintf(stderr, "LE");
-                break;
-            case JES_SYNTAX:
-                fprintf(stderr, "SY");
-                break;
-            case JES_CONTEXT:
-                fprintf(stderr, "CO");
-                break;
-            case JES_OPTIMIZATION:
-                fprintf(stderr, "OP");
-                break;
-            case JES_LINKER:
-                fprintf(stderr, "LI");
-                break;
-            case JES_BUILD:
-                fprintf(stderr, "BU");
-                break;
-        }
-
-        // print error code
-        fprintf(stderr, "%04d: ", cur->id);
-
-        // message
-        fprintf(stderr, "%s\n", error->message[cur->id]);
+        fprintf(stderr, "%s:%zd:%zd: %s %s%04d: %s\n",
+            compiler->source_file_name,
+            cur->ln,
+            cur->col,
+            error_level_map[JEL_TO_INDEX(def & ERR_DEF_MASK_LEVEL)],
+            error_scope_map[def & ERR_DEF_MASK_SCOPE],
+            cur->id,
+            error->message[cur->id]
+        );
 
         cur = cur->next;
     }
