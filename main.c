@@ -34,9 +34,6 @@ static char* test_paths[] = {
 
 int main(int argc, char* argv[])
 {
-    debug_java_symbol_lookup_table_no_collision_test(true);
-    // java_symbol_lookup_table_no_collision_test(false);
-
     compiler compiler;
     int num_source_files = ARRAY_SIZE(test_paths);
 
