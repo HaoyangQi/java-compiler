@@ -95,40 +95,10 @@ void debug_print_reserved_words()
     }
 }
 
-void debug_print_symbol_table(java_symbol_table* table)
+void debug_print_symbol_table(hash_table* table)
 {
     printf("===== RESERVED WORDS LOOKUP =====\n");
-
-    bool in_skip = false;
-    int c = 0;
-
-    for (int i = 0; i < table->num_slot; i++)
-    {
-        if (table->slots[i])
-        {
-            if (table->slots[i]->word)
-            {
-                printf("    %lx \"%s\", id=%d\n",
-                    table->slots[i]->full_hash,
-                    table->slots[i]->word->content,
-                    table->slots[i]->word->id);
-            }
-            else
-            {
-                printf("    ERROR: word not attached.\n");
-            }
-            in_skip = false;
-            c++;
-        }
-        else if (!in_skip)
-        {
-            printf("    ...\n");
-            in_skip = true;
-        }
-    }
-
-    printf("count: %d, should match reserved word count (%d)\n",
-        c, num_java_reserved_words);
+    debug_shash_table(table);
 }
 
 static void debug_print_lexeme_type(java_lexeme_type id)
@@ -523,7 +493,7 @@ void debug_print_token_content(java_token* token)
     free(content);
 }
 
-void debug_tokenize(file_buffer* buffer, java_symbol_table* table)
+void debug_tokenize(file_buffer* buffer, hash_table* table)
 {
     printf("===== TOKENIZED BUFFER CONTENT =====\n");
 
@@ -1031,4 +1001,30 @@ void debug_ast(tree_node* root)
 {
     printf("===== ABSTRACT SYNTAX TREE =====\n");
     debug_print_ast(root, 0);
+}
+
+void debug_shash_table(hash_table* table)
+{
+    printf("===== HASH TABLE =====\n");
+    printf("memory: %zd bytes\n", hash_table_memory_size(table));
+    printf("load factor: %.2f%%\n", hash_table_load_factor(table) * 100.0f);
+    printf("longest chain: %zd\n", hash_table_longest_chain_length(table));
+
+    for (size_t i = 0; i < table->bucket_size; i++)
+    {
+        printf("    ");
+
+        hash_pair* p = table->bucket[i];
+
+        if (p)
+        {
+            while (p)
+            {
+                printf("(%s, %p)->", (char*)(p->key), p->value);
+                p = p->next;
+            }
+        }
+
+        printf("(null)\n");
+    }
 }

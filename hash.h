@@ -4,15 +4,21 @@
 
 #include "types.h"
 
-// nothing fancy here, just calculate the modulo
-#define MOD_OF_HASH(h, m) ((hash_bits)(h) % (m))
+uint32_t hash_djb2(void* stream, size_t len);
+uint32_t hash_sdbm(void* str, size_t len);
+uint32_t hash_jenkins(void* stream, size_t len);
+uint32_t hash_murmur32(void* stream, uint32_t len, uint32_t seed);
+uint64_t hash_murmur64(void* stream, uint64_t len, uint64_t seed);
 
-typedef unsigned long hash_bits;
+#ifdef COMPILER_32
+typedef uint32_t hash;
+typedef uint32_t bytes_length;
+#else
+typedef uint64_t hash;
+typedef uint64_t bytes_length;
+#endif
 
-typedef hash_bits(*hash_func)(byte* str);
-
-hash_bits hash_djb2(byte* str);
-hash_bits hash_sdbm(byte* str);
-hash_bits hash_mod(byte* str, hash_bits mod);
+hash shash(char* str);
+hash bhash(void* bytes, bytes_length len);
 
 #endif

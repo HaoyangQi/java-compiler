@@ -3,6 +3,7 @@
 #define __COMPILER_PARSER_H__
 
 #include "types.h"
+#include "hash-table.h"
 #include "token.h"
 #include "file.h"
 #include "symtbl.h"
@@ -36,7 +37,7 @@ typedef struct _java_parser
     /* file buffer */
     file_buffer* buffer;
     /* language spec symbol table*/
-    java_symbol_table* reserved_words;
+    hash_table* reserved_words;
     /* AST */
     tree_node* ast_root;
     /* expression definition */
@@ -48,7 +49,7 @@ typedef struct _java_parser
 void init_parser(
     java_parser* parser,
     file_buffer* buffer,
-    java_symbol_table* rw,
+    hash_table* rw,
     java_expression* expr,
     java_error* err
 );

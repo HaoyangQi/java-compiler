@@ -48,7 +48,7 @@
 void init_parser(
     java_parser* parser,
     file_buffer* buffer,
-    java_symbol_table* rw,
+    hash_table* rw,
     java_expression* expr,
     java_error* err
 )
