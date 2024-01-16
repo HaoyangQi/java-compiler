@@ -1,8 +1,5 @@
 #include "compiler.h"
 
-#include "debug.h"
-#include "report.h"
-
 // JEL_* translation
 static const char* error_level_map[] = {
     "(undefine)",
@@ -29,9 +26,9 @@ static const char* error_scope_map[] = {
 */
 bool init_compiler(compiler* compiler)
 {
+    compiler->version = 1;
     compiler->tasked = false;
 
-    init_debug_report();
     init_file_buffer(&compiler->reader);
     init_symbol_table(&compiler->rw_lookup_table);
     init_expression(&compiler->expression);

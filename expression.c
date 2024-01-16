@@ -1,7 +1,6 @@
 #include "expression.h"
 #include "node.h"
 #include "ast.h"
-#include "report.h"
 
 /**
  * Expression Worker Initialization
@@ -19,8 +18,6 @@ void init_expression(java_expression* expression)
     // set default because OPID_UNDEFINED = 0
     memset(expression->definition, 0, definition_size);
     memset(expression->op_map, 0, map_size);
-
-    report_expression_static_data_size(definition_size + map_size);
 
     /**
      * operator definition initialization
