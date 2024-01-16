@@ -2,6 +2,22 @@
 #ifndef __COMPILER_TYPES_H__
 #define __COMPILER_TYPES_H__
 
+#if defined(_MSC_VER)
+#if defined(_M_X64)
+#define COMPILER_64
+#else
+#define COMPILER_32
+#endif
+#elif defined(__clang__) || defined(__INTEL_COMPILER) || defined(__GNUC__)
+#if defined(__x86_64)
+#define COMPILER_64
+#else
+#define COMPILER_32
+#endif
+#else
+#define COMPILER_32
+#endif
+
 #ifndef __cplusplus
 #include <stdbool.h>
 #endif
@@ -11,6 +27,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
+#include <stdint.h>
 
 #define ASSERT_ALLOCATION(ptr) assert((ptr) != NULL)
 #define ARRAY_SIZE(arr) (sizeof (arr) / sizeof ((arr)[0]))

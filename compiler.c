@@ -37,7 +37,6 @@ bool init_compiler(compiler* compiler)
     init_expression(&compiler->expression);
     init_error(&compiler->error);
 
-    load_language_spec(&compiler->rw_lookup_table);
     init_parser(
         &compiler->context,
         &compiler->reader,

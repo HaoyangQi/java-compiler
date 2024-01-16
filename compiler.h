@@ -3,7 +3,7 @@
 #define __COMPILER_H__
 
 #include "file.h"
-#include "symtbl.h"
+#include "hash-table.h"
 #include "parser.h"
 #include "expression.h"
 #include "error.h"
@@ -14,7 +14,7 @@ typedef struct
 
     char* source_file_name;
     file_buffer reader;
-    java_symbol_table rw_lookup_table;
+    hash_table rw_lookup_table;
     java_expression expression;
     java_parser context;
     java_error error;

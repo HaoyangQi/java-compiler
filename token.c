@@ -154,7 +154,7 @@ void init_token(java_token* token)
  *
  * a copy of EOF token will keep recurring once buffer reached the end
 */
-void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* table)
+void get_next_token(java_token* token, file_buffer* buffer, hash_table* rw)
 {
     /**
      * escape space sequence
@@ -1040,13 +1040,13 @@ void get_next_token(java_token* token, file_buffer* buffer, java_symbol_table* t
         char* content = (char*)malloc_assert(sizeof(char) * (len + 1));
 
         buffer_substring(content, token->from, len);
-        java_symbol* sym = symbol_lookup(table, content);
+        java_reserved_word* sym = symbol_lookup(rw, content);
 
         if (sym)
         {
             token->class = JT_RESERVED_WORD;
-            token->type = sym->word->id;
-            token->keyword = sym->word;
+            token->type = sym->id;
+            token->keyword = sym;
         }
 
         free(content);
