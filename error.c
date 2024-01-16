@@ -1,5 +1,4 @@
 #include "error.h"
-#include "report.h"
 
 /**
  * Common Error Messages
@@ -11,11 +10,8 @@ static char* ERR_MSG_NO_SEMICOLON = "Expected ';'.";
 */
 void init_error(java_error* error)
 {
-    size_t definition_size = sizeof(error_definiton) * JAVA_E_MAX;
-    size_t message_size = sizeof(char*) * JAVA_E_MAX;
-
-    error->definition = (error_definiton*)malloc_assert(definition_size);
-    error->message = (char**)malloc_assert(message_size);
+    error->definition = (error_definiton*)malloc_assert(sizeof(error_definiton) * JAVA_E_MAX);
+    error->message = (char**)malloc_assert(sizeof(char*) * JAVA_E_MAX);
     error->data = NULL;
     error->top = NULL;
 
@@ -26,19 +22,12 @@ void init_error(java_error* error)
     error->definition[JAVA_E_PKG_DECL_NO_NAME] = DEFINE_SYNTAX_ERROR;
     error->definition[JAVA_E_PKG_DECL_NO_SEMICOLON] = DEFINE_SYNTAX_ERROR;
 
-    report_error_definition_size(definition_size);
-
     /* Error Messages */
 
     error->message[JAVA_E_RESERVED] = "(Unregistered error)";
     error->message[JAVA_E_TRAILING_CONTENT] = "Unrecognized trailing content.";
     error->message[JAVA_E_PKG_DECL_NO_NAME] = "Expected 'name' in package declaration.";
     error->message[JAVA_E_PKG_DECL_NO_SEMICOLON] = ERR_MSG_NO_SEMICOLON;
-
-    // well... this is not accurate, because we still have string size to consider
-    // but let's ignore that for now because it is hard to predict how much 
-    // memory will be used by those static data, while we do know about malloc()
-    report_error_message_size(message_size);
 }
 
 /**

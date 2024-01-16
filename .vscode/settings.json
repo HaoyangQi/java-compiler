@@ -27,6 +27,7 @@
         "report.h": "c",
         "expression.h": "c",
         "symtbl.h": "c",
-        "utils.h": "c"
+        "utils.h": "c",
+        "compiler.h": "c"
     }
 }

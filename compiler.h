@@ -10,6 +10,7 @@
 
 typedef struct
 {
+    unsigned int version;
     bool tasked;
 
     char* source_file_name;
