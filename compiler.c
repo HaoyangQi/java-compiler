@@ -93,9 +93,13 @@ bool retask_compiler(compiler* compiler, char* source_path)
     );
     init_semantics(&compiler->semantics);
 
-    // load file last
-    // this is important because load_source_file may 
-    // generate error
+    /**
+     * load file last
+     *
+     * this is important because load_source_file may
+     * generate error, and once error occured, retask
+     * needs to exit immediately
+    */
     return load_source_file(&compiler->reader, source_path);
 }
 
