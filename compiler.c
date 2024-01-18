@@ -23,16 +23,19 @@ static const char* error_scope_map[] = {
 
 /**
  * Full initialization of compiler instance
+ *
+ * initialization order matters here!
 */
 bool init_compiler(compiler* compiler)
 {
     compiler->version = 1;
-    compiler->tasked = false;
 
-    init_file_buffer(&compiler->reader);
+    // special global instance
+    init_error(&compiler->error);
+
+    init_file_buffer(&compiler->reader, &compiler->error);
     init_symbol_table(&compiler->rw_lookup_table);
     init_expression(&compiler->expression);
-    init_error(&compiler->error);
 
     init_parser(
         &compiler->context,
@@ -41,6 +44,8 @@ bool init_compiler(compiler* compiler)
         &compiler->expression,
         &compiler->error
     );
+
+    init_semantics(&compiler->semantics);
 
     return true;
 }
@@ -50,56 +55,23 @@ bool init_compiler(compiler* compiler)
 */
 void release_compiler(compiler* compiler)
 {
-    compiler->tasked = false;
-
     release_file_buffer(&compiler->reader);
     release_symbol_table(&compiler->rw_lookup_table);
     release_expression(&compiler->expression);
     release_error(&compiler->error);
     release_parser(&compiler->context, false);
+    release_semantics(&compiler->semantics);
 }
 
 /**
  * Detach source-file-specific context from compiler
 */
-bool detask_compiler(compiler* compiler)
+void detask_compiler(compiler* compiler)
 {
-    if (compiler->tasked)
-    {
-        release_file_buffer(&compiler->reader);
-        clear_error(&compiler->error);
-        release_parser(&compiler->context, false);
-        compiler->tasked = false;
-
-        return true;
-    }
-
-    return false;
-}
-
-/**
- * format print file loader error message
-*/
-static void format_file_loader_message(file_loader_status status)
-{
-    switch (status)
-    {
-        case FILE_OK:
-            fprintf(stderr, "File loading completed without errors.\n");
-            break;
-        case FILE_PATH_REQUIRED:
-            fprintf(stderr, "Required file path name.\n");
-            break;
-        case FILE_OPEN_FAILED:
-            fprintf(stderr, "File failed to open as it does not exist.\n");
-            break;
-        case FILE_SIZE_MISMATCHED:
-            fprintf(stderr, "File mapping results in incorrect size.\n");
-            break;
-        default:
-            fprintf(stderr, "(Unrecognized error code: %d)\n", status);
-            break;
-    }
+    release_file_buffer(&compiler->reader);
+    clear_error(&compiler->error);
+    release_parser(&compiler->context, false);
+    release_semantics(&compiler->semantics);
 }
 
 /**
@@ -109,19 +81,9 @@ bool retask_compiler(compiler* compiler, char* source_path)
 {
     detask_compiler(compiler);
 
-    file_loader_status loader_status;
-
+    // relink all references
     compiler->source_file_name = source_path;
-    init_file_buffer(&compiler->reader);
-    loader_status = load_source_file(&compiler->reader, source_path);
-
-    if (loader_status != FILE_OK)
-    {
-        fprintf(stderr, "ERROR: File failed to load.\n");
-        format_file_loader_message(loader_status);
-        return false;
-    }
-
+    init_file_buffer(&compiler->reader, &compiler->error);
     init_parser(
         &compiler->context,
         &compiler->reader,
@@ -129,8 +91,34 @@ bool retask_compiler(compiler* compiler, char* source_path)
         &compiler->expression,
         &compiler->error
     );
+    init_semantics(&compiler->semantics);
 
-    compiler->tasked = true;
+    // load file last
+    // this is important because load_source_file may 
+    // generate error
+    return load_source_file(&compiler->reader, source_path);
+}
+
+/**
+ * Compiler Entry Point
+*/
+bool compile(compiler* compiler, char* source_path)
+{
+    if (!retask_compiler(compiler, source_path))
+    {
+        return false;
+    }
+
+    parse(&compiler->context);
+
+    // check error from parser
+    if (error_count(&compiler->error, JEL_ERROR) > 0)
+    {
+        return false;
+    }
+
+    contextualize(&compiler->semantics, compiler->context.ast_root);
+
     return true;
 }
 
@@ -144,23 +132,77 @@ bool retask_compiler(compiler* compiler, char* source_path)
 */
 void compiler_error_format_print(compiler* compiler)
 {
+    // <error level> <error code>: 
+    static char* msg_header_plain = "%s %s%04d: ";
+    // <file name>: <error level> <error code>: 
+    static char* msg_header_no_line_info = "%s: %s %s%04d: ";
+    // <file name>:<ln>:<col>: <error level> <error code>: 
+    static char* msg_header_full = "%s:%zd:%zd: %s %s%04d: ";
+
     java_error* error = &compiler->error;
     java_error_entry* cur = error->data;
-    error_definiton def;
+    error_definiton def, level, scope;
 
     while (cur)
     {
         def = error->definition[cur->id];
+        level = def & ERR_DEF_MASK_LEVEL;
+        scope = def & ERR_DEF_MASK_SCOPE;
 
-        fprintf(stderr, "%s:%zd:%zd: %s %s%04d: %s\n",
-            compiler->source_file_name,
-            cur->ln,
-            cur->col,
-            error_level_map[JEL_TO_INDEX(def & ERR_DEF_MASK_LEVEL)],
-            error_scope_map[def & ERR_DEF_MASK_SCOPE],
-            cur->id,
-            error->message[cur->id]
-        );
+        // print header
+        switch (scope)
+        {
+            case JES_INTERNAL:
+            case JES_RUNTIME:
+                // internal or runtime errors are too premature so 
+                // file info will not be displayed on-demand
+                fprintf(stderr, msg_header_plain,
+                    error_level_map[JEL_TO_INDEX(level)],
+                    error_scope_map[scope],
+                    cur->id
+                );
+                break;
+            case JES_LEXICAL:
+            case JES_SYNTAX:
+            case JES_CONTEXT:
+                // only parsing phase requires line info
+                fprintf(stderr, msg_header_full,
+                    compiler->source_file_name,
+                    cur->ln,
+                    cur->col,
+                    error_level_map[JEL_TO_INDEX(level)],
+                    error_scope_map[scope],
+                    cur->id
+                );
+                break;
+            default:
+                // otherwise we show everything except line info
+                fprintf(stderr, msg_header_no_line_info,
+                    compiler->source_file_name,
+                    error_level_map[JEL_TO_INDEX(level)],
+                    error_scope_map[scope],
+                    cur->id
+                );
+                break;
+        }
+
+        // now print message
+        // some of them may need format print
+        switch (cur->id)
+        {
+            case JAVA_E_FILE_OPEN_FAILED:
+            case JAVA_E_FILE_SIZE_NOT_MATCH:
+                fprintf(stderr, error->message[cur->id], compiler->source_file_name);
+                break;
+            default:
+                fprintf(stderr, error->message[cur->id]);
+                break;
+        }
+
+        /**
+         * TODO: print snapshot content for parsing errors
+        */
+        fprintf(stderr, "\n");
 
         cur = cur->next;
     }

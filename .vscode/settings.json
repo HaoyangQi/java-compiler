@@ -28,6 +28,7 @@
         "expression.h": "c",
         "symtbl.h": "c",
         "utils.h": "c",
-        "compiler.h": "c"
+        "compiler.h": "c",
+        "semantics.h": "c"
     }
 }

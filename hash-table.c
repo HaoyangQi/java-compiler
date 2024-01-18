@@ -3,11 +3,11 @@
 /**
  * Initialize hash table with estimated input data size
  *
- * By default the store hash minimum length 3
+ * By default the bucket size is HASH_DEFAULT_BUCKET_SIZE
 */
 void init_hash_table(hash_table* table, size_t data_size)
 {
-    data_size = max(data_size, 3);
+    data_size = data_size > 0 ? data_size : HASH_DEFAULT_BUCKET_SIZE;
     size_t size = sizeof(hash_pair*) * data_size;
 
     table->bucket = (hash_pair**)malloc_assert(size);
@@ -23,7 +23,7 @@ void init_hash_table(hash_table* table, size_t data_size)
 /**
  * release hash table
 */
-void release_hash_table(hash_table* table)
+void release_hash_table(hash_table* table, pair_data_deleter deleter)
 {
     // free every header
     for (int i = 0; i < table->bucket_size; i++)
@@ -32,6 +32,13 @@ void release_hash_table(hash_table* table)
 
         while (b)
         {
+            // free pair data
+            if (deleter)
+            {
+                (*deleter)(b->key, b->value);
+            }
+
+            // free the pair container and move on to next
             b = b->next;
             free(table->bucket[i]);
             table->bucket[i] = b;
@@ -100,6 +107,31 @@ size_t hash_table_memory_size(hash_table* table)
 }
 
 /**
+ * pair data full deleter
+*/
+void pair_data_delete_full(void* k, void* v)
+{
+    free(k);
+    free(v);
+}
+
+/**
+ * pair data key-only deleter
+*/
+void pair_data_delete_key(void* k, void* v)
+{
+    free(k);
+}
+
+/**
+ * pair data value-only deleter
+*/
+void pair_data_delete_value(void* k, void* v)
+{
+    free(v);
+}
+
+/**
  * create a key-value pair
 */
 static hash_pair* new_pair(void* k, void* v, bytes_length len)
@@ -149,7 +181,7 @@ static void rehash_test(hash_table* table)
 
     // now we override table
     // but before that we need to release it
-    release_hash_table(table);
+    release_hash_table(table, NULL);
     memcpy(table, &temp_table, sizeof(hash_table));
 
     // now detach the shared reference from temp table
@@ -160,56 +192,6 @@ static void rehash_test(hash_table* table)
 
 /**
  * insert a pair
-*/
-void shash_table_insert(hash_table* table, char* k, void* v)
-{
-    // first attempt to resize
-    rehash_test(table);
-
-    size_t index = shash(k) % table->bucket_size;
-    hash_pair* b = new_pair(k, v, strlen(k));
-
-    // collision check
-    if (table->bucket[index])
-    {
-        // O(1) insert: use new pair as the header
-        b->next = table->bucket[index];
-    }
-    else
-    {
-        // otherwise a new bucket will be occupied
-        table->num_filled++;
-    }
-
-    // insert it
-    table->bucket[index] = b;
-    table->num_pairs++;
-}
-
-/**
- * lookup a key and return the value if existed
-*/
-void* shash_table_find(hash_table* table, char* k)
-{
-    size_t index = shash(k) % table->bucket_size;
-    hash_pair* b = table->bucket[index];
-
-    // lookup with collision check
-    while (b)
-    {
-        if (strcmp(b->key, k) == 0)
-        {
-            return b->value;
-        }
-
-        b = b->next;
-    }
-
-    return NULL;
-}
-
-/**
- * same as shash_table_insert, but with generic key type
 */
 void bhash_table_insert(hash_table* table, void* k, bytes_length len, void* v)
 {
@@ -237,7 +219,33 @@ void bhash_table_insert(hash_table* table, void* k, bytes_length len, void* v)
 }
 
 /**
- * same as shash_table_find, but with generic key type
+ * key test
+*/
+bool bhash_table_test(hash_table* table, void* k, bytes_length len)
+{
+    size_t index = bhash(k, len) % table->bucket_size;
+    hash_pair* b = table->bucket[index];
+
+    // lookup with collision check
+    while (b)
+    {
+        if (strcmp(b->key, k) == 0)
+        {
+            return true;
+        }
+
+        b = b->next;
+    }
+
+    return false;
+}
+
+/**
+ * lookup a key and return the value if existed
+ *
+ * NOTE: this function cannot test if key exists when data
+ * corresponding to a key in stor is designed to be empty
+ * use test function to do key test
 */
 void* bhash_table_find(hash_table* table, void* k, bytes_length len)
 {
@@ -256,4 +264,62 @@ void* bhash_table_find(hash_table* table, void* k, bytes_length len)
     }
 
     return NULL;
+}
+
+/**
+ * string key insert
+*/
+void shash_table_insert(hash_table* table, char* k, void* v)
+{
+    bhash_table_insert(table, k, strlen(k), v);
+}
+
+/**
+ * string key test
+*/
+bool shash_table_test(hash_table* table, char* k)
+{
+    return bhash_table_test(table, k, strlen(k));
+}
+
+/**
+ * string key find
+*/
+void* shash_table_find(hash_table* table, char* k)
+{
+    return bhash_table_find(table, k, strlen(k));
+}
+
+/**
+ * bit-length data & string key insert
+ *
+ * size_t is:
+ * 1. 4 bytes on 32-bit machine
+ * 2. 8 bytes on 64-bit machine
+ *
+ * length is same as pointer length, so we do not allocate
+ * anything in pair, just use pointer itself for the data
+*/
+void shash_table_bl_insert(hash_table* table, char* k, size_t v)
+{
+    bhash_table_insert(table, k, strlen(k), (void*)v);
+}
+
+/**
+ * bit-length data & string key test
+*/
+bool shash_table_bl_test(hash_table* table, char* k)
+{
+    return bhash_table_test(table, k, strlen(k));
+}
+
+/**
+ * bit-length data & string key find
+ *
+ * since we use the pointer itself to store the data so
+ * the cast is safe here
+*/
+size_t shash_table_bl_find(hash_table* table, char* k)
+{
+    return (size_t)bhash_table_find(table, k, strlen(k));
 }

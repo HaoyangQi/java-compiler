@@ -1,11 +1,12 @@
 #include "file.h"
 
-void init_file_buffer(file_buffer* buffer)
+void init_file_buffer(file_buffer* buffer, java_error* error_logger)
 {
     buffer->size = 0;
     buffer->base = NULL;
     buffer->cur = NULL;
     buffer->limit = NULL;
+    buffer->error = error_logger;
 }
 
 void release_file_buffer(file_buffer* buffer)
@@ -13,18 +14,21 @@ void release_file_buffer(file_buffer* buffer)
     free(buffer->base);
 }
 
-file_loader_status load_source_file(file_buffer* buffer, const char* name)
+bool load_source_file(file_buffer* buffer, const char* name)
 {
-    if (!name)
+    // rough test to see if path name is valid
+    if (!name || name[0] == '\0')
     {
-        return FILE_PATH_REQUIRED;
+        error_log(buffer->error, JAVA_E_FILE_NO_PATH, 0, 0);
+        return false;
     }
 
     FILE* fp = fopen(name, "rb");
 
     if (!fp)
     {
-        return FILE_OPEN_FAILED;
+        error_log(buffer->error, JAVA_E_FILE_OPEN_FAILED, 0, 0);
+        return false;
     }
 
     fseek(fp, 0, SEEK_END);
@@ -42,7 +46,8 @@ file_loader_status load_source_file(file_buffer* buffer, const char* name)
         {
             free(buffer->base);
             buffer->base = NULL;
-            return FILE_SIZE_MISMATCHED;
+            error_log(buffer->error, JAVA_E_FILE_SIZE_NOT_MATCH, 0, 0);
+            return false;
         }
 
         buffer->base[buffer->size] = 0x00;
@@ -52,7 +57,7 @@ file_loader_status load_source_file(file_buffer* buffer, const char* name)
     buffer->limit = buffer->base + buffer->size;
 
     fclose(fp);
-    return FILE_OK;
+    return true;
 }
 
 inline bool is_eof(file_buffer* buffer)
