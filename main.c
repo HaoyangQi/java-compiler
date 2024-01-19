@@ -26,9 +26,10 @@ static char* test_paths[] = {
     // "./test/ambiguity-2.txt",
 
     // "./test/general-1.txt",
+    "./test/general-33.txt",
 
-    "./test/recovery/pkg-decl-1.txt",
-    "./test/recovery/pkg-decl-2.txt",
+    // "./test/recovery/pkg-decl-1.txt",
+    // "./test/recovery/pkg-decl-2.txt",
     "./test/recovery/pkg-decl-3.txt",
 };
 
@@ -49,17 +50,20 @@ int main(int argc, char* argv[])
     {
         printf("\nFile %d: %s\n", i + 1, test_paths[i]);
 
-        if (!retask_compiler(&compiler, test_paths[i]))
+        if (compile(&compiler, test_paths[i]))
         {
-            fprintf(stderr, "WARNING: File \"%s\" skipped.\n", test_paths[i]);
-            continue;
+            debug_ast(compiler.context.ast_root);
         }
-
-        parse(&compiler.context);
+        else
+        {
+            /**
+             * FIXME: debug only, remove later
+            */
+            debug_ast(compiler.context.ast_root);
+        }
 
         // debug_file_buffer(&compiler.reader);
         // debug_tokenize(&compiler.reader, &compiler.rw_lookup_table);
-        debug_ast(compiler.context.ast_root);
         compiler_error_format_print(&compiler);
     }
 

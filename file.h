@@ -3,12 +3,15 @@
 #define __COMPILER_FILE_H__
 
 #include "types.h"
+#include "error.h"
 
 /**
  * Java source file buffer
  *
  * file buffer reader will read file content into memory
  * in binary format
+ *
+ * error logger is external reference, no release required
 */
 typedef struct _file_buffer
 {
@@ -20,22 +23,13 @@ typedef struct _file_buffer
     byte* limit;
     /* buffer cursor of current read position */
     byte* cur;
+    /* error logger */
+    java_error* error;
 } file_buffer;
 
-/**
- * source file loader status flag
-*/
-typedef enum
-{
-    FILE_OK,
-    FILE_PATH_REQUIRED,
-    FILE_OPEN_FAILED,
-    FILE_SIZE_MISMATCHED,
-} file_loader_status;
-
-void init_file_buffer(file_buffer* buffer);
+void init_file_buffer(file_buffer* buffer, java_error* error_logger);
 void release_file_buffer(file_buffer* buffer);
-file_loader_status load_source_file(file_buffer* buffer, const char* name);
+bool load_source_file(file_buffer* buffer, const char* name);
 
 bool is_eof(file_buffer* buffer);
 bool buffer_ptr_safe_move(file_buffer* buffer);

@@ -1051,7 +1051,7 @@ void debug_java_symbol_lookup_table_no_collision_test(bool use_prime_size)
         }
         else
         {
-            release_hash_table(&t);
+            release_hash_table(&t, NULL);
             bucket_size = use_prime_size ? find_next_prime(bucket_size + 1) : (bucket_size + 1);
         }
     }
@@ -1065,7 +1065,7 @@ void debug_java_symbol_lookup_table_no_collision_test(bool use_prime_size)
     }
     debug_shash_table(&t);
 
-    release_hash_table(&t);
+    release_hash_table(&t, NULL);
 
     printf("================================\n");
 }

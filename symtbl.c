@@ -27,10 +27,12 @@ void init_symbol_table(hash_table* table)
 
 /**
  * release table
+ *
+ * since we only reference data, so no deletion required
 */
 void release_symbol_table(hash_table* table)
 {
-    release_hash_table(table);
+    release_hash_table(table, NULL);
 }
 
 /**

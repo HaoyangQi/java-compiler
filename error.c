@@ -14,10 +14,16 @@ void init_error(java_error* error)
     error->message = (char**)malloc_assert(sizeof(char*) * JAVA_E_MAX);
     error->data = NULL;
     error->top = NULL;
+    error->num_info = 0;
+    error->num_warn = 0;
+    error->num_err = 0;
 
     /* Error Definitions */
 
     error->definition[JAVA_E_RESERVED] = DEFINE_RESERVED_ERROR;
+    error->definition[JAVA_E_FILE_NO_PATH] = DEFINE_ERROR(JEL_ERROR, JES_RUNTIME);
+    error->definition[JAVA_E_FILE_OPEN_FAILED] = DEFINE_ERROR(JEL_ERROR, JES_RUNTIME);
+    error->definition[JAVA_E_FILE_SIZE_NOT_MATCH] = DEFINE_ERROR(JEL_ERROR, JES_RUNTIME);
     error->definition[JAVA_E_TRAILING_CONTENT] = DEFINE_ERROR(JEL_WARNING, JES_LEXICAL);
     error->definition[JAVA_E_PKG_DECL_NO_NAME] = DEFINE_SYNTAX_ERROR;
     error->definition[JAVA_E_PKG_DECL_NO_SEMICOLON] = DEFINE_SYNTAX_ERROR;
@@ -25,6 +31,9 @@ void init_error(java_error* error)
     /* Error Messages */
 
     error->message[JAVA_E_RESERVED] = "(Unregistered error)";
+    error->message[JAVA_E_FILE_NO_PATH] = "File name is not valid.";
+    error->message[JAVA_E_FILE_OPEN_FAILED] = "File '%s' failed to open.";
+    error->message[JAVA_E_FILE_SIZE_NOT_MATCH] = "File '%s' has incorrect loading size comparing to what is reported from file system.";
     error->message[JAVA_E_TRAILING_CONTENT] = "Unrecognized trailing content.";
     error->message[JAVA_E_PKG_DECL_NO_NAME] = "Expected 'name' in package declaration.";
     error->message[JAVA_E_PKG_DECL_NO_SEMICOLON] = ERR_MSG_NO_SEMICOLON;
@@ -36,6 +45,7 @@ void init_error(java_error* error)
 void release_error(java_error* error)
 {
     free(error->definition);
+    free(error->message);
     clear_error(error);
 }
 
@@ -152,5 +162,43 @@ static java_error_entry* error_new_entry(java_error_id id, size_t ln, size_t col
 */
 void error_log(java_error* error, java_error_id id, size_t ln, size_t col)
 {
+    if (!error)
+    {
+        return;
+    }
+
     error_stack_push(error, error_new_entry(id, ln, col));
+
+    switch (error->definition[id] & ERR_DEF_MASK_LEVEL)
+    {
+        case JEL_INFORMATION:
+            error->num_info++;
+            break;
+        case JEL_WARNING:
+            error->num_warn++;
+            break;
+        case JEL_ERROR:
+            error->num_err++;
+            break;
+        default:
+            break;
+    }
+}
+
+/**
+ * count specific level
+*/
+size_t error_count(java_error* error, error_definiton error_level)
+{
+    switch (error_level)
+    {
+        case JEL_INFORMATION:
+            return error->num_info;
+        case JEL_WARNING:
+            return error->num_warn;
+        case JEL_ERROR:
+            return error->num_err;
+        default:
+            return 0;
+    }
 }

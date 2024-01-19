@@ -77,6 +77,9 @@ typedef unsigned char error_definiton;
 typedef enum
 {
     JAVA_E_RESERVED = 0,
+    JAVA_E_FILE_NO_PATH,
+    JAVA_E_FILE_OPEN_FAILED,
+    JAVA_E_FILE_SIZE_NOT_MATCH,
     JAVA_E_TRAILING_CONTENT,
     JAVA_E_PKG_DECL_NO_NAME,
     JAVA_E_PKG_DECL_NO_SEMICOLON,
@@ -114,6 +117,12 @@ typedef struct
     java_error_entry* data;
     /* error stack top */
     java_error_entry* top;
+    /* number of info */
+    size_t num_info;
+    /* number of warnings */
+    size_t num_warn;
+    /* number of errors */
+    size_t num_err;
 } java_error;
 
 void init_error(java_error* error);
@@ -127,5 +136,6 @@ bool error_stack_pop(java_error* error);
 void error_stack_push(java_error* error, java_error_entry* item);
 
 void error_log(java_error* error, java_error_id id, size_t ln, size_t col);
+size_t error_count(java_error* error, error_definiton error_level);
 
 #endif
