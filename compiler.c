@@ -159,7 +159,7 @@ void compiler_error_format_print(compiler* compiler)
             case JES_INTERNAL:
             case JES_RUNTIME:
                 // internal or runtime errors are too premature so 
-                // file info will not be displayed on-demand
+                // file info will not be displayed by default
                 fprintf(stderr, msg_header_plain,
                     error_level_map[JEL_TO_INDEX(level)],
                     error_scope_map[scope],

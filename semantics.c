@@ -1,4 +1,5 @@
 #include "semantics.h"
+#include "node.h"
 
 /**
  * add a lookup node to the parent node
@@ -78,5 +79,35 @@ void release_semantics(java_semantics* se)
 /**
  * SSA Builder
 */
-void contextualize(java_semantics* se, tree_node* ast_root)
-{}
+void contextualize(java_semantics* se, tree_node* compilation_unit)
+{
+    // compilation unit does not have siblings
+    tree_node* node = compilation_unit->first_child;
+
+    // package
+    if (node && node->type == JNT_PKG_DECL)
+    {
+        /**
+         * TODO: handle pkg decl
+        */
+        node = node->next_sibling;
+    }
+
+    // imports
+    while (node && node->type == JNT_IMPORT_DECL)
+    {
+        /**
+         * TODO: handle import decl
+        */
+        node = node->next_sibling;
+    }
+
+    // top-levels
+    while (node && node->type == JNT_TOP_LEVEL)
+    {
+        /**
+         * TODO: handle import decl
+        */
+        node = node->next_sibling;
+    }
+}

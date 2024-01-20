@@ -3,10 +3,87 @@
 #define __COMPILER_TREE_H__
 
 #include "types.h"
-
-typedef void (*node_data_delete_callback)(int metadata, void* data);
+#include "langspec.h"
+#include "token.h"
+#include "node.h"
 
 /**
+ * Aux Data: ID
+ *
+ * nodes only require an identification
+ *
+ * NOTE: control the size of this union carefully
+*/
+typedef union
+{
+    java_lexeme_type simple;
+    java_token* complex;
+} node_data_id;
+
+/**
+ * Aux Data
+ *
+ * NOTE: control the size of this union carefully
+*/
+typedef union
+{
+    // nodes only require an identification
+    node_data_id id;
+
+    // import-specific
+    struct
+    {
+        bool on_demand;
+    } import;
+
+    // top-level (declaration) modifier
+    struct
+    {
+        lbit_flag modifier;
+    } top_level_declaration;
+
+    /**
+     * declarator form
+     *
+     * 1. type header
+     * 2. formal parameter
+     * 3. method header
+     * 4. variable declarator
+     * 5. array creation
+    */
+    struct
+    {
+        node_data_id id;
+        /* array dimension */
+        size_t dimension;
+    } declarator;
+
+    // operator
+    struct
+    {
+        // let's decouple external definiition here
+        // and use simple type for enum member
+        int id; // operator_id
+    } operator;
+
+    // constructor invocation
+    struct
+    {
+        /* true if calling from super class, this class otherwise */
+        bool is_super;
+    } constructor_invoke;
+
+    // switch-case label
+    struct
+    {
+        /* true if default label, case label otherwise */
+        bool is_default;
+    } switch_label;
+} tree_node_data;
+
+/**
+ * Abstract Syntax Tree Node
+ *
  * Left-Child, Right-Sibling (LCRS) Muti-Way Tree
  *
  * LCRS uses binary way to represent multi-way tree
@@ -29,14 +106,14 @@ typedef void (*node_data_delete_callback)(int metadata, void* data);
 */
 typedef struct _tree_node
 {
-    /* metadata describes type of data */
-    int metadata;
-    /* node data */
-    void* data;
+    /* node type */
+    java_node_query type;
     /* true if production completes */
     bool valid;
     /* false if production uniquely determines input */
     bool ambiguous;
+    /* aux data */
+    tree_node_data* data;
     /* binary way to represent multi-way tree */
     struct _tree_node* first_child;
     struct _tree_node* next_sibling;
@@ -45,9 +122,8 @@ typedef struct _tree_node
 } tree_node;
 
 void init_tree_node(tree_node* node);
-void tree_node_mutate(tree_node* node, int meta);
-void tree_node_attach(tree_node* node, int meta, void* data);
+void tree_node_mutate(tree_node* node, java_node_query type);
 void tree_node_add_child(tree_node* node, tree_node* child);
-void tree_node_delete(tree_node* node, node_data_delete_callback cb);
+void tree_node_delete(tree_node* node);
 
 #endif

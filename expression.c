@@ -253,9 +253,8 @@ tree_node* expression_stack_parse_top(java_expression_worker* worker)
     }
 
     tree_node* node = ast_node_operator();
-    node_data_operator* data = (node_data_operator*)(node->data);
 
-    data->op = worker->operator_stack->op;
+    node->data->operator.id = worker->operator_stack->op;
     expression_stack_pop(worker);
 
     return node;

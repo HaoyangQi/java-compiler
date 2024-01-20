@@ -192,6 +192,9 @@ static void rehash_test(hash_table* table)
 
 /**
  * insert a pair
+ *
+ * NOTE: insert does not assert duplicated keys, it keeps them all
+ * use test function to check for existence
 */
 void bhash_table_insert(hash_table* table, void* k, bytes_length len, void* v)
 {

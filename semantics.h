@@ -182,7 +182,7 @@ typedef struct
 
 void init_semantics(java_semantics* se);
 void release_semantics(java_semantics* se);
-void contextualize(java_semantics* se, tree_node* ast_root);
+void contextualize(java_semantics* se, tree_node* compilation_unit);
 
 /**
  * TODO: more

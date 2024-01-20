@@ -5,10 +5,10 @@
 */
 void init_tree_node(tree_node* node)
 {
-    node->metadata = 0;
-    node->data = NULL;
+    node->type = JNT_MAX;
     node->valid = true;
     node->ambiguous = true;
+    node->data = NULL;
     node->first_child = NULL;
     node->next_sibling = NULL;
     node->last_sibling = NULL;
@@ -17,18 +17,9 @@ void init_tree_node(tree_node* node)
 /**
  * Mutate tree node type into another
 */
-void tree_node_mutate(tree_node* node, int meta)
+void tree_node_mutate(tree_node* node, java_node_query type)
 {
-    node->metadata = meta;
-}
-
-/**
- * attach data to a tree node
-*/
-void tree_node_attach(tree_node* node, int meta, void* data)
-{
-    node->metadata = meta;
-    node->data = data;
+    node->type = type;
 }
 
 /**
@@ -51,17 +42,12 @@ void tree_node_add_child(tree_node* node, tree_node* child)
 }
 
 /**
- * recursively delete ast tree and data attached to each node
- *
- * if calback is specified, it will invoke that first to process data deletion in detail
- * then delete data itself
- * the callback must be generic and handles every scenario for node data, because the
- * deletion is recursive
+ * recursively delete ast and data attached to each node
  *
  * NOTE: always try deletion subtree before attaching, otherwise it will cause avalanche
  * effect
 */
-void tree_node_delete(tree_node* node, node_data_delete_callback cb)
+void tree_node_delete(tree_node* node)
 {
     if (!node)
     {
@@ -69,17 +55,40 @@ void tree_node_delete(tree_node* node, node_data_delete_callback cb)
     }
 
     // go deeper first
-    tree_node_delete(node->first_child, cb);
+    tree_node_delete(node->first_child);
 
     // then go to next sibling
-    tree_node_delete(node->next_sibling, cb);
+    tree_node_delete(node->next_sibling);
 
     // delete data
-    if (cb)
+    if (node->data)
     {
-        (*cb)(node->metadata, node->data);
+        switch (node->type)
+        {
+            case JNT_NAME_UNIT:
+            case JNT_CLASS_TYPE_UNIT:
+            case JNT_INTERFACE_TYPE_UNIT:
+            case JNT_CLASS_DECL:
+            case JNT_INTERFACE_DECL:
+            case JNT_CTOR_DECL:
+            case JNT_PRIMARY_COMPLEX:
+            case JNT_STATEMENT_BREAK:
+            case JNT_STATEMENT_CONTINUE:
+            case JNT_STATEMENT_LABEL:
+                free(node->data->id.complex);
+                break;
+            case JNT_METHOD_HEADER:
+            case JNT_FORMAL_PARAM:
+            case JNT_VAR_DECL:
+                free(node->data->declarator.id.complex);
+                break;
+            default:
+                // no-op
+                break;
+        }
+
+        free(node->data);
     }
-    free(node->data);
 
     // finally, delete self
     free(node);
