@@ -22,15 +22,17 @@ static char* test_paths[] = {
 
     // "./test/general-no-block-and-statement.txt",
 
+    "./test/switch-1.txt",
+
     // "./test/ambiguity-1.txt",
     // "./test/ambiguity-2.txt",
 
     // "./test/general-1.txt",
-    "./test/general-33.txt",
+    // "./test/general-3.txt",
 
     // "./test/recovery/pkg-decl-1.txt",
     // "./test/recovery/pkg-decl-2.txt",
-    "./test/recovery/pkg-decl-3.txt",
+    // "./test/recovery/pkg-decl-3.txt",
 };
 
 int main(int argc, char* argv[])
