@@ -29,6 +29,6 @@
         "symtbl.h": "c",
         "utils.h": "c",
         "compiler.h": "c",
-        "semantics.h": "c"
+        "ir.h": "c"
     }
 }

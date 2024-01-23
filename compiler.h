@@ -6,7 +6,7 @@
 #include "hash-table.h"
 #include "parser.h"
 #include "expression.h"
-#include "semantics.h"
+#include "ir.h"
 #include "error.h"
 
 typedef struct
@@ -18,7 +18,7 @@ typedef struct
     hash_table rw_lookup_table;
     java_expression expression;
     java_parser context;
-    java_semantics semantics;
+    java_ir ir;
     java_error error;
 } compiler;
 

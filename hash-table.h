@@ -28,7 +28,7 @@
 /**
  * default table size
 */
-#define HASH_DEFAULT_BUCKET_SIZE (11)
+#define HASH_TABLE_DEFAULT_BUCKET_SIZE (11)
 
 typedef struct _hash_bucket
 {

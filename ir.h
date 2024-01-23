@@ -10,27 +10,83 @@
 #include "error.h"
 
 /**
+ * scope type
+ *
+ * LST_NONE: a generic scope with no header
+ * we do not mark "switch" because its scope
+ * does not allow symbol creation
+*/
+typedef enum
+{
+    LST_COMPILATION_UNIT,
+    LST_CLASS,
+    LST_INTERFACE,
+    LST_NONE, // just a scope, no header
+    LST_IF,
+    LST_ELSE,
+    LST_FOR,
+    LST_WHILE,
+    LST_DO,
+    LST_TRY,
+    LST_CATCH,
+    LST_FINALLY,
+} lookup_scope_type;
+
+/**
  * Symbol Lookup Hierarchy
  *
- * LCRS Bi-Directional Muti-Way Tree
- *
- * Every node represents a Block
+ * It is a compile-time dynamic stack trace of
+ * current scope
  *
  * key is a copy of name string
- * value is a copy of semantic_variable_descriptor
+ * value is various based on scope type it serves
  *
  * TODO: need semantic_block* reference back to a block
  * if it is a function or a loop
 */
 typedef struct _lookup_hierarchy
 {
-    // name -> variable_descriptor
+    lookup_scope_type type;
+
+    // name -> lookup_value_descriptor
     hash_table table;
 
-    struct _lookup_hierarchy* parent;
-    struct _lookup_hierarchy* first_child;
-    struct _lookup_hierarchy* next_sibling;
+    struct _lookup_hierarchy* next;
 } lookup_hierarchy;
+
+/**
+ * scope lookup table value descriptor
+ *
+ * here we use node type for further classification
+*/
+typedef struct _lookup_value_descriptor
+{
+    java_node_query type;
+
+    union
+    {
+        struct
+        {
+            // package name string
+            char* package_name;
+        } import;
+
+        struct
+        {
+            // max one super class allowed
+            struct _lookup_value_descriptor* extend;
+            /**
+             * TODO: implement list
+            */
+        } class;
+
+        struct interface
+        {
+            // max one super interface allowed
+            struct _lookup_value_descriptor* extend;
+        } interface;
+    };
+} lookup_value_descriptor;
 
 /**
  * variable descriptor
@@ -170,19 +226,30 @@ typedef struct _semantic_block
 */
 typedef struct
 {
-    // symbol lookup tree
-    lookup_hierarchy* lookup_root;
+    // on-demand import package names
+    hash_table tbl_on_demand_packages;
+    // symbol lookup of current scope
+    lookup_hierarchy* lookup_current_scope;
     // member initializer block
     semantic_block* member_initialization;
     // method SSAs
     semantic_block** methods;
     // toplevel block count
     size_t num_methods;
-} java_semantics;
+    // error data
+    java_error* error;
+} java_ir;
 
-void init_semantics(java_semantics* se);
-void release_semantics(java_semantics* se);
-void contextualize(java_semantics* se, tree_node* compilation_unit);
+hash_table* lookup_new_scope(java_ir* ir, lookup_scope_type type);
+bool lookup_pop_scope(java_ir* ir);
+hash_table* lookup_current_scope(java_ir* ir);
+lookup_value_descriptor* new_lookup_value_descriptor(java_node_query type);
+void lookup_value_descriptor_delete(lookup_value_descriptor* v);
+
+void init_ir(java_ir* ir, java_error* error);
+void release_ir(java_ir* ir);
+void contextualize(java_ir* ir, tree_node* compilation_unit);
+void ir_error(java_ir* ir, java_error_id id);
 
 /**
  * TODO: more

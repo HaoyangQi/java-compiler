@@ -11,7 +11,7 @@ void init_tree_node(tree_node* node)
     node->data = NULL;
     node->first_child = NULL;
     node->next_sibling = NULL;
-    node->last_sibling = NULL;
+    node->last_child = NULL;
 }
 
 /**
@@ -27,16 +27,16 @@ void tree_node_mutate(tree_node* node, java_node_query type)
 */
 void tree_node_add_child(tree_node* node, tree_node* child)
 {
-    if (node->last_sibling)
+    if (node->last_child)
     {
-        node->last_sibling->next_sibling = child;
+        node->last_child->next_sibling = child;
     }
     else
     {
         node->first_child = child;
     }
 
-    node->last_sibling = child;
+    node->last_child = child;
     node->valid = node->valid && child->valid;
     node->ambiguous = node->ambiguous || child->ambiguous;
 }

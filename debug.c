@@ -1032,3 +1032,71 @@ void debug_java_symbol_lookup_table_no_collision_test(bool use_prime_size)
 
     printf("================================\n");
 }
+
+void debug_ir_on_demand_imports(java_ir* ir)
+{
+    hash_table* table = &ir->tbl_on_demand_packages;
+
+    printf("===== ON-DEMAND IMPORT PACKAGES =====\n");
+    printf("memory: %zd bytes\n", hash_table_memory_size(table));
+    printf("load factor: %.2f%%\n", hash_table_load_factor(table) * 100.0f);
+    printf("longest chain: %zd\n", hash_table_longest_chain_length(table));
+
+    for (size_t i = 0; i < table->bucket_size; i++)
+    {
+        hash_pair* p = table->bucket[i];
+
+        if (p)
+        {
+            while (p)
+            {
+                printf("    %s\n", (char*)(p->key));
+                p = p->next;
+            }
+        }
+    }
+}
+
+void debug_ir_type_imports(java_ir* ir)
+{
+    hash_table* table = lookup_current_scope(ir);
+
+    printf("===== ON-DEMAND IMPORT PACKAGES =====\n");
+
+    if (!table)
+    {
+        printf("(null)\n");
+        return;
+    }
+
+    printf("memory: %zd bytes\n", hash_table_memory_size(table));
+    printf("load factor: %.2f%%\n", hash_table_load_factor(table) * 100.0f);
+    printf("longest chain: %zd\n", hash_table_longest_chain_length(table));
+
+    for (size_t i = 0; i < table->bucket_size; i++)
+    {
+        hash_pair* p = table->bucket[i];
+
+        if (p)
+        {
+            while (p)
+            {
+                lookup_value_descriptor* v = (lookup_value_descriptor*)(p->value);
+
+                printf("    %s ", (char*)(p->key));
+
+                switch (v->type)
+                {
+                    case JNT_IMPORT_DECL:
+                        printf("FROM %s\n", v->import.package_name);
+                        break;
+                    default:
+                        // no-op
+                        break;
+                }
+
+                p = p->next;
+            }
+        }
+    }
+}

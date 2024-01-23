@@ -45,7 +45,7 @@ bool init_compiler(compiler* compiler)
         &compiler->error
     );
 
-    init_semantics(&compiler->semantics);
+    init_ir(&compiler->ir, &compiler->error);
 
     return true;
 }
@@ -60,7 +60,7 @@ void release_compiler(compiler* compiler)
     release_expression(&compiler->expression);
     release_error(&compiler->error);
     release_parser(&compiler->context, false);
-    release_semantics(&compiler->semantics);
+    release_ir(&compiler->ir);
 }
 
 /**
@@ -71,7 +71,7 @@ void detask_compiler(compiler* compiler)
     release_file_buffer(&compiler->reader);
     clear_error(&compiler->error);
     release_parser(&compiler->context, false);
-    release_semantics(&compiler->semantics);
+    release_ir(&compiler->ir);
 }
 
 /**
@@ -91,7 +91,7 @@ bool retask_compiler(compiler* compiler, char* source_path)
         &compiler->expression,
         &compiler->error
     );
-    init_semantics(&compiler->semantics);
+    init_ir(&compiler->ir, &compiler->error);
 
     /**
      * load file last
@@ -121,7 +121,13 @@ bool compile(compiler* compiler, char* source_path)
         return false;
     }
 
-    contextualize(&compiler->semantics, compiler->context.ast_root);
+    contextualize(&compiler->ir, compiler->context.ast_root);
+
+    // check error from parser
+    if (error_count(&compiler->error, JEL_ERROR) > 0)
+    {
+        return false;
+    }
 
     return true;
 }

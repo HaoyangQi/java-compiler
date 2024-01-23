@@ -12,7 +12,7 @@ static char* test_paths[] = {
     // "./test/pkg-decl-4.txt",
     // "./test/pkg-decl-5.txt",
 
-    // "./test/import-decl-1.txt",
+    "./test/import-decl-1.txt",
     // "./test/import-decl-2.txt",
 
     // "./test/top-level-1.txt",
@@ -22,7 +22,7 @@ static char* test_paths[] = {
 
     // "./test/general-no-block-and-statement.txt",
 
-    "./test/switch-1.txt",
+    // "./test/switch-1.txt",
 
     // "./test/ambiguity-1.txt",
     // "./test/ambiguity-2.txt",
@@ -54,14 +54,19 @@ int main(int argc, char* argv[])
 
         if (compile(&compiler, test_paths[i]))
         {
-            debug_ast(compiler.context.ast_root);
+            // debug_ast(compiler.context.ast_root);
+            debug_ir_on_demand_imports(&compiler.ir);
+            debug_ir_type_imports(&compiler.ir);
         }
         else
         {
             /**
              * FIXME: debug only, remove later
             */
-            debug_ast(compiler.context.ast_root);
+
+            // debug_ast(compiler.context.ast_root);
+            debug_ir_on_demand_imports(&compiler.ir);
+            debug_ir_type_imports(&compiler.ir);
         }
 
         // debug_file_buffer(&compiler.reader);

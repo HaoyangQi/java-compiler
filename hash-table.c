@@ -3,11 +3,11 @@
 /**
  * Initialize hash table with estimated input data size
  *
- * By default the bucket size is HASH_DEFAULT_BUCKET_SIZE
+ * By default the bucket size is HASH_TABLE_DEFAULT_BUCKET_SIZE
 */
 void init_hash_table(hash_table* table, size_t data_size)
 {
-    data_size = data_size > 0 ? data_size : HASH_DEFAULT_BUCKET_SIZE;
+    data_size = data_size > 0 ? data_size : HASH_TABLE_DEFAULT_BUCKET_SIZE;
     size_t size = sizeof(hash_pair*) * data_size;
 
     table->bucket = (hash_pair**)malloc_assert(size);
