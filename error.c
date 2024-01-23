@@ -27,6 +27,10 @@ void init_error(java_error* error)
     error->definition[JAVA_E_TRAILING_CONTENT] = DEFINE_ERROR(JEL_WARNING, JES_LEXICAL);
     error->definition[JAVA_E_PKG_DECL_NO_NAME] = DEFINE_SYNTAX_ERROR;
     error->definition[JAVA_E_PKG_DECL_NO_SEMICOLON] = DEFINE_SYNTAX_ERROR;
+    error->definition[JAVA_E_IMPORT_NO_NAME] = DEFINE_SYNTAX_ERROR;
+    error->definition[JAVA_E_IMPORT_NO_SEMICOLON] = DEFINE_SYNTAX_ERROR;
+    error->definition[JAVA_E_IMPORT_AMBIGUOUS] = DEFINE_ERROR(JEL_ERROR, JES_CONTEXT);
+    error->definition[JAVA_E_IMPORT_DUPLICATE] = DEFINE_ERROR(JEL_WARNING, JES_CONTEXT);
 
     /* Error Messages */
 
@@ -37,6 +41,10 @@ void init_error(java_error* error)
     error->message[JAVA_E_TRAILING_CONTENT] = "Unrecognized trailing content.";
     error->message[JAVA_E_PKG_DECL_NO_NAME] = "Expected 'name' in package declaration.";
     error->message[JAVA_E_PKG_DECL_NO_SEMICOLON] = ERR_MSG_NO_SEMICOLON;
+    error->message[JAVA_E_IMPORT_NO_NAME] = "Expected 'name' in import declaration.";
+    error->message[JAVA_E_IMPORT_NO_SEMICOLON] = ERR_MSG_NO_SEMICOLON;
+    error->message[JAVA_E_IMPORT_AMBIGUOUS] = "Ambiguous import type name, resolution of same type diverges.";
+    error->message[JAVA_E_IMPORT_DUPLICATE] = "Duplicated import, discarded.";
 }
 
 /**

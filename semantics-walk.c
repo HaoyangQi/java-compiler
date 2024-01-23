@@ -1,4 +1,4 @@
-#include "semantics.h"
+#include "ir.h"
 
 void semantics_walk_top_level(tree_node* node)
 {

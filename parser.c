@@ -593,7 +593,7 @@ static tree_node* parse_import_declaration(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected name after import declaration\n");
+        parser_error(parser, JAVA_E_IMPORT_NO_NAME);
         return node;
     }
 
@@ -612,7 +612,7 @@ static tree_node* parse_import_declaration(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected ';'\n");
+        parser_error(parser, JAVA_E_IMPORT_NO_SEMICOLON);
     }
 
     return node;

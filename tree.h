@@ -118,7 +118,7 @@ typedef struct _tree_node
     struct _tree_node* first_child;
     struct _tree_node* next_sibling;
     /* aux info for sibling traversal and addition */
-    struct _tree_node* last_sibling;
+    struct _tree_node* last_child;
 } tree_node;
 
 void init_tree_node(tree_node* node);

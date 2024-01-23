@@ -16,7 +16,7 @@
 
 #include "parser.h"
 
-static void parser_recovery_package_declaration(java_parser* parser);
+static void parser_recovery_package_or_import(java_parser* parser);
 
 /**
  * Parser Error Recovery Dispatch
@@ -34,7 +34,9 @@ void parser_recovery_dispatch(java_parser* parser, java_error_id id)
     {
         case JAVA_E_PKG_DECL_NO_NAME:
         case JAVA_E_PKG_DECL_NO_SEMICOLON:
-            parser_recovery_package_declaration(parser);
+        case JAVA_E_IMPORT_NO_NAME:
+        case JAVA_E_IMPORT_NO_SEMICOLON:
+            parser_recovery_package_or_import(parser);
             break;
         default:
             // no-op
@@ -49,8 +51,11 @@ void parser_recovery_dispatch(java_parser* parser, java_error_id id)
  *
  * semicolon will be skipped because it contributes to no meaning when standalone
  * on top level
+ *
+ * import can follow itself, so both package and import declarations have same
+ * FOLLOW set
 */
-static void parser_recovery_package_declaration(java_parser* parser)
+static void parser_recovery_package_or_import(java_parser* parser)
 {
     java_lexeme_type type = peek_token_type(parser, TOKEN_PEEK_1st);
     bool skip = type != JLT_MAX;
