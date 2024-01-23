@@ -1061,7 +1061,7 @@ void debug_ir_type_imports(java_ir* ir)
 {
     hash_table* table = lookup_current_scope(ir);
 
-    printf("===== ON-DEMAND IMPORT PACKAGES =====\n");
+    printf("===== IMPORT TYPES =====\n");
 
     if (!table)
     {
