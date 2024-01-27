@@ -13,6 +13,7 @@ void init_ir(java_ir* ir, java_error* error)
     ir->error = error;
 
     init_hash_table(&ir->tbl_on_demand_packages, HASH_TABLE_DEFAULT_BUCKET_SIZE);
+    init_hash_table(&ir->tbl_global, HASH_TABLE_DEFAULT_BUCKET_SIZE);
 }
 
 /**
@@ -22,6 +23,8 @@ void release_ir(java_ir* ir)
 {
     // delete on-demand import package names
     release_hash_table(&ir->tbl_on_demand_packages, &pair_data_delete_key);
+    // delete global name lookup
+    release_hash_table(&ir->tbl_global, &lookup_scope_deleter);
     // delete entire lookup stack
     while (lookup_pop_scope(ir));
 }

@@ -1,7 +1,18 @@
 package mypack;
 
+import java.text.DecimalFormat;
+import java.util.InputMismatchException;
+import java.util.Scanner;
+import somepackage.*;
+
 class MyPackageClass {
+    int a = 34;
+    float fp = .2f;
+    String ss;
+
     public static void main(String[] args) {
         System.out.println("This is my package!");
     }
+
+    short s0 = 9,s1,s2 = 0;
 }

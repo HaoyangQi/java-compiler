@@ -4,6 +4,7 @@
  * Common Error Messages
 */
 static char* ERR_MSG_NO_SEMICOLON = "Expected ';'.";
+static char* ERR_MSG_NO_RIGHT_BRACE = "Expected '}'.";
 
 /**
  * Initialize Error Manager
@@ -29,8 +30,19 @@ void init_error(java_error* error)
     error->definition[JAVA_E_PKG_DECL_NO_SEMICOLON] = DEFINE_SYNTAX_ERROR;
     error->definition[JAVA_E_IMPORT_NO_NAME] = DEFINE_SYNTAX_ERROR;
     error->definition[JAVA_E_IMPORT_NO_SEMICOLON] = DEFINE_SYNTAX_ERROR;
-    error->definition[JAVA_E_IMPORT_AMBIGUOUS] = DEFINE_ERROR(JEL_ERROR, JES_CONTEXT);
+    error->definition[JAVA_E_IMPORT_AMBIGUOUS] = DEFINE_CONTEXT_ERROR;
     error->definition[JAVA_E_IMPORT_DUPLICATE] = DEFINE_ERROR(JEL_WARNING, JES_CONTEXT);
+    error->definition[JAVA_E_CLASS_NO_NAME] = DEFINE_SYNTAX_ERROR;
+    error->definition[JAVA_E_CLASS_NO_BODY] = DEFINE_SYNTAX_ERROR;
+    error->definition[JAVA_E_CLASS_NAME_DUPLICATE] = DEFINE_CONTEXT_ERROR;
+    error->definition[JAVA_E_CLASS_BODY_ENCLOSE] = DEFINE_CONTEXT_ERROR;
+    error->definition[JAVA_E_MEMBER_VAR_DUPLICATE] = DEFINE_CONTEXT_ERROR;
+    error->definition[JAVA_E_MEMBER_VAR_DIM_AMBIGUOUS] = DEFINE_CONTEXT_ERROR;
+    error->definition[JAVA_E_MEMBER_VAR_DIM_DUPLICATE] = DEFINE_ERROR(JEL_WARNING, JES_CONTEXT);
+    error->definition[JAVA_E_MEMBER_VAR_NO_SEMICOLON] = DEFINE_SYNTAX_ERROR;
+    error->definition[JAVA_E_MEMBER_NO_TYPE] = DEFINE_SYNTAX_ERROR;
+    error->definition[JAVA_E_MEMBER_NO_NAME] = DEFINE_SYNTAX_ERROR;
+    error->definition[JAVA_E_MEMBER_AMBIGUOUS] = DEFINE_SYNTAX_ERROR;
 
     /* Error Messages */
 
@@ -45,6 +57,17 @@ void init_error(java_error* error)
     error->message[JAVA_E_IMPORT_NO_SEMICOLON] = ERR_MSG_NO_SEMICOLON;
     error->message[JAVA_E_IMPORT_AMBIGUOUS] = "Ambiguous import type name, resolution of same type diverges.";
     error->message[JAVA_E_IMPORT_DUPLICATE] = "Duplicated import, discarded.";
+    error->message[JAVA_E_CLASS_NO_NAME] = "Expected 'name' in class declaration.";
+    error->message[JAVA_E_CLASS_NO_BODY] = "Expected class body in class declaration.";
+    error->message[JAVA_E_CLASS_NAME_DUPLICATE] = "Duplicated class name.";
+    error->message[JAVA_E_CLASS_BODY_ENCLOSE] = ERR_MSG_NO_RIGHT_BRACE;
+    error->message[JAVA_E_MEMBER_VAR_DUPLICATE] = "Duplicated member variable.";
+    error->message[JAVA_E_MEMBER_VAR_DIM_AMBIGUOUS] = "Dimension definition mismatched.";
+    error->message[JAVA_E_MEMBER_VAR_DIM_DUPLICATE] = "Duplicated dimension definition.";
+    error->message[JAVA_E_MEMBER_VAR_NO_SEMICOLON] = ERR_MSG_NO_SEMICOLON;
+    error->message[JAVA_E_MEMBER_NO_TYPE] = "Expected 'type' in member declaration.";
+    error->message[JAVA_E_MEMBER_NO_NAME] = "Expected 'name' in member declaration.";
+    error->message[JAVA_E_MEMBER_AMBIGUOUS] = "Incomplete member declaration.";
 }
 
 /**

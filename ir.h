@@ -9,6 +9,8 @@
 #include "tree.h"
 #include "error.h"
 
+#include "string-list.h"
+
 /**
  * scope type
  *
@@ -55,6 +57,17 @@ typedef struct _lookup_hierarchy
 } lookup_hierarchy;
 
 /**
+ * type info
+*/
+typedef struct
+{
+    java_lexeme_type primitive;
+    char* reference;
+
+    size_t dim;
+} type_name;
+
+/**
  * scope lookup table value descriptor
  *
  * here we use node type for further classification
@@ -73,18 +86,40 @@ typedef struct _lookup_value_descriptor
 
         struct
         {
+            // modifier
+            lbit_flag modifier;
             // max one super class allowed
-            struct _lookup_value_descriptor* extend;
+            char* extend;
             /**
              * TODO: implement list
             */
         } class;
 
-        struct interface
+        struct
         {
             // max one super interface allowed
-            struct _lookup_value_descriptor* extend;
+            char* extend;
         } interface;
+
+        struct
+        {
+            // modifier
+            lbit_flag modifier;
+        } constructor;
+
+        struct
+        {
+            // modifier
+            lbit_flag modifier;
+            // type
+            type_name type;
+        } member_variable;
+
+        struct
+        {
+            // modifier
+            lbit_flag modifier;
+        } method;
     };
 } lookup_value_descriptor;
 
@@ -228,6 +263,8 @@ typedef struct
 {
     // on-demand import package names
     hash_table tbl_on_demand_packages;
+    // other global names
+    hash_table tbl_global;
     // symbol lookup of current scope
     lookup_hierarchy* lookup_current_scope;
     // member initializer block
@@ -240,11 +277,21 @@ typedef struct
     java_error* error;
 } java_ir;
 
+void lookup_scope_deleter(char* k, lookup_value_descriptor* v);
 hash_table* lookup_new_scope(java_ir* ir, lookup_scope_type type);
 bool lookup_pop_scope(java_ir* ir);
+hash_table* lookup_global_scope(java_ir* ir);
 hash_table* lookup_current_scope(java_ir* ir);
 lookup_value_descriptor* new_lookup_value_descriptor(java_node_query type);
 void lookup_value_descriptor_delete(lookup_value_descriptor* v);
+lookup_value_descriptor* lookup_value_descriptor_copy(lookup_value_descriptor* v);
+bool lookup_register(
+    java_ir* ir,
+    hash_table* table,
+    char* name,
+    lookup_value_descriptor* desc,
+    java_error_id err
+);
 
 void init_ir(java_ir* ir, java_error* error);
 void release_ir(java_ir* ir);

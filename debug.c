@@ -1057,18 +1057,11 @@ void debug_ir_on_demand_imports(java_ir* ir)
     }
 }
 
-void debug_ir_type_imports(java_ir* ir)
+void debug_ir_global_names(java_ir* ir)
 {
-    hash_table* table = lookup_current_scope(ir);
+    hash_table* table = lookup_global_scope(ir);
 
-    printf("===== IMPORT TYPES =====\n");
-
-    if (!table)
-    {
-        printf("(null)\n");
-        return;
-    }
-
+    printf("===== GLOBAL NAMES =====\n");
     printf("memory: %zd bytes\n", hash_table_memory_size(table));
     printf("load factor: %.2f%%\n", hash_table_load_factor(table) * 100.0f);
     printf("longest chain: %zd\n", hash_table_longest_chain_length(table));
@@ -1083,20 +1076,160 @@ void debug_ir_type_imports(java_ir* ir)
             {
                 lookup_value_descriptor* v = (lookup_value_descriptor*)(p->value);
 
-                printf("    %s ", (char*)(p->key));
-
+                // header
                 switch (v->type)
                 {
                     case JNT_IMPORT_DECL:
-                        printf("FROM %s\n", v->import.package_name);
+                        printf("    import");
+                        break;
+                    case JNT_CLASS_DECL:
+                        printf("    ");
+                        debug_print_modifier_bit_flag(v->class.modifier);
+                        printf(" class");
                         break;
                     default:
                         // no-op
+                        printf("    (UNREGISTERED: %d)\n", v->type);
+                        break;
+                }
+
+                // key
+                printf(" %s", (char*)(p->key));
+
+                // value
+                switch (v->type)
+                {
+                    case JNT_IMPORT_DECL:
+                        printf(" FROM %s\n", v->import.package_name);
+                        break;
+                    case JNT_CLASS_DECL:
+                        if (v->class.extend)
+                        {
+                            printf(" extends %s\n", v->class.extend);
+                        }
+                        break;
+                    default:
+                        // no-op
+                        printf(" (UNREGISTERED VALUE)\n");
                         break;
                 }
 
                 p = p->next;
             }
         }
+    }
+}
+
+void debug_ir_lookup(java_ir* ir)
+{
+    lookup_hierarchy* lh = ir->lookup_current_scope;
+
+    while (lh)
+    {
+        printf("===== Lookup =====\n");
+
+        switch (lh->type)
+        {
+            case LST_COMPILATION_UNIT:
+                printf("Compilation\n");
+                break;
+            case LST_CLASS:
+                printf("Class Scope\n");
+                break;
+            case LST_INTERFACE:
+                printf("Interface Scope\n");
+                break;
+            case LST_NONE:
+                printf("Scope\n");
+                break;
+            case LST_IF:
+                printf("If Scope\n");
+                break;
+            case LST_ELSE:
+                printf("Else Scope\n");
+                break;
+            case LST_FOR:
+                printf("For Scope\n");
+                break;
+            case LST_WHILE:
+                printf("While Scope\n");
+                break;
+            case LST_DO:
+                printf("Do Scope\n");
+                break;
+            case LST_TRY:
+                printf("Try Scope\n");
+                break;
+            case LST_CATCH:
+                printf("Catch Scope\n");
+                break;
+            case LST_FINALLY:
+                printf("Finally Scope\n");
+                break;
+            default:
+                printf("(UNKNOWN SCOPE TYPE)\n");
+                break;
+        }
+
+        hash_table* table = &lh->table;
+
+        printf("memory: %zd bytes\n", hash_table_memory_size(table));
+        printf("load factor: %.2f%%\n", hash_table_load_factor(table) * 100.0f);
+        printf("longest chain: %zd\n", hash_table_longest_chain_length(table));
+
+        for (size_t i = 0; i < table->bucket_size; i++)
+        {
+            hash_pair* p = table->bucket[i];
+
+            if (p)
+            {
+                while (p)
+                {
+                    lookup_value_descriptor* v = (lookup_value_descriptor*)(p->value);
+
+                    // header
+                    switch (v->type)
+                    {
+                        case JNT_VAR_DECL:
+                            printf("    VAR");
+                            break;
+                        default:
+                            // no-op
+                            printf("    (UNREGISTERED: %d)", v->type);
+                            break;
+                    }
+
+                    // key
+                    printf(" %s", (char*)(p->key));
+
+                    // value
+                    switch (v->type)
+                    {
+                        case JNT_VAR_DECL:
+                            printf("\n      Access: ");
+                            debug_print_modifier_bit_flag(v->member_variable.modifier);
+                            printf("\n      Type: ");
+                            if (v->member_variable.type.primitive != JLT_MAX)
+                            {
+                                debug_print_lexeme_type(v->member_variable.type.primitive);
+                            }
+                            else
+                            {
+                                printf("%s", v->member_variable.type.reference);
+                            }
+                            printf("\n");
+                            break;
+                        default:
+                            // no-op
+                            printf(" (UNREGISTERED VALUE)\n");
+                            break;
+                    }
+
+                    p = p->next;
+                }
+            }
+        }
+
+        lh = lh->next;
     }
 }
