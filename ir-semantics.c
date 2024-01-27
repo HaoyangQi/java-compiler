@@ -211,7 +211,7 @@ static void ctx_class(java_ir* ir, tree_node* node)
             interface_type = interface_type->next_sibling;
         }
 
-        // concat all names with '&'
+        // concat all names
         desc->class.implement = string_list_concat(&sl, ",");
         release_string_list(&sl);
 
