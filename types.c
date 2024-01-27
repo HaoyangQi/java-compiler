@@ -21,3 +21,18 @@ void* realloc_assert(void* p, size_t sz)
 
     return d;
 }
+
+/**
+ * allocate a string buffer and copy source to it
+*/
+char* strmcpy_assert(const char* source)
+{
+    if (!source || strlen(source) <= 0)
+    {
+        return NULL;
+    }
+
+    char* s = (char*)malloc_assert(sizeof(char) * (strlen(source) + 1));
+    strcpy(s, source);
+    return s;
+}

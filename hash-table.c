@@ -222,6 +222,29 @@ void bhash_table_insert(hash_table* table, void* k, bytes_length len, void* v)
 }
 
 /**
+ * update existing pair
+*/
+bool bhash_table_update(hash_table* table, void* k, bytes_length len, void* v)
+{
+    size_t index = bhash(k, len) % table->bucket_size;
+    hash_pair* b = table->bucket[index];
+
+    // lookup with collision check
+    while (b)
+    {
+        if (strcmp(b->key, k) == 0)
+        {
+            b->value = v;
+            return true;
+        }
+
+        b = b->next;
+    }
+
+    return false;
+}
+
+/**
  * key test
 */
 bool bhash_table_test(hash_table* table, void* k, bytes_length len)
@@ -278,6 +301,14 @@ void shash_table_insert(hash_table* table, char* k, void* v)
 }
 
 /**
+ * string key pair update
+*/
+bool shash_table_update(hash_table* table, char* k, void* v)
+{
+    return bhash_table_update(table, k, strlen(k), v);
+}
+
+/**
  * string key test
 */
 bool shash_table_test(hash_table* table, char* k)
@@ -306,6 +337,14 @@ void* shash_table_find(hash_table* table, char* k)
 void shash_table_bl_insert(hash_table* table, char* k, size_t v)
 {
     bhash_table_insert(table, k, strlen(k), (void*)v);
+}
+
+/**
+ * bit-length data & string key pair update
+*/
+bool shash_table_bl_update(hash_table* table, char* k, size_t v)
+{
+    return bhash_table_update(table, k, strlen(k), (void*)v);
 }
 
 /**

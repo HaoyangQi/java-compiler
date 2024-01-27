@@ -66,6 +66,7 @@ typedef unsigned char error_definiton;
 #define JEL_TO_INDEX(l) (((error_definiton)(l)) >> 4)
 #define DEFINE_RESERVED_ERROR 0
 #define DEFINE_SYNTAX_ERROR ((error_definiton)(0x34))
+#define DEFINE_CONTEXT_ERROR ((error_definiton)(0x35))
 
 /**
  * Error Message ID
@@ -87,6 +88,17 @@ typedef enum
     JAVA_E_IMPORT_NO_SEMICOLON,
     JAVA_E_IMPORT_AMBIGUOUS,
     JAVA_E_IMPORT_DUPLICATE,
+    JAVA_E_CLASS_NO_NAME,
+    JAVA_E_CLASS_NO_BODY,
+    JAVA_E_CLASS_NAME_DUPLICATE,
+    JAVA_E_CLASS_BODY_ENCLOSE,
+    JAVA_E_MEMBER_VAR_DUPLICATE,
+    JAVA_E_MEMBER_VAR_DIM_AMBIGUOUS,
+    JAVA_E_MEMBER_VAR_DIM_DUPLICATE,
+    JAVA_E_MEMBER_VAR_NO_SEMICOLON,
+    JAVA_E_MEMBER_NO_TYPE,
+    JAVA_E_MEMBER_NO_NAME,
+    JAVA_E_MEMBER_AMBIGUOUS,
 
     JAVA_E_MAX,
 } java_error_id;

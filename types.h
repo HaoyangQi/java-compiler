@@ -39,5 +39,6 @@ typedef unsigned long int lbit_flag;
 
 void* malloc_assert(size_t sz);
 void* realloc_assert(void* p, size_t sz);
+char* strmcpy_assert(const char* source);
 
 #endif

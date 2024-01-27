@@ -67,14 +67,17 @@ void pair_data_delete_key(void* k, void* v);
 void pair_data_delete_value(void* k, void* v);
 
 void bhash_table_insert(hash_table* table, void* k, bytes_length len, void* v);
+bool bhash_table_update(hash_table* table, void* k, bytes_length len, void* v);
 bool bhash_table_test(hash_table* table, void* k, bytes_length len);
 void* bhash_table_find(hash_table* table, void* k, bytes_length len);
 
 void shash_table_insert(hash_table* table, char* k, void* v);
+bool shash_table_update(hash_table* table, char* k, void* v);
 bool shash_table_test(hash_table* table, char* k);
 void* shash_table_find(hash_table* table, char* k);
 
 void shash_table_bl_insert(hash_table* table, char* k, size_t v);
+bool shash_table_bl_update(hash_table* table, char* k, size_t v);
 bool shash_table_bl_test(hash_table* table, char* k);
 size_t shash_table_bl_find(hash_table* table, char* k);
 

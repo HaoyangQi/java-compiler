@@ -686,15 +686,14 @@ static tree_node* parse_class_declaration(java_parser* parser)
     // class
     consume_token(parser, NULL);
 
-    // ID, terminate if incomplete
+    // ID, skip if incomplete
     if (peek_token_class_is(parser, TOKEN_PEEK_1st, JT_IDENTIFIER))
     {
         consume_token(parser, node->data->id.complex);
     }
     else
     {
-        fprintf(stderr, "TODO error: expected name after class declaration\n");
-        return node;
+        parser_error(parser, JAVA_E_CLASS_NO_NAME);
     }
 
     // [Class Extends]
@@ -716,7 +715,7 @@ static tree_node* parse_class_declaration(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected class body in class declaration\n");
+        parser_error(parser, JAVA_E_CLASS_NO_BODY);
     }
 
     return node;
@@ -848,7 +847,7 @@ static tree_node* parse_class_body(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected '}' at the end of class body\n");
+        parser_error(parser, JAVA_E_CLASS_BODY_ENCLOSE);
     }
 
     return node;
@@ -1099,7 +1098,8 @@ static tree_node* parse_class_body_declaration(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected type name in the declaration\n");
+        // if missing, we terminate current reduction and start at next declaration
+        parser_error(parser, JAVA_E_MEMBER_NO_TYPE);
         return node;
     }
 
@@ -1129,17 +1129,17 @@ static tree_node* parse_class_body_declaration(java_parser* parser)
                 }
                 else
                 {
-                    fprintf(stderr, "TODO error: expected ';'\n");
+                    parser_error(parser, JAVA_E_MEMBER_VAR_NO_SEMICOLON);
                 }
                 break;
             default:
-                fprintf(stderr, "TODO error: ambiguous declaration\n");
+                parser_error(parser, JAVA_E_MEMBER_AMBIGUOUS);
                 break;
         }
     }
     else
     {
-        fprintf(stderr, "TODO error: expected a name in declaration\n");
+        parser_error(parser, JAVA_E_MEMBER_NO_NAME);
     }
 
     return node;
