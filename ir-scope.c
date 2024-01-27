@@ -82,6 +82,7 @@ lookup_value_descriptor* new_lookup_value_descriptor(java_node_query type)
         case JNT_CLASS_DECL:
             v->class.modifier = 0;
             v->class.extend = NULL;
+            v->class.implement = NULL;
             break;
         case JNT_VAR_DECL:
             v->member_variable.modifier = 0;
@@ -107,6 +108,7 @@ void lookup_value_descriptor_delete(lookup_value_descriptor* v)
             break;
         case JNT_CLASS_DECL:
             free(v->class.extend);
+            free(v->class.implement);
             break;
         case JNT_VAR_DECL:
             free(v->member_variable.type.reference);
@@ -137,6 +139,7 @@ lookup_value_descriptor* lookup_value_descriptor_copy(lookup_value_descriptor* v
             break;
         case JNT_CLASS_DECL:
             w->class.extend = strmcpy_assert(v->class.extend);
+            w->class.implement = strmcpy_assert(v->class.implement);
             break;
         case JNT_VAR_DECL:
             w->member_variable.type.reference = strmcpy_assert(v->member_variable.type.reference);
@@ -153,6 +156,8 @@ lookup_value_descriptor* lookup_value_descriptor_copy(lookup_value_descriptor* v
  * name lookup register
  *
  * when passing error code JAVA_E_MAX, no error will be logged
+ *
+ * NOTE: if failed, desc will be deleted
 */
 bool lookup_register(
     java_ir* ir,
@@ -169,6 +174,7 @@ bool lookup_register(
             ir_error(ir, err);
         }
 
+        lookup_value_descriptor_delete(desc);
         return false;
     }
     else
