@@ -90,9 +90,8 @@ typedef struct _lookup_value_descriptor
             lbit_flag modifier;
             // max one super class allowed
             char* extend;
-            /**
-             * TODO: implement list
-            */
+            // a list of names, separated by ','
+            char* implement;
         } class;
 
         struct

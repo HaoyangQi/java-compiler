@@ -148,9 +148,6 @@ static void ctx_import(java_ir* ir, tree_node* node)
             {
                 ir_error(ir, JAVA_E_IMPORT_AMBIGUOUS);
             }
-
-            // discard descriptor candidate
-            lookup_value_descriptor_delete(desc);
         }
     }
     else
@@ -191,25 +188,33 @@ static void ctx_class(java_ir* ir, tree_node* node)
     // [extends, implements, body]
     part = part->first_child;
 
-    // extends
+    // extends, this name will be resolved later in linker
     if (part && part->type == JNT_CLASS_EXTENDS)
     {
-        /**
-         * TODO:
-         * register name in lookup, because it is a type name
-         * value is NULL, resolve later
-        */
+        // extends->classtype->unit
+        desc->class.extend = __name_unit_concat(part->first_child->first_child, NULL);
         part = part->next_sibling;
     }
 
-    // implements
+    // implements, names will be resolved later in linker
     if (part && part->type == JNT_CLASS_IMPLEMENTS)
     {
-        /**
-         * TODO:
-         * register name in lookup, because it is a type name
-         * value is NULL, resolve later
-        */
+        // implements->list->interfacetype
+        tree_node* interface_type = part->first_child->first_child;
+        string_list sl;
+
+        // extract all names
+        init_string_list(&sl);
+        while (interface_type)
+        {
+            string_list_append(&sl, __name_unit_concat(interface_type->first_child, NULL));
+            interface_type = interface_type->next_sibling;
+        }
+
+        // concat all names with '&'
+        desc->class.implement = string_list_concat(&sl, ",");
+        release_string_list(&sl);
+
         part = part->next_sibling;
     }
 
@@ -220,8 +225,10 @@ static void ctx_class(java_ir* ir, tree_node* node)
     table = lookup_new_scope(ir, LST_CLASS);
 
     // each part is a class body declaration
-    part = part->first_child;
+    tree_node* first_decl = part->first_child;
 
+    // first pass: register definition
+    part = first_decl;
     while (part)
     {
         // class body declaration -> [static|ctor|type]
@@ -294,10 +301,6 @@ static void ctx_class(java_ir* ir, tree_node* node)
                         }
                     }
 
-                    /**
-                     * TODO: generate code for initializer
-                    */
-
                     declaration = declaration->next_sibling;
                 }
             }
@@ -308,6 +311,23 @@ static void ctx_class(java_ir* ir, tree_node* node)
                 */
             }
         }
+
+        part = part->next_sibling;
+    }
+
+    // now go back to first declaration for code generation
+    part = first_decl;
+
+    // second pass: code generation
+    while (part)
+    {
+        /**
+         * TODO: IR code generation for:
+         * 1. static initializer
+         * 2. constructor
+         * 3. member variable initializer
+         * 4. method block
+        */
 
         part = part->next_sibling;
     }

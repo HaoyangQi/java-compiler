@@ -1105,8 +1105,13 @@ void debug_ir_global_names(java_ir* ir)
                     case JNT_CLASS_DECL:
                         if (v->class.extend)
                         {
-                            printf(" extends %s\n", v->class.extend);
+                            printf(" extends %s", v->class.extend);
                         }
+                        if (v->class.implement)
+                        {
+                            printf(" implements %s", v->class.implement);
+                        }
+                        printf("\n");
                         break;
                     default:
                         // no-op
