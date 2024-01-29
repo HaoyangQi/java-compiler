@@ -1,7 +1,7 @@
 #include "ir.h"
 
-// hash table mapping string->lookup_value_descriptor wrapper
-#define HT_STR2DESC(t, s) ((lookup_value_descriptor*)shash_table_find(t, s))
+// hash table mapping string->definition wrapper
+#define HT_STR2DESC(t, s) ((definition*)shash_table_find(t, s))
 
 /* reserved constant context */
 
@@ -37,8 +37,6 @@ static void ctx_interface(java_ir* ir, tree_node* node);
 */
 void contextualize(java_ir* ir, tree_node* compilation_unit)
 {
-    lookup_new_scope(ir, LST_COMPILATION_UNIT);
-
     // compilation unit does not have siblings
     tree_node* node = compilation_unit->first_child;
 
@@ -112,7 +110,7 @@ static char* __name_unit_concat(tree_node* from, tree_node* stop_before)
 */
 static void ctx_import(java_ir* ir, tree_node* node)
 {
-    lookup_value_descriptor* desc = NULL;
+    definition* desc = NULL;
     hash_table* table = NULL;
     // JNT_IMPORT_DECL -> Name -> Unit
     tree_node* name = node->first_child;
@@ -134,7 +132,7 @@ static void ctx_import(java_ir* ir, tree_node* node)
     if (registered_name)
     {
         table = lookup_global_scope(ir);
-        desc = new_lookup_value_descriptor(JNT_IMPORT_DECL);
+        desc = new_definition(JNT_IMPORT_DECL);
         desc->import.package_name = pkg_name;
 
         // name resolution must be unique
@@ -169,12 +167,16 @@ static void ctx_import(java_ir* ir, tree_node* node)
 /**
  * contextualize "class declaration"
  *
+ * although it is scoped by class, we do not use specific scope on stack
+ * because we flush top-level one by one and class/interface will serve
+ * as global by default
+ *
  * node: top level
 */
 static void ctx_class(java_ir* ir, tree_node* node)
 {
-    hash_table* table = NULL;
-    lookup_value_descriptor* desc = new_lookup_value_descriptor(JNT_CLASS_DECL);
+    hash_table* table = lookup_global_scope(ir);
+    definition* desc = new_definition(JNT_CLASS_DECL);
     tree_node* part = node->first_child; // class declaration
     char* registered_name = t2s(part->data->id.complex);
 
@@ -182,7 +184,6 @@ static void ctx_class(java_ir* ir, tree_node* node)
     desc->class.modifier = node->data->top_level_declaration.modifier;
 
     // class name register
-    table = lookup_global_scope(ir);
     lookup_register(ir, table, registered_name, desc, JAVA_E_CLASS_NAME_DUPLICATE);
 
     // [extends, implements, body]
@@ -221,9 +222,6 @@ static void ctx_class(java_ir* ir, tree_node* node)
     // now we must have class body
     // otherwise it should not pass syntax parser
 
-    // class body scope
-    table = lookup_new_scope(ir, LST_CLASS);
-
     // each part is a class body declaration
     tree_node* first_decl = part->first_child;
 
@@ -234,19 +232,13 @@ static void ctx_class(java_ir* ir, tree_node* node)
         // class body declaration -> [static|ctor|type]
         tree_node* declaration = part->first_child;
 
-        if (declaration->type == JNT_STATIC_INIT)
-        {
-            /**
-             * TODO: static initializer
-            */
-        }
-        else if (declaration->type == JNT_CTOR_DECL)
+        if (declaration->type == JNT_CTOR_DECL)
         {
             /**
              * TODO: constructor
             */
         }
-        else
+        else if (declaration->type == JNT_TYPE)
         {
             /**
              * Type as starter, it can be method/variable declarator
@@ -254,7 +246,7 @@ static void ctx_class(java_ir* ir, tree_node* node)
 
             if (declaration->next_sibling->type == JNT_VAR_DECLARATORS)
             {
-                desc = new_lookup_value_descriptor(JNT_VAR_DECL);
+                desc = new_definition(JNT_VAR_DECL);
 
                 desc->member_variable.modifier = part->data->top_level_declaration.modifier;
                 desc->member_variable.type.primitive = declaration->data->declarator.id.simple;
@@ -275,7 +267,7 @@ static void ctx_class(java_ir* ir, tree_node* node)
                 {
                     lookup_register(ir, table,
                         t2s(declaration->data->declarator.id.complex),
-                        lookup_value_descriptor_copy(desc),
+                        definition_copy(desc),
                         JAVA_E_MEMBER_VAR_DUPLICATE
                     );
 
@@ -329,14 +321,39 @@ static void ctx_class(java_ir* ir, tree_node* node)
          * 4. method block
         */
 
+        // class body declaration -> [static|ctor|type]
+        tree_node* declaration = part->first_child;
+
+        if (declaration->type == JNT_STATIC_INIT)
+        {
+            /**
+             * TODO: static initializer
+            */
+        }
+        else if (declaration->type == JNT_CTOR_DECL)
+        {
+            /**
+             * TODO: constructor
+            */
+        }
+        else if (declaration->type == JNT_TYPE)
+        {
+            if (declaration->next_sibling->type == JNT_VAR_DECLARATORS)
+            {
+                /**
+                 * TODO: var decl
+                */
+            }
+            else if (declaration->next_sibling->type == JNT_METHOD_DECL)
+            {
+                /**
+                 * TODO: method
+                */
+            }
+        }
+
         part = part->next_sibling;
     }
-
-    // pop context
-    /**
-     * TODO: pop it!
-    */
-    // lookup_pop_scope(ir);
 }
 
 /**
@@ -346,5 +363,5 @@ static void ctx_interface(java_ir* ir, tree_node* node)
 {
     hash_table* table = lookup_new_scope(ir, LST_INTERFACE);
 
-    lookup_pop_scope(ir);
+    lookup_pop_scope(ir, false);
 }

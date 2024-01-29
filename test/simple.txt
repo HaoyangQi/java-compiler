@@ -14,5 +14,9 @@ class MyPackageClass extends C1 implements C2, C3 {
         System.out.println("This is my package!");
     }
 
+    private int calc(int x, int y) {
+        return x > y ? a + x * y : a * x - y;
+    }
+
     short s0 = 9,s1,s2 = 0;
 }
