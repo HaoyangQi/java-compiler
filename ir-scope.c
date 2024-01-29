@@ -170,9 +170,10 @@ definition* new_definition(java_node_query type)
             v->class.implement = NULL;
             break;
         case JNT_VAR_DECL:
-            v->member_variable.modifier = 0;
-            v->member_variable.version = 0;
-            __init_type_name(&v->member_variable.type);
+            v->variable.is_class_member = false;
+            v->variable.modifier = 0;
+            v->variable.version = 0;
+            __init_type_name(&v->variable.type);
         case JNT_METHOD_DECL:
             v->method.modifier = 0;
             __init_type_name(&v->method.return_type);
@@ -215,7 +216,7 @@ static definition* __definition_delete_single(definition* v)
             free(v->class.implement);
             break;
         case JNT_VAR_DECL:
-            free(v->member_variable.type.reference);
+            free(v->variable.type.reference);
             break;
         default:
             // no-op
@@ -259,7 +260,7 @@ definition* __definition_copy_single(definition* v)
             w->class.implement = strmcpy_assert(v->class.implement);
             break;
         case JNT_VAR_DECL:
-            w->member_variable.type.reference = strmcpy_assert(v->member_variable.type.reference);
+            w->variable.type.reference = strmcpy_assert(v->variable.type.reference);
             break;
         default:
             // no-op

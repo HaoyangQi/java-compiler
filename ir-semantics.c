@@ -1,7 +1,7 @@
 #include "ir.h"
 
 // hash table mapping string->definition wrapper
-#define HT_STR2DESC(t, s) ((definition*)shash_table_find(t, s))
+#define HT_STR2DEF(t, s) ((definition*)shash_table_find(t, s))
 
 /* reserved constant context */
 
@@ -24,6 +24,23 @@ static char* t2s(java_token* token)
     buffer_substring(content, token->from, len);
 
     return content;
+}
+
+/**
+ * Token-To-Definition Helper
+ *
+ * a definition associated to a name cannot be NULL, so if
+ * undefined it returns NULL
+ *
+ * returned definition is a reference, not a copy
+*/
+static definition* t2d(hash_table* table, java_token* token)
+{
+    char* registered_name = t2s(token);
+    definition* def = HT_STR2DEF(table, registered_name);
+    free(registered_name);
+
+    return def;
 }
 
 static void ctx_import(java_ir* ir, tree_node* node);
@@ -138,7 +155,7 @@ static void ctx_import(java_ir* ir, tree_node* node)
         // name resolution must be unique
         if (!lookup_register(ir, table, registered_name, desc, JAVA_E_MAX))
         {
-            if (strcmp(pkg_name, HT_STR2DESC(table, registered_name)->import.package_name) == 0)
+            if (strcmp(pkg_name, HT_STR2DEF(table, registered_name)->import.package_name) == 0)
             {
                 ir_error(ir, JAVA_E_IMPORT_DUPLICATE);
             }
@@ -248,15 +265,16 @@ static void ctx_class(java_ir* ir, tree_node* node)
             {
                 desc = new_definition(JNT_VAR_DECL);
 
-                desc->member_variable.modifier = part->data->top_level_declaration.modifier;
-                desc->member_variable.type.primitive = declaration->data->declarator.id.simple;
-                desc->member_variable.type.dim = declaration->data->declarator.dimension;
+                desc->variable.is_class_member = true;
+                desc->variable.modifier = part->data->top_level_declaration.modifier;
+                desc->variable.type.primitive = declaration->data->declarator.id.simple;
+                desc->variable.type.dim = declaration->data->declarator.dimension;
 
                 // if not primitive type, then it must be a reference type
-                if (desc->member_variable.type.primitive == JLT_MAX)
+                if (desc->variable.type.primitive == JLT_MAX)
                 {
                     // type->class_type->unit
-                    desc->member_variable.type.reference = __name_unit_concat(declaration->first_child->first_child, NULL);
+                    desc->variable.type.reference = __name_unit_concat(declaration->first_child->first_child, NULL);
                 }
 
                 // variable declarators -> [var, var, ...]
@@ -283,7 +301,7 @@ static void ctx_class(java_ir* ir, tree_node* node)
                     */
                     if (declaration->data->declarator.dimension > 0)
                     {
-                        if (desc->member_variable.type.dim != declaration->data->declarator.dimension)
+                        if (desc->variable.type.dim != declaration->data->declarator.dimension)
                         {
                             ir_error(ir, JAVA_E_MEMBER_VAR_DIM_AMBIGUOUS);
                         }
@@ -343,6 +361,8 @@ static void ctx_class(java_ir* ir, tree_node* node)
                 /**
                  * TODO: var decl
                 */
+                declaration = declaration->next_sibling->first_child;
+                desc = t2d(table, declaration->data->declarator.id.complex);
             }
             else if (declaration->next_sibling->type == JNT_METHOD_DECL)
             {

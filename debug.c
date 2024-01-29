@@ -1070,7 +1070,7 @@ static void debug_print_definition(definition* v)
             debug_print_modifier_bit_flag(v->class.modifier);
             break;
         case JNT_VAR_DECL:
-            printf("def var");
+            printf("def %s", v->variable.is_class_member ? "member var" : "var");
             break;
         default:
             // no-op
@@ -1097,15 +1097,15 @@ static void debug_print_definition(definition* v)
             break;
         case JNT_VAR_DECL:
             printf(" Access: ");
-            debug_print_modifier_bit_flag(v->member_variable.modifier);
+            debug_print_modifier_bit_flag(v->variable.modifier);
             printf(", Type: ");
-            if (v->member_variable.type.primitive != JLT_MAX)
+            if (v->variable.type.primitive != JLT_MAX)
             {
-                debug_print_lexeme_type(v->member_variable.type.primitive);
+                debug_print_lexeme_type(v->variable.type.primitive);
             }
             else
             {
-                printf("%s", v->member_variable.type.reference);
+                printf("%s", v->variable.type.reference);
             }
             printf("\n");
             break;

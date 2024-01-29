@@ -113,13 +113,15 @@ typedef struct _definition
 
         struct
         {
+            // if it is a member variable
+            bool is_class_member;
             // modifier
             lbit_flag modifier;
             // type
             type_name type;
             // current version
             size_t version;
-        } member_variable;
+        } variable;
 
         struct
         {
