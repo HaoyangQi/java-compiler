@@ -6,9 +6,7 @@
 */
 void init_ir(java_ir* ir, java_error* error)
 {
-    ir->lookup_current_scope = NULL;
-    ir->member_initialization = NULL;
-    ir->methods = NULL;
+    ir->scope_stack_top = NULL;
     ir->num_methods = 0;
     ir->error = error;
 
@@ -26,7 +24,7 @@ void release_ir(java_ir* ir)
     // delete global name lookup
     release_hash_table(&ir->tbl_global, &lookup_scope_deleter);
     // delete entire lookup stack
-    while (lookup_pop_scope(ir));
+    while (lookup_pop_scope(ir, false));
 }
 
 /**

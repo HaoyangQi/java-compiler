@@ -1057,6 +1057,85 @@ void debug_ir_on_demand_imports(java_ir* ir)
     }
 }
 
+static void debug_print_definition(definition* v)
+{
+    // header
+    switch (v->type)
+    {
+        case JNT_IMPORT_DECL:
+            printf("import");
+            break;
+        case JNT_CLASS_DECL:
+            printf("class ");
+            debug_print_modifier_bit_flag(v->class.modifier);
+            break;
+        case JNT_VAR_DECL:
+            printf("def var");
+            break;
+        default:
+            // no-op
+            printf("(UNREGISTERED: %d)", v->type);
+            break;
+    }
+
+    // value
+    switch (v->type)
+    {
+        case JNT_IMPORT_DECL:
+            printf(" FROM %s\n", v->import.package_name);
+            break;
+        case JNT_CLASS_DECL:
+            if (v->class.extend)
+            {
+                printf(" extends %s", v->class.extend);
+            }
+            if (v->class.implement)
+            {
+                printf(" implements %s", v->class.implement);
+            }
+            printf("\n");
+            break;
+        case JNT_VAR_DECL:
+            printf(" Access: ");
+            debug_print_modifier_bit_flag(v->member_variable.modifier);
+            printf(", Type: ");
+            if (v->member_variable.type.primitive != JLT_MAX)
+            {
+                debug_print_lexeme_type(v->member_variable.type.primitive);
+            }
+            else
+            {
+                printf("%s", v->member_variable.type.reference);
+            }
+            printf("\n");
+            break;
+        default:
+            // no-op
+            printf(" (UNREGISTERED VALUE)\n");
+            break;
+    }
+}
+
+static void debug_print_scope_frame_table(hash_table* table)
+{
+    for (size_t i = 0; i < table->bucket_size; i++)
+    {
+        hash_pair* p = table->bucket[i];
+
+        if (p)
+        {
+            while (p)
+            {
+                // key
+                printf("    %s: ", (char*)(p->key));
+                debug_print_definition(p->value);
+
+                p = p->next;
+            }
+        }
+    }
+}
+
 void debug_ir_global_names(java_ir* ir)
 {
     hash_table* table = lookup_global_scope(ir);
@@ -1066,77 +1145,27 @@ void debug_ir_global_names(java_ir* ir)
     printf("load factor: %.2f%%\n", hash_table_load_factor(table) * 100.0f);
     printf("longest chain: %zd\n", hash_table_longest_chain_length(table));
 
-    for (size_t i = 0; i < table->bucket_size; i++)
-    {
-        hash_pair* p = table->bucket[i];
-
-        if (p)
-        {
-            while (p)
-            {
-                lookup_value_descriptor* v = (lookup_value_descriptor*)(p->value);
-
-                // header
-                switch (v->type)
-                {
-                    case JNT_IMPORT_DECL:
-                        printf("    import");
-                        break;
-                    case JNT_CLASS_DECL:
-                        printf("    ");
-                        debug_print_modifier_bit_flag(v->class.modifier);
-                        printf(" class");
-                        break;
-                    default:
-                        // no-op
-                        printf("    (UNREGISTERED: %d)\n", v->type);
-                        break;
-                }
-
-                // key
-                printf(" %s", (char*)(p->key));
-
-                // value
-                switch (v->type)
-                {
-                    case JNT_IMPORT_DECL:
-                        printf(" FROM %s\n", v->import.package_name);
-                        break;
-                    case JNT_CLASS_DECL:
-                        if (v->class.extend)
-                        {
-                            printf(" extends %s", v->class.extend);
-                        }
-                        if (v->class.implement)
-                        {
-                            printf(" implements %s", v->class.implement);
-                        }
-                        printf("\n");
-                        break;
-                    default:
-                        // no-op
-                        printf(" (UNREGISTERED VALUE)\n");
-                        break;
-                }
-
-                p = p->next;
-            }
-        }
-    }
+    debug_print_scope_frame_table(table);
 }
 
 void debug_ir_lookup(java_ir* ir)
 {
-    lookup_hierarchy* lh = ir->lookup_current_scope;
+    scope_frame* lh = ir->scope_stack_top;
+
+    if (!lh)
+    {
+        printf("(lookup stack is empty)\n");
+        return;
+    }
 
     while (lh)
     {
-        printf("===== Lookup =====\n");
+        printf("===== LOOKUP STACK =====\n>>>>>>>>>> ");
 
         switch (lh->type)
         {
             case LST_COMPILATION_UNIT:
-                printf("Compilation\n");
+                printf("Compilation Scope\n");
                 break;
             case LST_CLASS:
                 printf("Class Scope\n");
@@ -1176,64 +1205,13 @@ void debug_ir_lookup(java_ir* ir)
                 break;
         }
 
-        hash_table* table = &lh->table;
+        hash_table* table = lh->table;
 
         printf("memory: %zd bytes\n", hash_table_memory_size(table));
         printf("load factor: %.2f%%\n", hash_table_load_factor(table) * 100.0f);
         printf("longest chain: %zd\n", hash_table_longest_chain_length(table));
 
-        for (size_t i = 0; i < table->bucket_size; i++)
-        {
-            hash_pair* p = table->bucket[i];
-
-            if (p)
-            {
-                while (p)
-                {
-                    lookup_value_descriptor* v = (lookup_value_descriptor*)(p->value);
-
-                    // header
-                    switch (v->type)
-                    {
-                        case JNT_VAR_DECL:
-                            printf("    VAR");
-                            break;
-                        default:
-                            // no-op
-                            printf("    (UNREGISTERED: %d)", v->type);
-                            break;
-                    }
-
-                    // key
-                    printf(" %s", (char*)(p->key));
-
-                    // value
-                    switch (v->type)
-                    {
-                        case JNT_VAR_DECL:
-                            printf("\n      Access: ");
-                            debug_print_modifier_bit_flag(v->member_variable.modifier);
-                            printf("\n      Type: ");
-                            if (v->member_variable.type.primitive != JLT_MAX)
-                            {
-                                debug_print_lexeme_type(v->member_variable.type.primitive);
-                            }
-                            else
-                            {
-                                printf("%s", v->member_variable.type.reference);
-                            }
-                            printf("\n");
-                            break;
-                        default:
-                            // no-op
-                            printf(" (UNREGISTERED VALUE)\n");
-                            break;
-                    }
-
-                    p = p->next;
-                }
-            }
-        }
+        debug_print_scope_frame_table(table);
 
         lh = lh->next;
     }

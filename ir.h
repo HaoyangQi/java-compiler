@@ -43,18 +43,22 @@ typedef enum
  * key is a copy of name string
  * value is various based on scope type it serves
  *
- * TODO: need semantic_block* reference back to a block
- * if it is a function or a loop
+ * every scope has a counter for instrction numbering
 */
-typedef struct _lookup_hierarchy
+typedef struct _scope_frame
 {
+    // scope identifier
     lookup_scope_type type;
+    // frame instruction counter
+    size_t fic;
 
-    // name -> lookup_value_descriptor
-    hash_table table;
+    /**
+     * TYPE: hash_table<char*, definition>
+    */
+    hash_table* table;
 
-    struct _lookup_hierarchy* next;
-} lookup_hierarchy;
+    struct _scope_frame* next;
+} scope_frame;
 
 /**
  * type info
@@ -72,9 +76,10 @@ typedef struct
  *
  * here we use node type for further classification
 */
-typedef struct _lookup_value_descriptor
+typedef struct _definition
 {
     java_node_query type;
+    struct _definition* next;
 
     union
     {
@@ -112,144 +117,167 @@ typedef struct _lookup_value_descriptor
             lbit_flag modifier;
             // type
             type_name type;
+            // current version
+            size_t version;
         } member_variable;
 
         struct
         {
             // modifier
             lbit_flag modifier;
+            // return type
+            type_name return_type;
         } method;
     };
-} lookup_value_descriptor;
+} definition;
 
 /**
- * variable descriptor
+ * IR OP CODE
  *
- * TODO: need to describe type
-*/
-typedef struct
-{
-    // use counter, 0 means definition
-    size_t version;
-} semantic_variable_descriptor;
-
-/**
- * value type
+ * every operation has unique identifier, despite what
+ * form it has
+ *
+ * 1. assignment operator will not be modelled here because it is implicitly
+ *    supported by the assignment form
+ * 2. arithmetic unary sign "+" and "-" are not modelled because they can be
+ *    done at compile-time
+ * 3. operator "? :" is not modelled because it is an syntatic sugar which
+ *    should be expanded in "if-else" form in code graph
+ *
+ * IROP_ADD     addition
+ * IROP_SUB     subtraction
+ * IROP_MUL     multiplication
+ * IROP_DIV     division
+ * IROP_MOD     modulo
+ * IROP_BINC    pre-increment
+ * IROP_AINC    post-increment
+ * IROP_BDEC    pre-decrement
+ * IROP_ADEC    post-decrement
+ * IROP_SLS     left shift
+ * IROP_SRS     right shift
+ * IROP_URS     unsigned right shift
+ * IROP_LT      less than
+ * IROP_GT      greater than
+ * IROP_LE      less or equal
+ * IROP_GE      greater or equal
+ * IROP_EQ      equal
+ * IROP_NE      not equal
+ * IROP_IO      instance of
+ * IROP_LNEG    logical negation
+ * IROP_LAND    logicl and
+ * IROP_LOR     logical or
+ * IROP_BNEG    bit-wise negation
+ * IROP_BAND    bit-wise and
+ * IROP_BOR     bit-wise or
+ * IROP_XOR     bit-wise exclusive or
+ * IROP_GOTO    jump
+ * IROP_RETURN  return
+ * IROP_TEST    test-and-jump
 */
 typedef enum
 {
-    SVT_NAME,
-    SVT_LITERAL,
-} semantic_value_type;
+    // undefined value
+    IROP_UNDEFINED = 0,
+
+    /* arithmetic */
+
+    IROP_ADD,
+    IROP_SUB,
+    IROP_MUL,
+    IROP_DIV,
+    IROP_MOD,
+    IROP_BINC,
+    IROP_AINC,
+    IROP_BDEC,
+    IROP_ADEC,
+    IROP_SLS,
+    IROP_SRS,
+    IROP_URS,
+
+    /* Relational */
+
+    IROP_LT,
+    IROP_GT,
+    IROP_LE,
+    IROP_GE,
+    IROP_EQ,
+    IROP_NE,
+    IROP_IO,
+
+    /* Logical */
+
+    IROP_LNEG,
+    IROP_LAND,
+    IROP_LOR,
+
+    /* Bit-wise */
+
+    IROP_BNEG,
+    IROP_BAND,
+    IROP_BOR,
+    IROP_XOR,
+
+    /* IR-specific */
+
+    IROP_GOTO,
+    IROP_RETURN,
+    IROP_TEST,
+
+    IROP_MAX,
+} operation;
 
 /**
- * value
+ * Single Assignment Form
+ *
+ * It is generalized as a "single instruction"
+ * a sequence of instructions defines a node
+ *
+ * max form: ref[0] = ref[1] op ref[2]
+ * only ref[0] can be lvalue
+*/
+typedef struct _instruction
+{
+    // instruction id within the immediate scope
+    size_t id;
+    // opcode
+    operation op;
+    // references
+    definition* ref[3];
+    // value version
+    size_t version[3];
+
+    // next instruction
+    struct _instruction* next;
+} instruction;
+
+/**
+ * SSA Graph Node
+ *
+*/
+typedef struct _code_graph_node
+{
+    instruction* inst_first;
+    instruction* inst_last;
+
+    size_t num_in;
+    size_t num_out;
+
+    struct _code_graph_node** in;
+    struct _code_graph_node** out;
+} code_graph_node;
+
+/**
+ * SSA Graph entry point
+ *
+ * it will contain the original copy of scope lookup
 */
 typedef struct
 {
-    semantic_value_type type;
-
-    // value description
-    union
-    {
-        // reference type
-        struct
-        {
-            /**
-             * TODO: do we need key here?
-            */
-            // char* s;
-            semantic_variable_descriptor* definition;
-            size_t version;
-        } name;
-
-        // primitive type
-        struct
-        {
-            java_lexeme_type type;
-            java_number_bit_length bits;
-            void* data;
-        } literal;
-    } describe;
-} semantic_value;
-
-/**
- * single assignment form
- *
- * v <- aux_1 op aux_2
- *
- * multiple statements are chained in order
- * when they are in same block
- *
- * the simplist form is an assignment expression:
- * a ;
- * it takes one value, and that is it
- *
- * but there is allowed 3 values at most because
- * it is a single assignment form
- *
- * what about "? :"
- * it is considered as a syntatic suger instead of
- * a simple assignment, because it branches statements
- * and diverges the pathway; it needs to be broken
- * down into simpler version in SSA
- *
- * TODO:
-*/
-typedef struct _semantic_assignment
-{
-    // at least one value is mandatory
-    semantic_value v;
-    // another two values are optional
-    semantic_value* aux_1;
-    semantic_value* aux_2;
-    // operator is also optional
-    java_operator op;
-
-    struct _semantic_assignment* next;
-} semantic_assignment;
-
-typedef enum
-{
-    SBT_SIMPLE,
-    SBT_IF,
-    SBT_LOOP,
-} semantic_block_branch_type;
-
-/**
- * A block of assignments
- *
- * Connecting together we have SSA
-*/
-typedef struct _semantic_block
-{
-    // lookupup table of current scope
-    lookup_hierarchy* lookup_from;
-    // assignments within the block
-    semantic_assignment* assignment;
-    // branch type
-    semantic_block_branch_type branch_type;
-
-    // branch form
-    union
-    {
-        struct
-        {
-            struct _semantic_block* next;
-        } single;
-
-        struct
-        {
-            struct _semantic_block* yes;
-            struct _semantic_block* no;
-        } binary;
-
-        struct
-        {
-            struct _semantic_block* condition_block;
-        } loop;
-    } branch_like;
-} semantic_block;
+    // scope lookup table
+    hash_table* scope;
+    // first graph node
+    code_graph_node* graph;
+} code_graph;
 
 /**
  * Top Level of Semantics
@@ -264,31 +292,30 @@ typedef struct
     hash_table tbl_on_demand_packages;
     // other global names
     hash_table tbl_global;
-    // symbol lookup of current scope
-    lookup_hierarchy* lookup_current_scope;
-    // member initializer block
-    semantic_block* member_initialization;
-    // method SSAs
-    semantic_block** methods;
+    // stack top symbol lookup
+    scope_frame* scope_stack_top;
     // toplevel block count
     size_t num_methods;
     // error data
     java_error* error;
 } java_ir;
 
-void lookup_scope_deleter(char* k, lookup_value_descriptor* v);
+void lookup_scope_deleter(char* k, definition* v);
 hash_table* lookup_new_scope(java_ir* ir, lookup_scope_type type);
-bool lookup_pop_scope(java_ir* ir);
+bool lookup_pop_scope(java_ir* ir, bool merge_global);
 hash_table* lookup_global_scope(java_ir* ir);
 hash_table* lookup_current_scope(java_ir* ir);
-lookup_value_descriptor* new_lookup_value_descriptor(java_node_query type);
-void lookup_value_descriptor_delete(lookup_value_descriptor* v);
-lookup_value_descriptor* lookup_value_descriptor_copy(lookup_value_descriptor* v);
+
+definition* new_definition(java_node_query type);
+void definition_concat(definition* dest, definition* src);
+void definition_delete(definition* v);
+definition* definition_copy(definition* v);
+
 bool lookup_register(
     java_ir* ir,
     hash_table* table,
     char* name,
-    lookup_value_descriptor* desc,
+    definition* desc,
     java_error_id err
 );
 

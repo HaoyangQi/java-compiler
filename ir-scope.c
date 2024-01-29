@@ -6,10 +6,10 @@
  * TODO: we may need delete routine for semantic_variable_descriptor in the
  * future
 */
-void lookup_scope_deleter(char* k, lookup_value_descriptor* v)
+void lookup_scope_deleter(char* k, definition* v)
 {
     free(k);
-    lookup_value_descriptor_delete(v);
+    definition_delete(v);
 }
 
 /**
@@ -17,30 +17,75 @@ void lookup_scope_deleter(char* k, lookup_value_descriptor* v)
 */
 hash_table* lookup_new_scope(java_ir* ir, lookup_scope_type type)
 {
-    lookup_hierarchy* scope = (lookup_hierarchy*)malloc_assert(sizeof(lookup_hierarchy));
+    scope_frame* scope = (scope_frame*)malloc_assert(sizeof(scope_frame));
 
     // init
     scope->type = type;
-    init_hash_table(&scope->table, HASH_TABLE_DEFAULT_BUCKET_SIZE);
+    scope->fic = 0;
+    scope->table = (hash_table*)malloc_assert(sizeof(hash_table));
+    init_hash_table(scope->table, HASH_TABLE_DEFAULT_BUCKET_SIZE);
 
     // push
-    scope->next = ir->lookup_current_scope;
-    ir->lookup_current_scope = scope;
+    scope->next = ir->scope_stack_top;
+    ir->scope_stack_top = scope;
 
-    return &scope->table;
+    return scope->table;
 }
 
 /**
  * pop current lookup node
+ *
+ * if merge_global is true, table contents will be merged into global lookup
 */
-bool lookup_pop_scope(java_ir* ir)
+bool lookup_pop_scope(java_ir* ir, bool merge_global)
 {
-    lookup_hierarchy* top = ir->lookup_current_scope;
+    scope_frame* top = ir->scope_stack_top;
+
+    // merge
+    if (top && merge_global)
+    {
+        hash_table* table = top->table;
+
+        for (size_t i = 0; i < table->bucket_size; i++)
+        {
+            hash_pair* p = table->bucket[i];
+
+            if (p)
+            {
+                while (p)
+                {
+                    hash_pair* pair = shash_table_get(&ir->tbl_global, p->key);
+
+                    // if key exists, we merge; otherwise simply insert
+                    if (pair)
+                    {
+                        definition_concat(pair->value, p->value);
+                    }
+                    else
+                    {
+                        shash_table_insert(&ir->tbl_global, p->key, p->value);
+                    }
+
+                    /**
+                     * detach all data since we are moving it to global
+                     *
+                     * NOTE: this is destructive and will make the table
+                     * stop functioning
+                    */
+                    p->key = NULL;
+                    p->value = NULL;
+
+                    p = p->next;
+                }
+            }
+        }
+    }
 
     if (top)
     {
-        release_hash_table(&top->table, &lookup_scope_deleter);
-        ir->lookup_current_scope = top->next;
+        release_hash_table(top->table, &lookup_scope_deleter);
+        free(top->table);
+        ir->scope_stack_top = top->next;
         free(top);
 
         return true;
@@ -62,17 +107,57 @@ hash_table* lookup_global_scope(java_ir* ir)
 */
 hash_table* lookup_current_scope(java_ir* ir)
 {
-    return &ir->lookup_current_scope->table;
+    return ir->scope_stack_top->table;
+}
+
+static void __init_type_name(type_name* t)
+{
+    t->primitive = JLT_MAX;
+    t->reference = NULL;
+    t->dim = 0;
 }
 
 /**
- * generate lookup_value_descriptor instance
+ * name lookup register
+ *
+ * when passing error code JAVA_E_MAX, no error will be logged
+ *
+ * NOTE: if failed, desc will be deleted
 */
-lookup_value_descriptor* new_lookup_value_descriptor(java_node_query type)
+bool lookup_register(
+    java_ir* ir,
+    hash_table* table,
+    char* name,
+    definition* desc,
+    java_error_id err
+)
 {
-    lookup_value_descriptor* v = (lookup_value_descriptor*)malloc_assert(sizeof(lookup_value_descriptor));
+    if (shash_table_test(table, name))
+    {
+        if (err != JAVA_E_MAX)
+        {
+            ir_error(ir, err);
+        }
+
+        definition_delete(desc);
+        return false;
+    }
+    else
+    {
+        shash_table_insert(table, name, desc);
+        return true;
+    }
+}
+
+/**
+ * generate definition instance
+*/
+definition* new_definition(java_node_query type)
+{
+    definition* v = (definition*)malloc_assert(sizeof(definition));
 
     v->type = type;
+    v->next = NULL;
 
     switch (type)
     {
@@ -86,9 +171,11 @@ lookup_value_descriptor* new_lookup_value_descriptor(java_node_query type)
             break;
         case JNT_VAR_DECL:
             v->member_variable.modifier = 0;
-            v->member_variable.type.primitive = JLT_MAX;
-            v->member_variable.type.reference = NULL;
-            v->member_variable.type.dim = 0;
+            v->member_variable.version = 0;
+            __init_type_name(&v->member_variable.type);
+        case JNT_METHOD_DECL:
+            v->method.modifier = 0;
+            __init_type_name(&v->method.return_type);
         default:
             break;
     }
@@ -97,10 +184,27 @@ lookup_value_descriptor* new_lookup_value_descriptor(java_node_query type)
 }
 
 /**
- * delete descriptor content
+ * im-place concatenate two definition chain
 */
-void lookup_value_descriptor_delete(lookup_value_descriptor* v)
+void definition_concat(definition* dest, definition* src)
 {
+    // locate the end of chain
+    while (dest->next != NULL)
+    {
+        dest++;
+    }
+
+    // append
+    dest->next = src;
+}
+
+/**
+ * delete single definition
+*/
+static definition* __definition_delete_single(definition* v)
+{
+    definition* n = v->next;
+
     switch (v->type)
     {
         case JNT_IMPORT_DECL:
@@ -119,17 +223,30 @@ void lookup_value_descriptor_delete(lookup_value_descriptor* v)
     }
 
     free(v);
+
+    return n;
 }
 
 /**
- * copy descriptor content
+ * delete descriptor content
 */
-lookup_value_descriptor* lookup_value_descriptor_copy(lookup_value_descriptor* v)
+void definition_delete(definition* v)
 {
-    lookup_value_descriptor* w = (lookup_value_descriptor*)malloc_assert(sizeof(lookup_value_descriptor));
+    while (v)
+    {
+        v = __definition_delete_single(v);
+    }
+}
+
+/**
+ * copy single definition
+*/
+definition* __definition_copy_single(definition* v)
+{
+    definition* w = (definition*)malloc_assert(sizeof(definition));
 
     // shallow copy first
-    memcpy(w, v, sizeof(lookup_value_descriptor));
+    memcpy(w, v, sizeof(definition));
 
     // now deep copy
     switch (v->type)
@@ -149,37 +266,36 @@ lookup_value_descriptor* lookup_value_descriptor_copy(lookup_value_descriptor* v
             break;
     }
 
+    // clear pointer
+    w->next = NULL;
+
     return w;
 }
 
 /**
- * name lookup register
- *
- * when passing error code JAVA_E_MAX, no error will be logged
- *
- * NOTE: if failed, desc will be deleted
+ * copy definition
 */
-bool lookup_register(
-    java_ir* ir,
-    hash_table* table,
-    char* name,
-    lookup_value_descriptor* desc,
-    java_error_id err
-)
+definition* definition_copy(definition* v)
 {
-    if (shash_table_test(table, name))
+    definition* head = NULL;
+    definition* cur = NULL;
+
+    while (v)
     {
-        if (err != JAVA_E_MAX)
+        // if head is defined, so is cur
+        if (head)
         {
-            ir_error(ir, err);
+            cur->next = __definition_copy_single(v);
+            cur = cur->next;
+        }
+        else
+        {
+            cur = __definition_copy_single(v);
+            head = cur;
         }
 
-        lookup_value_descriptor_delete(desc);
-        return false;
+        v = v->next;
     }
-    else
-    {
-        shash_table_insert(table, name, desc);
-        return true;
-    }
+
+    return head;
 }

@@ -293,6 +293,30 @@ void* bhash_table_find(hash_table* table, void* k, bytes_length len)
 }
 
 /**
+ * find a pair and return the reference
+ *
+ * NULL returned from this method is unambiguous: means key does not exist
+*/
+hash_pair* bhash_table_get(hash_table* table, void* k, bytes_length len)
+{
+    size_t index = bhash(k, len) % table->bucket_size;
+    hash_pair* b = table->bucket[index];
+
+    // lookup with collision check
+    while (b)
+    {
+        if (strcmp(b->key, k) == 0)
+        {
+            return b;
+        }
+
+        b = b->next;
+    }
+
+    return NULL;
+}
+
+/**
  * string key insert
 */
 void shash_table_insert(hash_table* table, char* k, void* v)
@@ -322,6 +346,14 @@ bool shash_table_test(hash_table* table, char* k)
 void* shash_table_find(hash_table* table, char* k)
 {
     return bhash_table_find(table, k, strlen(k));
+}
+
+/**
+ * string key get
+*/
+hash_pair* shash_table_get(hash_table* table, char* k)
+{
+    return bhash_table_get(table, k, strlen(k));
 }
 
 /**
