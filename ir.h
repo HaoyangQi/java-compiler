@@ -364,11 +364,25 @@ typedef struct _basic_block
 } basic_block;
 
 /**
- * CFG/SSA Entry Point
- *
+ * Dynamic array of nodes
 */
 typedef struct
 {
+    basic_block** arr;
+    size_t size;
+    size_t num;
+} node_array;
+
+/**
+ * CFG Entry Point
+ *
+ * nodes and edges are managed here as the source of all references
+ * and as the aid for deletion process
+*/
+typedef struct
+{
+    // nodes
+    node_array nodes;
     // edges
     edge_array edges;
     // entry point
@@ -381,6 +395,8 @@ typedef struct
  * on top level, each method occupies a tree of blocks
  * additionally, member initializers will occupy a
  * tree;
+ *
+ * all code graphs should be NULL by default
 */
 typedef struct
 {
@@ -394,6 +410,9 @@ typedef struct
     size_t num_methods;
     // error data
     java_error* error;
+
+    // member declarator initialization code
+    cfg* code_member_init;
 } java_ir;
 
 void lookup_scope_deleter(char* k, definition* v);
@@ -401,12 +420,6 @@ hash_table* lookup_new_scope(java_ir* ir, lookup_scope_type type);
 bool lookup_pop_scope(java_ir* ir, bool merge_global);
 hash_table* lookup_global_scope(java_ir* ir);
 hash_table* lookup_current_scope(java_ir* ir);
-
-definition* new_definition(java_node_query type);
-void definition_concat(definition* dest, definition* src);
-void definition_delete(definition* v);
-definition* definition_copy(definition* v);
-
 bool lookup_register(
     java_ir* ir,
     hash_table* table,
@@ -414,6 +427,23 @@ bool lookup_register(
     definition* desc,
     java_error_id err
 );
+
+definition* new_definition(java_node_query type);
+void definition_concat(definition* dest, definition* src);
+void definition_delete(definition* v);
+definition* definition_copy(definition* v);
+
+void init_cfg(cfg* g);
+void release_cfg(cfg* g);
+basic_block* cfg_new_basic_block(cfg* g);
+void cfg_new_edge(cfg* g, basic_block* from, basic_block* to);
+void cfg_connect(cfg* g, basic_block* dest, cfg* src_graph);
+
+instruction* new_instruction();
+void delete_instruction(instruction* inst);
+void instruction_insert(basic_block* node, instruction* prev, instruction* inst);
+void instruction_push_back(basic_block* node, instruction* inst);
+void instruction_push_front(basic_block* node, instruction* inst);
 
 void init_ir(java_ir* ir, java_error* error);
 void release_ir(java_ir* ir);
