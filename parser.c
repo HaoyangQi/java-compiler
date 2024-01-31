@@ -3375,7 +3375,7 @@ static tree_node* parse_primary(java_parser* parser)
                 // optimization: for some cases, trigger will not cause ambiguity
                 if (peek_token_is_type_word(parser, TOKEN_PEEK_1st))
                 {
-                    // LocalVariableDeclaration
+                    // Type
                     tree_node_add_child(node, parse_type(parser));
                 }
                 else

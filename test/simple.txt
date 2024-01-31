@@ -9,6 +9,7 @@ class MyPackageClass extends C1 implements C2, C3 {
     int a = 34;
     float fp = .2f;
     String ss;
+    int[] arr = {1, 2, 3};
     int r = 4 * (a + 7) - a / 2;
 
     public static void main(String[] args) {
