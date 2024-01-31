@@ -8,6 +8,9 @@
 // reserved entry point name
 static const char* reserved_method_name_entry_point = "main";
 
+// primitive data bit-length
+static const int primitive_bit_length[IRPV_MAX] = { 8, 16, 32, 64, 16, 32, 64, 32 };
+
 /**
  * Token-To-String Helper
  *
@@ -117,6 +120,54 @@ static char* __name_unit_concat(tree_node* from, tree_node* stop_before)
     release_string_list(&sl);
 
     return s;
+}
+
+/**
+ * contexualize variable declaration
+ *
+ * node: variable declarator
+*/
+static bool def(
+    java_ir* ir,
+    hash_table* table,
+    definition* type_def,
+    tree_node* declarator,
+    java_error_id err_dup,
+    java_error_id err_dim_amb,
+    java_error_id err_dim_dup
+)
+{
+    bool success = lookup_register(
+        ir,
+        table,
+        t2s(declarator->data->declarator.id.complex),
+        definition_copy(type_def),
+        err_dup
+    );
+
+    /**
+     * dimension check
+     *
+     * Java allows any of the array declaration form:
+     * 1. Type[] Name;
+     * 2. Type Name[];
+     *
+     * but not both, so if dimension matches, warning will be issued;
+     * otherwise it is an error
+    */
+    if (declarator->data->declarator.dimension > 0)
+    {
+        if (type_def->variable.type.dim != declarator->data->declarator.dimension)
+        {
+            ir_error(ir, err_dim_amb);
+        }
+        else
+        {
+            ir_error(ir, err_dim_dup);
+        }
+    }
+
+    return success;
 }
 
 /**
@@ -283,34 +334,12 @@ static void ctx_class(java_ir* ir, tree_node* node)
                 // register, every id has same type
                 while (declaration)
                 {
-                    lookup_register(ir, table,
-                        t2s(declaration->data->declarator.id.complex),
-                        definition_copy(desc),
-                        JAVA_E_MEMBER_VAR_DUPLICATE
+                    def(
+                        ir, table, desc, declaration,
+                        JAVA_E_MEMBER_VAR_DUPLICATE,
+                        JAVA_E_MEMBER_VAR_DIM_AMBIGUOUS,
+                        JAVA_E_MEMBER_VAR_DIM_DUPLICATE
                     );
-
-                    /**
-                     * dimension check
-                     *
-                     * Java allows any of the array declaration form:
-                     * 1. Type[] Name;
-                     * 2. Type Name[];
-                     *
-                     * but not both, so if dimension matches, warning will be issued;
-                     * otherwise it is an error
-                    */
-                    if (declaration->data->declarator.dimension > 0)
-                    {
-                        if (desc->variable.type.dim != declaration->data->declarator.dimension)
-                        {
-                            ir_error(ir, JAVA_E_MEMBER_VAR_DIM_AMBIGUOUS);
-                        }
-                        else
-                        {
-                            ir_error(ir, JAVA_E_MEMBER_VAR_DIM_DUPLICATE);
-                        }
-                    }
-
                     declaration = declaration->next_sibling;
                 }
             }
@@ -358,11 +387,26 @@ static void ctx_class(java_ir* ir, tree_node* node)
         {
             if (declaration->next_sibling->type == JNT_VAR_DECLARATORS)
             {
-                /**
-                 * TODO: var decl
-                */
                 declaration = declaration->next_sibling->first_child;
                 desc = t2d(table, declaration->data->declarator.id.complex);
+
+                // if has a child, then it is the initializer
+                declaration = declaration->first_child;
+                if (declaration)
+                {
+                    if (declaration->type == JNT_EXPRESSION)
+                    {
+                        /**
+                         * TODO: expression code
+                        */
+                    }
+                    else if (declaration->type == JNT_ARRAY_INIT)
+                    {
+                        /**
+                         * TODO: array (of expression) init code
+                        */
+                    }
+                }
             }
             else if (declaration->next_sibling->type == JNT_METHOD_DECL)
             {

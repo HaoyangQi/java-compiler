@@ -1,37 +1,11 @@
+/**
+ * Control Flow Graph Generation Functions
+ *
+ * Most of them are recursive, and mainly divided into 2 types:
+ * 1. expression walk
+ * 2. statement walk
+*/
+
 #include "ir.h"
 
-void semantics_walk_top_level(tree_node* node)
-{
-    if (!node)
-    {
-        return;
-    }
 
-    // top level does not have siblings
-    node = node->first_child;
-
-    /**
-     * TODO: handle pkg decl
-    */
-
-    /**
-     * TODO: handle import
-    */
-
-    // traverse
-    while (node)
-    {
-        /**
-         * TODO: process
-        */
-
-        // go deeper first
-        if (node->first_child)
-        {
-            semantics_walk_top_level(node->first_child);
-        }
-
-        // then go next sibling
-        node = node->next_sibling;
-    }
-}

@@ -12,6 +12,10 @@
 #include "string-list.h"
 
 /**
+ * Primitive Value Bit Size
+*/
+
+/**
  * scope type
  *
  * LST_NONE: a generic scope with no header
@@ -72,6 +76,34 @@ typedef struct
 } type_name;
 
 /**
+ * Primitive Value Types
+ *
+ * TODO: string literal?
+ * well... it is NOT primitive type, but it can be literal
+*/
+typedef enum
+{
+    // byte
+    IRPV_INTEGER_BIT_8 = 0,
+    // short
+    IRPV_INTEGER_BIT_16,
+    // int
+    IRPV_INTEGER_BIT_32,
+    // long
+    IRPV_INTEGER_BIT_64,
+    // char
+    IRPV_INTEGER_BIT_U16,
+    // float
+    IRPV_PRECISION_SINGLE,
+    // double
+    IRPV_PRECISION_DOUBLE,
+    // boolean
+    IRPV_BOOLEAN,
+
+    IRPV_MAX,
+} primitive;
+
+/**
  * scope lookup table value descriptor
  *
  * here we use node type for further classification
@@ -130,6 +162,14 @@ typedef struct _definition
             // return type
             type_name return_type;
         } method;
+
+        struct
+        {
+            // primitive type
+            primitive type;
+            // literal value
+            uint64_t imm;
+        } literal;
     };
 } definition;
 
@@ -224,9 +264,39 @@ typedef enum
     IROP_GOTO,
     IROP_RETURN,
     IROP_TEST,
+    IROP_PHI,
 
     IROP_MAX,
 } operation;
+
+/**
+ * reference type
+ *
+ * IR_ASN_REF_DEFINITION: definition
+ * IR_ASN_REF_INSTRUCTION: instruction
+ * IR_ASN_REF_LITERAL: definition copy
+*/
+typedef enum
+{
+    IR_ASN_REF_UNDEFINED = 0,
+
+    IR_ASN_REF_DEFINITION,
+    IR_ASN_REF_INSTRUCTION,
+    IR_ASN_REF_LITERAL,
+} reference_type;
+
+/**
+ * assignment reference
+*/
+typedef struct
+{
+    // type selector
+    reference_type type;
+    // definition OR instruction
+    void* ref;
+    // version of reference, used only for definition
+    size_t ver;
+} reference;
 
 /**
  * Single Assignment Form
@@ -239,47 +309,71 @@ typedef enum
 */
 typedef struct _instruction
 {
-    // instruction id within the immediate scope
-    size_t id;
     // opcode
     operation op;
-    // references
-    definition* ref[3];
-    // value version
-    size_t version[3];
+    // value reference
+    reference ref[3];
 
+    // previous instruction
+    struct _instruction* prev;
     // next instruction
     struct _instruction* next;
 } instruction;
 
+struct _basic_block;
+
 /**
- * SSA Graph Node
+ * CFG Edge Info
+*/
+typedef struct _cfg_edge
+{
+    struct _basic_block* from;
+    struct _basic_block* to;
+} cfg_edge;
+
+/**
+ * Dynamic array of edges
+*/
+typedef struct
+{
+    cfg_edge** arr;
+    size_t size;
+    size_t num;
+} edge_array;
+
+/**
+ * block edge type
+*/
+typedef enum
+{
+    BLOCK_EDGE_IN,
+    BLOCK_EDGE_OUT,
+} basic_block_edge_type;
+
+/**
+ * CFG Basic Block
  *
 */
-typedef struct _code_graph_node
+typedef struct _basic_block
 {
     instruction* inst_first;
     instruction* inst_last;
 
-    size_t num_in;
-    size_t num_out;
-
-    struct _code_graph_node** in;
-    struct _code_graph_node** out;
-} code_graph_node;
+    edge_array in;
+    edge_array out;
+} basic_block;
 
 /**
- * SSA Graph entry point
+ * CFG/SSA Entry Point
  *
- * it will contain the original copy of scope lookup
 */
 typedef struct
 {
-    // scope lookup table
-    hash_table* scope;
-    // first graph node
-    code_graph_node* graph;
-} code_graph;
+    // edges
+    edge_array edges;
+    // entry point
+    basic_block* entry;
+} cfg;
 
 /**
  * Top Level of Semantics
