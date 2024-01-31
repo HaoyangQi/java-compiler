@@ -140,7 +140,6 @@ void delete_instruction(instruction* inst)
     }
 
     free(inst);
-    return next;
 }
 
 /**
