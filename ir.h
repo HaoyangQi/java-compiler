@@ -374,7 +374,19 @@ typedef struct
 } node_array;
 
 /**
+ * CFG Node Type
+*/
+typedef enum
+{
+    CFG_BLOCK_ENTRY,
+    CFG_BLOCK_EXIT,
+    CFG_BLOCK_NORMAL,
+} cfg_block_type;
+
+/**
  * CFG Entry Point
+ *
+ * CFG is always one-way-in, one-way-out
  *
  * nodes and edges are managed here as the source of all references
  * and as the aid for deletion process
@@ -387,6 +399,8 @@ typedef struct
     edge_array edges;
     // entry point
     basic_block* entry;
+    // exit point
+    basic_block* exit;
 } cfg;
 
 /**
@@ -437,13 +451,16 @@ void init_cfg(cfg* g);
 void release_cfg(cfg* g);
 basic_block* cfg_new_basic_block(cfg* g);
 void cfg_new_edge(cfg* g, basic_block* from, basic_block* to);
-void cfg_connect(cfg* g, basic_block* dest, cfg* src_graph);
+cfg* cfg_connect(cfg* g, cfg* src_graph);
 
 instruction* new_instruction();
 void delete_instruction(instruction* inst);
 void instruction_insert(basic_block* node, instruction* prev, instruction* inst);
 void instruction_push_back(basic_block* node, instruction* inst);
 void instruction_push_front(basic_block* node, instruction* inst);
+
+cfg* walk_expression(tree_node* expression);
+cfg* walk_block(tree_node* block);
 
 void init_ir(java_ir* ir, java_error* error);
 void release_ir(java_ir* ir);
