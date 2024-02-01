@@ -56,8 +56,6 @@ typedef struct _scope_frame
 {
     // scope identifier
     lookup_scope_type type;
-    // frame instruction counter
-    size_t fic;
 
     /**
      * TYPE: hash_table<char*, definition*>

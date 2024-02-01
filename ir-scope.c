@@ -21,7 +21,6 @@ hash_table* lookup_new_scope(java_ir* ir, lookup_scope_type type)
 
     // init
     scope->type = type;
-    scope->fic = 0;
     scope->table = (hash_table*)malloc_assert(sizeof(hash_table));
     init_hash_table(scope->table, HASH_TABLE_DEFAULT_BUCKET_SIZE);
 
