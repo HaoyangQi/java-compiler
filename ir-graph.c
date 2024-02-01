@@ -173,6 +173,7 @@ void init_cfg(cfg* g)
     node_array_init(&g->nodes, NODE_ARRAY_SIZE_INCREMENT_FACTOR);
     edge_array_init(&g->edges, EDGE_ARRAY_SIZE_INCREMENT_FACTOR);
     g->entry = NULL;
+    g->exit = NULL;
 }
 
 /**
@@ -202,6 +203,13 @@ basic_block* cfg_new_basic_block(cfg* g)
     basic_block* n = (basic_block*)malloc_assert(sizeof(basic_block));
     memset(n, 0, sizeof(basic_block));
 
+    // align minimum graph case
+    if (g->nodes.num == 0)
+    {
+        g->entry = n;
+        g->exit = n;
+    }
+
     // register
     g->nodes.arr[g->nodes.num] = n;
     g->nodes.num++;
@@ -229,6 +237,52 @@ void cfg_new_edge(cfg* g, basic_block* from, basic_block* to)
     // connect blocks
     basic_block_add_edge(from, edge, BLOCK_EDGE_OUT);
     basic_block_add_edge(to, edge, BLOCK_EDGE_IN);
+
+    // update entry
+    if ((!g->entry || g->entry->in.num != 0) && from->in.num == 0)
+    {
+        // if new from is also an entry candidate, we do NOT update
+        // because old block could like be the entry
+        g->entry = from;
+    }
+    else if (g->entry && g->entry->in.num != 0)
+    {
+        // if old expired, find a new one
+        for (size_t i = 0; i < g->nodes.num; i++)
+        {
+            g->entry = g->nodes.arr[i];
+
+            if (g->entry->in.num == 0)
+            {
+                break;
+            }
+
+            g->entry = NULL;
+        }
+    }
+
+    // update exit
+    if (!g->exit || to->out.num == 0)
+    {
+        // if new to is also an exit candidate, we update
+        // because new block could likely be the exit
+        g->exit = to;
+    }
+    else if (g->exit && g->exit->out.num != 0)
+    {
+        // if old exit expired, find a new one
+        for (size_t i = 0; i < g->nodes.num; i++)
+        {
+            g->exit = g->nodes.arr[i];
+
+            if (g->exit->out.num == 0)
+            {
+                break;
+            }
+
+            g->exit = NULL;
+        }
+    }
 }
 
 /**
@@ -237,20 +291,27 @@ void cfg_new_edge(cfg* g, basic_block* from, basic_block* to)
  * if source graph has only one node, it simply merge the block
  * into dest
  *
- * source graph wrapper will be deleted
- *
- * NOTE: dest MUST belong to destination graph g, otherwise the
- * behavior is undefined and will cause memory leak
+ * if dest graph is NULL; source graph will be returned
+ * if source graph is NULL, dest graph will be returned
+ * otherwise source graph wrapper will be deleted, return dest graph
 */
-void cfg_connect(cfg* g, basic_block* dest, cfg* src_graph)
+cfg* cfg_connect(cfg* g, cfg* src_graph)
 {
-    // if node is the graph, graph merge is block merge
-    if (src_graph->nodes.num == 1)
+    if (!g)
     {
+        return src_graph;
+    }
+    else if (!src_graph)
+    {
+        return g;
+    }
+    else if (src_graph->nodes.num == 1)
+    {
+        // if node is the graph, graph merge is block merge
         basic_block* src = src_graph->entry;
 
         // append
-        instruction_push_back(dest, src->inst_first);
+        instruction_push_back(g->exit, src->inst_first);
 
         // detach
         src->inst_first = NULL;
@@ -278,17 +339,23 @@ void cfg_connect(cfg* g, basic_block* dest, cfg* src_graph)
             g->edges.num++;
         }
 
+        // roughly estimate new exit to save efforts during edge creation
+        g->exit = src_graph->exit;
+
         // connect by creating new edge
-        cfg_new_edge(g, dest, src_graph->entry);
+        cfg_new_edge(g, g->exit, src_graph->entry);
 
         // reset source graph for safer deletion
         src_graph->entry = NULL;
+        src_graph->exit = NULL;
         src_graph->nodes.num = 0;
         src_graph->edges.num = 0;
     }
 
     // delete
     release_cfg(src_graph);
+
+    return g;
 }
 
 /**

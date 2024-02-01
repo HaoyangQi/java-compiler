@@ -252,7 +252,6 @@ static void ctx_class(java_ir* ir, tree_node* node)
     definition* desc = new_definition(JNT_CLASS_DECL);
     tree_node* part = node->first_child; // class declaration
     char* registered_name = t2s(part->data->id.complex);
-    bool need_member_init = false;
 
     // modifier data
     desc->class.modifier = node->data->top_level_declaration.modifier;
@@ -346,7 +345,6 @@ static void ctx_class(java_ir* ir, tree_node* node)
                         JAVA_E_MEMBER_VAR_DIM_AMBIGUOUS,
                         JAVA_E_MEMBER_VAR_DIM_DUPLICATE
                     );
-                    need_member_init = need_member_init || declaration->first_child != NULL;
 
                     declaration = declaration->next_sibling;
                 }
@@ -364,13 +362,6 @@ static void ctx_class(java_ir* ir, tree_node* node)
 
     // now go back to first declaration for code generation
     part = first_decl;
-
-    // member code graph initialization
-    if (need_member_init)
-    {
-        ir->code_member_init = (cfg*)malloc_assert(sizeof(cfg));
-        init_cfg(ir->code_member_init);
-    }
 
     // second pass: code generation
     while (part)
@@ -414,6 +405,7 @@ static void ctx_class(java_ir* ir, tree_node* node)
                         /**
                          * TODO: expression code
                         */
+                        ir->code_member_init = cfg_connect(ir->code_member_init, walk_expression(declaration));
                     }
                     else if (declaration->type == JNT_ARRAY_INIT)
                     {
