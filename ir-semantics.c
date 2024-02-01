@@ -5,9 +5,6 @@
 
 #include "ir.h"
 
-// hash table mapping string->definition wrapper
-#define HT_STR2DEF(t, s) ((definition*)shash_table_find(t, s))
-
 /* reserved constant context */
 
 // reserved entry point name
@@ -15,41 +12,6 @@ static const char* reserved_method_name_entry_point = "main";
 
 // primitive data bit-length
 static const int primitive_bit_length[IRPV_MAX] = { 8, 16, 32, 64, 16, 32, 64, 32 };
-
-/**
- * Token-To-String Helper
- *
- * return a copy of string that a token consists
- *
- * no validation here because we are beyond that
- * (thus not in job description :P)
-*/
-static char* t2s(java_token* token)
-{
-    size_t len = buffer_count(token->from, token->to);
-    char* content = (char*)malloc_assert(sizeof(char) * (len + 1));
-
-    buffer_substring(content, token->from, len);
-
-    return content;
-}
-
-/**
- * Token-To-Definition Helper
- *
- * a definition associated to a name cannot be NULL, so if
- * undefined it returns NULL
- *
- * returned definition is a reference, not a copy
-*/
-static definition* t2d(hash_table* table, java_token* token)
-{
-    char* registered_name = t2s(token);
-    definition* def = HT_STR2DEF(table, registered_name);
-    free(registered_name);
-
-    return def;
-}
 
 static void ctx_import(java_ir* ir, tree_node* node);
 static void ctx_class(java_ir* ir, tree_node* node);
@@ -125,54 +87,6 @@ static char* __name_unit_concat(tree_node* from, tree_node* stop_before)
     release_string_list(&sl);
 
     return s;
-}
-
-/**
- * contexualize variable declaration
- *
- * node: variable declarator
-*/
-static bool def(
-    java_ir* ir,
-    hash_table* table,
-    definition* type_def,
-    tree_node* declarator,
-    java_error_id err_dup,
-    java_error_id err_dim_amb,
-    java_error_id err_dim_dup
-)
-{
-    bool success = lookup_register(
-        ir,
-        table,
-        t2s(declarator->data->declarator.id.complex),
-        definition_copy(type_def),
-        err_dup
-    );
-
-    /**
-     * dimension check
-     *
-     * Java allows any of the array declaration form:
-     * 1. Type[] Name;
-     * 2. Type Name[];
-     *
-     * but not both, so if dimension matches, warning will be issued;
-     * otherwise it is an error
-    */
-    if (declarator->data->declarator.dimension > 0)
-    {
-        if (type_def->variable.type.dim != declarator->data->declarator.dimension)
-        {
-            ir_error(ir, err_dim_amb);
-        }
-        else
-        {
-            ir_error(ir, err_dim_dup);
-        }
-    }
-
-    return success;
 }
 
 /**
@@ -340,7 +254,7 @@ static void ctx_class(java_ir* ir, tree_node* node)
                 while (declaration)
                 {
                     def(
-                        ir, table, desc, declaration,
+                        ir, desc, declaration,
                         JAVA_E_MEMBER_VAR_DUPLICATE,
                         JAVA_E_MEMBER_VAR_DIM_AMBIGUOUS,
                         JAVA_E_MEMBER_VAR_DIM_DUPLICATE
@@ -348,6 +262,9 @@ static void ctx_class(java_ir* ir, tree_node* node)
 
                     declaration = declaration->next_sibling;
                 }
+
+                // cleanup
+                definition_delete(desc);
             }
             else if (declaration->next_sibling->type == JNT_METHOD_DECL)
             {
@@ -402,10 +319,7 @@ static void ctx_class(java_ir* ir, tree_node* node)
                 {
                     if (declaration->type == JNT_EXPRESSION)
                     {
-                        /**
-                         * TODO: expression code
-                        */
-                        ir->code_member_init = cfg_connect(ir->code_member_init, walk_expression(declaration));
+                        ir->code_member_init = cfg_connect(ir->code_member_init, walk_expression(ir, declaration));
                     }
                     else if (declaration->type == JNT_ARRAY_INIT)
                     {

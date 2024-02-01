@@ -13,7 +13,7 @@
  *
  * node: JNT_EXPRESSION
 */
-cfg* walk_expression(tree_node* expression)
+cfg* walk_expression(java_ir* ir, tree_node* expression)
 {
     return NULL;
 }
@@ -23,7 +23,7 @@ cfg* walk_expression(tree_node* expression)
  *
  * node: JNT_BLOCK
 */
-cfg* walk_block(tree_node* block)
+cfg* walk_block(java_ir* ir, tree_node* block)
 {
     return NULL;
 }

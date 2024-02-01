@@ -39,3 +39,38 @@ void ir_error(java_ir* ir, java_error_id id)
 {
     error_log(ir->error, id, 0, 0);
 }
+
+/**
+ * Token-To-String Helper
+ *
+ * return a copy of string that a token consists
+ *
+ * no validation here because we are beyond that
+ * (thus not in job description :P)
+*/
+char* t2s(java_token* token)
+{
+    size_t len = buffer_count(token->from, token->to);
+    char* content = (char*)malloc_assert(sizeof(char) * (len + 1));
+
+    buffer_substring(content, token->from, len);
+
+    return content;
+}
+
+/**
+ * Token-To-Definition Helper
+ *
+ * a definition associated to a name cannot be NULL, so if
+ * undefined it returns NULL
+ *
+ * returned definition is a reference, not a copy
+*/
+definition* t2d(hash_table* table, java_token* token)
+{
+    char* registered_name = t2s(token);
+    definition* def = HT_STR2DEF(table, registered_name);
+    free(registered_name);
+
+    return def;
+}
