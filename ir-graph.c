@@ -245,7 +245,7 @@ void cfg_new_edge(cfg* g, basic_block* from, basic_block* to)
         // because old block could like be the entry
         g->entry = from;
     }
-    else
+    else if (g->entry && g->entry->in.num != 0)
     {
         // if old expired, find a new one
         for (size_t i = 0; i < g->nodes.num; i++)
@@ -268,7 +268,7 @@ void cfg_new_edge(cfg* g, basic_block* from, basic_block* to)
         // because new block could likely be the exit
         g->exit = to;
     }
-    else
+    else if (g->exit && g->exit->out.num != 0)
     {
         // if old exit expired, find a new one
         for (size_t i = 0; i < g->nodes.num; i++)
