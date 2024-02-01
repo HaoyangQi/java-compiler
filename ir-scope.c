@@ -21,7 +21,6 @@ hash_table* lookup_new_scope(java_ir* ir, lookup_scope_type type)
 
     // init
     scope->type = type;
-    scope->fic = 0;
     scope->table = (hash_table*)malloc_assert(sizeof(hash_table));
     init_hash_table(scope->table, HASH_TABLE_DEFAULT_BUCKET_SIZE);
 
@@ -103,9 +102,17 @@ hash_table* lookup_global_scope(java_ir* ir)
 }
 
 /**
+ * get hierarchical scope
+*/
+hash_table* lookup_working_scope(java_ir* ir)
+{
+    return ir->scope_stack_top ? ir->scope_stack_top->table : &ir->tbl_global;
+}
+
+/**
  * get current scope
 */
-hash_table* lookup_current_scope(java_ir* ir)
+hash_table* lookup_top_scope(java_ir* ir)
 {
     return ir->scope_stack_top->table;
 }
@@ -299,4 +306,106 @@ definition* definition_copy(definition* v)
     }
 
     return head;
+}
+
+/**
+ * hierarchical name register routine
+ *
+ * NOTE: type_def will be copied to table
+ *
+ * node: variable declarator
+*/
+bool def(
+    java_ir* ir,
+    definition* type_def,
+    tree_node* declarator,
+    java_error_id err_dup,
+    java_error_id err_dim_amb,
+    java_error_id err_dim_dup
+)
+{
+    // test if exists
+    bool success = use(ir, declarator, JAVA_E_MAX) == NULL;
+    hash_table* table = lookup_working_scope(ir);
+
+    if (success)
+    {
+        shash_table_insert(table, t2s(declarator->data->declarator.id.complex), definition_copy(type_def));
+    }
+    else
+    {
+        ir_error(ir, err_dup);
+    }
+
+    /**
+     * dimension check
+     *
+     * Java allows any of the array declaration form:
+     * 1. Type[] Name;
+     * 2. Type Name[];
+     *
+     * but not both, so if dimension matches, warning will be issued;
+     * otherwise it is an error
+    */
+    if (declarator->data->declarator.dimension > 0)
+    {
+        if (type_def->variable.type.dim != declarator->data->declarator.dimension)
+        {
+            ir_error(ir, err_dim_amb);
+        }
+        else
+        {
+            ir_error(ir, err_dim_dup);
+        }
+    }
+
+    return success;
+}
+
+/**
+ * hierarchical name lookup routine
+ *
+ * NOTE: on-demand imports are not checked here, meaning definitions
+ * are prioritized local definitions, and during linking, names
+ * will be imported and check for ambiguity
+ *
+ * node: variable declarator
+*/
+definition* use(java_ir* ir, tree_node* declarator, java_error_id err_undef)
+{
+    scope_frame* cur = ir->scope_stack_top;
+    hash_pair* p;
+    char* name = t2s(declarator->data->declarator.id.complex);
+
+    // first we go through hierarchy
+    while (cur)
+    {
+        p = shash_table_get(cur->table, name);
+
+        if (p)
+        {
+            return p->value;
+        }
+
+        cur = cur->next;
+    }
+
+    // if nothing we try global
+    p = shash_table_get(&ir->tbl_global, name);
+
+    // cleanup
+    free(name);
+
+    // error check
+    if (!p)
+    {
+        if (err_undef != JAVA_E_MAX)
+        {
+            ir_error(ir, err_undef);
+        }
+
+        return NULL;
+    }
+
+    return p->value;
 }

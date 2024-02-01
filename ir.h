@@ -11,6 +11,9 @@
 
 #include "string-list.h"
 
+// hash table mapping string->definition wrapper
+#define HT_STR2DEF(t, s) ((definition*)shash_table_find(t, s))
+
 /**
  * Primitive Value Bit Size
 */
@@ -53,11 +56,9 @@ typedef struct _scope_frame
 {
     // scope identifier
     lookup_scope_type type;
-    // frame instruction counter
-    size_t fic;
 
     /**
-     * TYPE: hash_table<char*, definition>
+     * TYPE: hash_table<char*, definition*>
     */
     hash_table* table;
 
@@ -429,11 +430,15 @@ typedef struct
     cfg* code_member_init;
 } java_ir;
 
+char* t2s(java_token* token);
+definition* t2d(hash_table* table, java_token* token);
+
 void lookup_scope_deleter(char* k, definition* v);
 hash_table* lookup_new_scope(java_ir* ir, lookup_scope_type type);
 bool lookup_pop_scope(java_ir* ir, bool merge_global);
 hash_table* lookup_global_scope(java_ir* ir);
-hash_table* lookup_current_scope(java_ir* ir);
+hash_table* lookup_working_scope(java_ir* ir);
+hash_table* lookup_top_scope(java_ir* ir);
 bool lookup_register(
     java_ir* ir,
     hash_table* table,
@@ -441,6 +446,15 @@ bool lookup_register(
     definition* desc,
     java_error_id err
 );
+bool def(
+    java_ir* ir,
+    definition* type_def,
+    tree_node* declarator,
+    java_error_id err_dup,
+    java_error_id err_dim_amb,
+    java_error_id err_dim_dup
+);
+definition* use(java_ir* ir, tree_node* declarator, java_error_id err_undef);
 
 definition* new_definition(java_node_query type);
 void definition_concat(definition* dest, definition* src);
@@ -459,16 +473,12 @@ void instruction_insert(basic_block* node, instruction* prev, instruction* inst)
 void instruction_push_back(basic_block* node, instruction* inst);
 void instruction_push_front(basic_block* node, instruction* inst);
 
-cfg* walk_expression(tree_node* expression);
-cfg* walk_block(tree_node* block);
+cfg* walk_expression(java_ir* ir, tree_node* expression);
+cfg* walk_block(java_ir* ir, tree_node* block);
 
 void init_ir(java_ir* ir, java_error* error);
 void release_ir(java_ir* ir);
 void contextualize(java_ir* ir, tree_node* compilation_unit);
 void ir_error(java_ir* ir, java_error_id id);
-
-/**
- * TODO: more
-*/
 
 #endif
