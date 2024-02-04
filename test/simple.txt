@@ -6,21 +6,21 @@ import java.util.Scanner;
 import somepackage.*;
 
 class MyPackageClass extends C1 implements C2, C3 {
-    int a = 34;
-    float fp = .2f;
-    String ss;
-    int[] arr = {1, 2, 3};
-    int r = 4 * (a + 7) - a / 2;
-    int r1 = 1-1-1-1-1-1;
+    //int a = 34;
+    //float fp = .2f;
+    //String ss;
+    //int[] arr = {1, 2, 3};
+    //int r = 4 * (a + 7) - a / 2;
+    //int r1 = 1-1-1-1-1-1;
     int r2 = 1+2*3/4;
 
-    public static void main(String[] args) {
-        System.out.println("This is my package!");
-    }
+    //public static void main(String[] args) {
+    //    System.out.println("This is my package!");
+    //}
 
-    private int calc(int x, int y) {
-        return x > y ? a + x * y : a * x - y;
-    }
+    //private int calc(int x, int y) {
+    //    return x > y ? a + x * y : a * x - y;
+    //}
 
-    short s0 = 9,s1,s2 = 0;
+    //short s0 = 9,s1,s2 = 0;
 }
