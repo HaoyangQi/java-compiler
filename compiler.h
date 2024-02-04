@@ -2,6 +2,7 @@
 #ifndef __COMPILER_H__
 #define __COMPILER_H__
 
+#include "architecture.h"
 #include "file.h"
 #include "hash-table.h"
 #include "parser.h"
@@ -28,7 +29,7 @@ void release_compiler(compiler* compiler);
 void detask_compiler(compiler* compiler);
 bool retask_compiler(compiler* compiler, char* source_path);
 
-bool compile(compiler* compiler, char* source_path);
+bool compile(compiler* compiler, architecture* arch, char* source_path);
 void compiler_error_format_print(compiler* compiler);
 
 #endif

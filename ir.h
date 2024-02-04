@@ -8,6 +8,7 @@
 #include "expression.h"
 #include "tree.h"
 #include "error.h"
+#include "architecture.h"
 
 #include "string-list.h"
 
@@ -423,6 +424,9 @@ typedef struct
     scope_frame* scope_stack_top;
     // toplevel block count
     size_t num_methods;
+
+    // architecture info
+    architecture* arch;
     // error data
     java_error* error;
 
@@ -432,6 +436,7 @@ typedef struct
 
 char* t2s(java_token* token);
 definition* t2d(hash_table* table, java_token* token);
+primitive t2p(java_ir* ir, java_token* t, uint64_t* n);
 
 void lookup_scope_deleter(char* k, definition* v);
 hash_table* lookup_new_scope(java_ir* ir, lookup_scope_type type);
@@ -478,7 +483,7 @@ cfg* walk_block(java_ir* ir, tree_node* block);
 
 void init_ir(java_ir* ir, java_error* error);
 void release_ir(java_ir* ir);
-void contextualize(java_ir* ir, tree_node* compilation_unit);
+void contextualize(java_ir* ir, architecture* arch, tree_node* compilation_unit);
 void ir_error(java_ir* ir, java_error_id id);
 
 #endif

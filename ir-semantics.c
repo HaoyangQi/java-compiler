@@ -9,9 +9,8 @@
 
 // reserved entry point name
 static const char* reserved_method_name_entry_point = "main";
-
-// primitive data bit-length
-static const int primitive_bit_length[IRPV_MAX] = { 8, 16, 32, 64, 16, 32, 64, 32 };
+// reserved default architecture
+static const architecture default_arch = { .bits = ARCH_64_BIT };
 
 static void ctx_import(java_ir* ir, tree_node* node);
 static void ctx_class(java_ir* ir, tree_node* node);
@@ -22,8 +21,11 @@ static void ctx_interface(java_ir* ir, tree_node* node);
  *
  * It will generate a SSA form of AST
 */
-void contextualize(java_ir* ir, tree_node* compilation_unit)
+void contextualize(java_ir* ir, architecture* arch, tree_node* compilation_unit)
 {
+    // register architecture of current target
+    ir->arch = arch ? arch : &default_arch;
+
     // compilation unit does not have siblings
     tree_node* node = compilation_unit->first_child;
 

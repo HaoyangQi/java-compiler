@@ -44,6 +44,7 @@ void init_error(java_error* error)
     error->definition[JAVA_E_MEMBER_NO_NAME] = DEFINE_SYNTAX_ERROR;
     error->definition[JAVA_E_MEMBER_AMBIGUOUS] = DEFINE_SYNTAX_ERROR;
     error->definition[JAVA_E_EXPRESSION_NO_OPERAND] = DEFINE_SYNTAX_ERROR;
+    error->definition[JAVA_E_NUMBER_OVERFLOW] = DEFINE_CONTEXT_ERROR;
 
     /* Error Messages */
 
@@ -70,6 +71,7 @@ void init_error(java_error* error)
     error->message[JAVA_E_MEMBER_NO_NAME] = "Expected 'name' in member declaration.";
     error->message[JAVA_E_MEMBER_AMBIGUOUS] = "Incomplete member declaration.";
     error->message[JAVA_E_EXPRESSION_NO_OPERAND] = "Invalid expression: expected operand.";
+    error->message[JAVA_E_NUMBER_OVERFLOW] = "Invalid number: number overflows.";
 }
 
 /**

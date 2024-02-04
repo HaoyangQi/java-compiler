@@ -552,7 +552,7 @@ static void debug_print_operator(java_parser* parser, operator_id id)
             printf("OPID_LAMBDA -> ");
             break;
         default:
-            printf("(UNKNOWN OPID: %d) -> ", id);
+            printf("(UNKNOWN OPID) -> ");
             break;
     }
 
@@ -964,7 +964,7 @@ static void debug_print_ast_node(java_parser* parser, tree_node* node)
             printf("Expression");
             break;
         case JNT_OPERATOR:
-            printf("OP: ");
+            printf("OP[%d]: ", node->data->operator.id);
             debug_print_operator(parser, node->data->operator.id);
             break;
         case JNT_STATEMENT:

@@ -142,7 +142,7 @@ void init_token(java_token* token)
     token->class = JT_EOF;
     token->type = JLT_MAX;
     token->keyword = NULL;
-    token->number.type = JT_NUM_NONE;
+    token->number.type = JT_NUM_MAX;
     token->number.bits = JT_NUM_BIT_LENGTH_NORMAL;
 }
 
