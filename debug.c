@@ -44,7 +44,7 @@ void debug_report(compiler* compiler)
     printf("Language version: %d\n", compiler->version);
     debug_report_hash_table_summary(&compiler->rw_lookup_table, "Reserved word");
     printf("Expression static data size: %zd bytes\n",
-        sizeof(java_operator) * OPID_MAX + sizeof(java_operator) * JLT_MAX);
+        sizeof(java_operator) * OPID_MAX + sizeof(operator_id) * JLT_MAX);
     printf("Error static data size: %zd bytes\n",
         sizeof(error_definiton) * JAVA_E_MAX + sizeof(char*) * JAVA_E_MAX);
 
@@ -412,16 +412,151 @@ static void debug_print_lexeme_type(java_lexeme_type id)
     }
 }
 
-void debug_print_operator(java_operator id)
+static void debug_print_operator(java_parser* parser, operator_id id)
 {
-    if (id == OP_INVALID)
+    if (id == OPID_UNDEFINED)
     {
-        printf("(undefined: %d, token: %d)", id, OP_TOKEN(id));
+        printf("(undefined: %d)", id);
+        return;
     }
-    else
+
+    switch (id)
     {
-        debug_print_lexeme_type(OP_TOKEN(id));
+        case OPID_POST_INC:
+            printf("OPID_POST_INC -> ");
+            break;
+        case OPID_POST_DEC:
+            printf("OPID_POST_DEC -> ");
+            break;
+        case OPID_SIGN_POS:
+            printf("OPID_SIGN_POS -> ");
+            break;
+        case OPID_SIGN_NEG:
+            printf("OPID_SIGN_NEG -> ");
+            break;
+        case OPID_LOGIC_NOT:
+            printf("OPID_LOGIC_NOT -> ");
+            break;
+        case OPID_BIT_NOT:
+            printf("OPID_BIT_NOT -> ");
+            break;
+        case OPID_PRE_INC:
+            printf("OPID_PRE_INC -> ");
+            break;
+        case OPID_PRE_DEC:
+            printf("OPID_PRE_DEC -> ");
+            break;
+        case OPID_MUL:
+            printf("OPID_MUL -> ");
+            break;
+        case OPID_DIV:
+            printf("OPID_DIV -> ");
+            break;
+        case OPID_MOD:
+            printf("OPID_MOD -> ");
+            break;
+        case OPID_ADD:
+            printf("OPID_ADD -> ");
+            break;
+        case OPID_SUB:
+            printf("OPID_SUB -> ");
+            break;
+        case OPID_SHIFT_L:
+            printf("OPID_SHIFT_L -> ");
+            break;
+        case OPID_SHIFT_R:
+            printf("OPID_SHIFT_R -> ");
+            break;
+        case OPID_SHIFT_UR:
+            printf("OPID_SHIFT_UR -> ");
+            break;
+        case OPID_LESS:
+            printf("OPID_LESS -> ");
+            break;
+        case OPID_LESS_EQ:
+            printf("OPID_LESS_EQ -> ");
+            break;
+        case OPID_GREAT:
+            printf("OPID_GREAT -> ");
+            break;
+        case OPID_GREAT_EQ:
+            printf("OPID_GREAT_EQ -> ");
+            break;
+        case OPID_INSTANCE_OF:
+            printf("OPID_INSTANCE_OF -> ");
+            break;
+        case OPID_EQ:
+            printf("OPID_EQ -> ");
+            break;
+        case OPID_NOT_EQ:
+            printf("OPID_NOT_EQ -> ");
+            break;
+        case OPID_BIT_AND:
+            printf("OPID_BIT_AND -> ");
+            break;
+        case OPID_BIT_XOR:
+            printf("OPID_BIT_XOR -> ");
+            break;
+        case OPID_BIT_OR:
+            printf("OPID_BIT_OR -> ");
+            break;
+        case OPID_LOGIC_AND:
+            printf("OPID_LOGIC_AND -> ");
+            break;
+        case OPID_LOGIC_OR:
+            printf("OPID_LOGIC_OR -> ");
+            break;
+        case OPID_TERNARY_1:
+            printf("OPID_TERNARY_1 -> ");
+            break;
+        case OPID_TERNARY_2:
+            printf("OPID_TERNARY_2 -> ");
+            break;
+        case OPID_ASN:
+            printf("OPID_ASN -> ");
+            break;
+        case OPID_ADD_ASN:
+            printf("OPID_ADD_ASN -> ");
+            break;
+        case OPID_SUB_ASN:
+            printf("OPID_SUB_ASN -> ");
+            break;
+        case OPID_MUL_ASN:
+            printf("OPID_MUL_ASN -> ");
+            break;
+        case OPID_DIV_ASN:
+            printf("OPID_DIV_ASN -> ");
+            break;
+        case OPID_MOD_ASN:
+            printf("OPID_MOD_ASN -> ");
+            break;
+        case OPID_AND_ASN:
+            printf("OPID_AND_ASN -> ");
+            break;
+        case OPID_XOR_ASN:
+            printf("OPID_XOR_ASN -> ");
+            break;
+        case OPID_OR_ASN:
+            printf("OPID_OR_ASN -> ");
+            break;
+        case OPID_SHIFT_L_ASN:
+            printf("OPID_SHIFT_L_ASN -> ");
+            break;
+        case OPID_SHIFT_R_ASN:
+            printf("OPID_SHIFT_R_ASN -> ");
+            break;
+        case OPID_SHIFT_UR_ASN:
+            printf("OPID_SHIFT_UR_ASN -> ");
+            break;
+        case OPID_LAMBDA:
+            printf("OPID_LAMBDA -> ");
+            break;
+        default:
+            printf("(UNKNOWN OPID: %d) -> ", id);
+            break;
     }
+
+    debug_print_lexeme_type(OP_TOKEN(parser->expression->definition[id]));
 }
 
 void debug_print_number_bit_length(java_number_bit_length l)
@@ -629,7 +764,7 @@ static void debug_print_modifier_bit_flag(lbit_flag modifiers)
     }
 }
 
-static void debug_print_ast_node(tree_node* node)
+static void debug_print_ast_node(java_parser* parser, tree_node* node)
 {
     switch (node->type)
     {
@@ -830,7 +965,7 @@ static void debug_print_ast_node(tree_node* node)
             break;
         case JNT_OPERATOR:
             printf("OP: ");
-            debug_print_operator(node->data->operator.id);
+            debug_print_operator(parser, node->data->operator.id);
             break;
         case JNT_STATEMENT:
             printf("Statement (Invalid)");
@@ -923,7 +1058,7 @@ static void debug_print_ast_node(tree_node* node)
     }
 }
 
-static void debug_print_ast(tree_node* node, int depth)
+static void debug_print_ast(java_parser* parser, tree_node* node, int depth)
 {
     if (!node)
     {
@@ -938,13 +1073,13 @@ static void debug_print_ast(tree_node* node, int depth)
             printf("  ");
         }
 
-        debug_print_ast_node(node);
+        debug_print_ast_node(parser, node);
         printf("\n");
 
         // go deeper first
         if (node->first_child)
         {
-            debug_print_ast(node->first_child, depth + 1);
+            debug_print_ast(parser, node->first_child, depth + 1);
         }
 
         // then go next sibling
@@ -952,10 +1087,10 @@ static void debug_print_ast(tree_node* node, int depth)
     }
 }
 
-void debug_ast(tree_node* root)
+void debug_ast(java_parser* parser)
 {
     printf("===== ABSTRACT SYNTAX TREE =====\n");
-    debug_print_ast(root, 0);
+    debug_print_ast(parser, parser->ast_root, 0);
 }
 
 void debug_shash_table(hash_table* table)

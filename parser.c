@@ -3497,7 +3497,7 @@ static tree_node* parse_expression(java_parser* parser)
     tree_node* node = ast_node_expression();
     java_expression_worker worker;
     java_lexeme_type token_type;
-    java_operator op_type;
+    operator_id op_type;
     size_t num_op_question = 0;
     bool next_is_operator;
     bool allow_primary = true; // allow in 1st iteration
@@ -3571,28 +3571,28 @@ static tree_node* parse_expression(java_parser* parser)
                 // handle ambiguity
                 if (!worker.last_push_operand)
                 {
-                    op_type = parser->expression->definition[OPID_SIGN_POS];
+                    op_type = OPID_SIGN_POS;
                 }
                 break;
             case JLT_SYM_MINUS:
                 // handle ambiguity
                 if (!worker.last_push_operand)
                 {
-                    op_type = parser->expression->definition[OPID_SIGN_NEG];
+                    op_type = OPID_SIGN_NEG;
                 }
                 break;
             case JLT_SYM_INCREMENT:
                 // handle ambiguity
                 if (!worker.last_push_operand)
                 {
-                    op_type = parser->expression->definition[OPID_PRE_INC];
+                    op_type = OPID_PRE_INC;
                 }
                 break;
             case JLT_SYM_DECREMENT:
                 // handle ambiguity
                 if (!worker.last_push_operand)
                 {
-                    op_type = parser->expression->definition[OPID_PRE_DEC];
+                    op_type = OPID_PRE_DEC;
                 }
                 break;
             default:
@@ -3607,7 +3607,7 @@ static tree_node* parse_expression(java_parser* parser)
             consume_token(parser, NULL);
 
             // precedence validation
-            while (expression_stack_pop_required(&worker, op_type))
+            while (expression_stack_pop_required(parser->expression, &worker, op_type))
             {
                 tree_node_add_child(node, expression_stack_parse_top(&worker));
             }

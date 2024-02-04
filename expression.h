@@ -159,7 +159,7 @@ typedef struct
     /* array of operator definitions */
     java_operator* definition;
     /* token-to-operator map */
-    java_operator* op_map;
+    operator_id* op_map;
 } java_expression;
 
 void init_expression(java_expression* expression);
@@ -172,8 +172,7 @@ void release_expression(java_expression* expression);
 */
 typedef struct _expr_operator
 {
-    java_operator op;
-    // java_token* token;
+    operator_id op;
     struct _expr_operator* next;
 } expr_operator;
 
@@ -193,11 +192,11 @@ typedef struct
 void init_expression_worker(java_expression_worker* worker);
 void release_expression_worker(java_expression_worker* worker);
 
-void expression_stack_push(java_expression_worker* worker, java_operator op);
+void expression_stack_push(java_expression_worker* worker, operator_id op);
 bool expression_stack_pop(java_expression_worker* worker);
-java_operator expression_stack_top(java_expression_worker* worker);
+operator_id expression_stack_top(java_expression_worker* worker);
 bool expression_stack_empty(java_expression_worker* worker);
-bool expression_stack_pop_required(java_expression_worker* worker, java_operator op);
+bool expression_stack_pop_required(java_expression* expression, java_expression_worker* worker, operator_id opid);
 tree_node* expression_stack_parse_top(java_expression_worker* worker);
 
 #endif
