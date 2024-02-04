@@ -61,7 +61,7 @@ typedef union
     // operator
     struct
     {
-        // let's decouple external definiition here
+        // let's decouple external definition here
         // and use simple type for enum member
         int id; // operator_id
     } operator;
@@ -119,6 +119,7 @@ typedef struct _tree_node
     struct _tree_node* next_sibling;
     /* aux info for sibling traversal and addition */
     struct _tree_node* last_child;
+    struct _tree_node* prev_sibling;
 } tree_node;
 
 void init_tree_node(tree_node* node);

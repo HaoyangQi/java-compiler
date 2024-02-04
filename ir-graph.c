@@ -311,7 +311,8 @@ cfg* cfg_connect(cfg* g, cfg* src_graph)
         basic_block* src = src_graph->entry;
 
         // append
-        instruction_push_back(g->exit, src->inst_first);
+        g->exit->inst_last->next = src->inst_first;
+        g->exit->inst_last = src->inst_last;
 
         // detach
         src->inst_first = NULL;
@@ -323,21 +324,16 @@ cfg* cfg_connect(cfg* g, cfg* src_graph)
         node_array_resize(&g->nodes, src_graph->nodes.num);
         edge_array_resize(&g->edges, src_graph->edges.num);
 
-        // merge node array
-        for (size_t i = 0; i < src_graph->nodes.num; i++)
-        {
-            g->nodes.arr[g->nodes.num] = src_graph->nodes.arr[i];
-            src_graph->nodes.arr[i] = NULL;
-            g->nodes.num++;
-        }
+        size_t node_arr_mem_size = src_graph->nodes.num * sizeof(basic_block*);
+        size_t edge_arr_mem_size = src_graph->edges.num * sizeof(cfg_edge*);
 
-        // merge edge array
-        for (size_t i = 0; i < src_graph->edges.num; i++)
-        {
-            g->edges.arr[g->edges.num] = src_graph->edges.arr[i];
-            src_graph->edges.arr[i] = NULL;
-            g->edges.num++;
-        }
+        // merge array
+        memcpy(g->nodes.arr + g->nodes.num, src_graph->nodes.arr, node_arr_mem_size);
+        memcpy(g->edges.arr + g->edges.num, src_graph->edges.arr, edge_arr_mem_size);
+
+        // detach
+        memset(src_graph->nodes.arr, 0, node_arr_mem_size);
+        memset(src_graph->edges.arr, 0, edge_arr_mem_size);
 
         // roughly estimate new exit to save efforts during edge creation
         g->exit = src_graph->exit;
@@ -405,8 +401,8 @@ void delete_instruction(instruction* inst)
 */
 void instruction_insert(basic_block* node, instruction* prev, instruction* inst)
 {
-    // guard: sequence insertion not allowed if not appending at the end
-    if (prev->next && inst->next)
+    // guard: sequence insertion not allowed if instruction is part of a list
+    if (inst->prev || inst->next)
     {
         return;
     }

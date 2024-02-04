@@ -12,6 +12,7 @@ void init_tree_node(tree_node* node)
     node->first_child = NULL;
     node->next_sibling = NULL;
     node->last_child = NULL;
+    node->prev_sibling = NULL;
 }
 
 /**
@@ -27,6 +28,8 @@ void tree_node_mutate(tree_node* node, java_node_query type)
 */
 void tree_node_add_child(tree_node* node, tree_node* child)
 {
+    child->prev_sibling = node->last_child;
+
     if (node->last_child)
     {
         node->last_child->next_sibling = child;

@@ -10,10 +10,10 @@
 void init_expression(java_expression* expression)
 {
     size_t definition_size = sizeof(java_operator) * OPID_MAX;
-    size_t map_size = sizeof(java_operator) * JLT_MAX;
+    size_t map_size = sizeof(operator_id) * JLT_MAX;
 
     expression->definition = (java_operator*)malloc_assert(definition_size);
-    expression->op_map = (java_operator*)malloc_assert(map_size);
+    expression->op_map = (operator_id*)malloc_assert(map_size);
 
     // set default because OPID_UNDEFINED = 0
     memset(expression->definition, 0, definition_size);
@@ -95,49 +95,49 @@ void init_expression(java_expression* expression)
      * so that we can use last_push_operand to test it
     */
 
-    expression->op_map[JLT_SYM_INCREMENT] = expression->definition[OPID_POST_INC];
-    expression->op_map[JLT_SYM_DECREMENT] = expression->definition[OPID_POST_DEC];
+    expression->op_map[JLT_SYM_INCREMENT] = OPID_POST_INC;
+    expression->op_map[JLT_SYM_DECREMENT] = OPID_POST_DEC;
     // OPID_SIGN_POS has conflict lexeme JLT_SYM_PLUS
     // OPID_SIGN_NEG has conflict lexeme JLT_SYM_MINUS
-    expression->op_map[JLT_SYM_EXCALMATION] = expression->definition[OPID_LOGIC_NOT];
-    expression->op_map[JLT_SYM_TILDE] = expression->definition[OPID_BIT_NOT];
+    expression->op_map[JLT_SYM_EXCALMATION] = OPID_LOGIC_NOT;
+    expression->op_map[JLT_SYM_TILDE] = OPID_BIT_NOT;
     // OPID_PRE_INC has conflict lexeme JLT_SYM_INCREMENT
     // OPID_PRE_DEC has conflict lexeme JLT_SYM_DECREMENT
-    expression->op_map[JLT_SYM_ASTERISK] = expression->definition[OPID_MUL];
-    expression->op_map[JLT_SYM_FORWARD_SLASH] = expression->definition[OPID_DIV];
-    expression->op_map[JLT_SYM_PERCENT] = expression->definition[OPID_MOD];
-    expression->op_map[JLT_SYM_PLUS] = expression->definition[OPID_ADD];
-    expression->op_map[JLT_SYM_MINUS] = expression->definition[OPID_SUB];
-    expression->op_map[JLT_SYM_LEFT_SHIFT] = expression->definition[OPID_SHIFT_L];
-    expression->op_map[JLT_SYM_RIGHT_SHIFT] = expression->definition[OPID_SHIFT_R];
-    expression->op_map[JLT_SYM_RIGHT_SHIFT_UNSIGNED] = expression->definition[OPID_SHIFT_UR];
-    expression->op_map[JLT_SYM_ANGLE_BRACKET_OPEN] = expression->definition[OPID_LESS];
-    expression->op_map[JLT_SYM_LESS_EQUAL] = expression->definition[OPID_LESS_EQ];
-    expression->op_map[JLT_SYM_ANGLE_BRACKET_CLOSE] = expression->definition[OPID_GREAT];
-    expression->op_map[JLT_SYM_GREATER_EQUAL] = expression->definition[OPID_GREAT_EQ];
-    expression->op_map[JLT_RWD_INSTANCEOF] = expression->definition[OPID_INSTANCE_OF];
-    expression->op_map[JLT_SYM_RELATIONAL_EQUAL] = expression->definition[OPID_EQ];
-    expression->op_map[JLT_SYM_NOT_EQUAL] = expression->definition[OPID_NOT_EQ];
-    expression->op_map[JLT_SYM_AMPERSAND] = expression->definition[OPID_BIT_AND];
-    expression->op_map[JLT_SYM_CARET] = expression->definition[OPID_BIT_XOR];
-    expression->op_map[JLT_SYM_PIPE] = expression->definition[OPID_BIT_OR];
-    expression->op_map[JLT_SYM_LOGIC_AND] = expression->definition[OPID_LOGIC_AND];
-    expression->op_map[JLT_SYM_LOGIC_OR] = expression->definition[OPID_LOGIC_OR];
-    expression->op_map[JLT_SYM_QUESTION] = expression->definition[OPID_TERNARY_1];
-    expression->op_map[JLT_SYM_COLON] = expression->definition[OPID_TERNARY_2];
-    expression->op_map[JLT_SYM_EQUAL] = expression->definition[OPID_ASN];
-    expression->op_map[JLT_SYM_ADD_ASSIGNMENT] = expression->definition[OPID_ADD_ASN];
-    expression->op_map[JLT_SYM_SUBTRACT_ASSIGNMENT] = expression->definition[OPID_SUB_ASN];
-    expression->op_map[JLT_SYM_MULTIPLY_ASSIGNMENT] = expression->definition[OPID_MUL_ASN];
-    expression->op_map[JLT_SYM_DIVIDE_ASSIGNMENT] = expression->definition[OPID_DIV_ASN];
-    expression->op_map[JLT_SYM_MODULO_ASSIGNMENT] = expression->definition[OPID_MOD_ASN];
-    expression->op_map[JLT_SYM_BIT_AND_ASSIGNMENT] = expression->definition[OPID_AND_ASN];
-    expression->op_map[JLT_SYM_BIT_XOR_ASSIGNMENT] = expression->definition[OPID_XOR_ASN];
-    expression->op_map[JLT_SYM_BIT_OR_ASSIGNMENT] = expression->definition[OPID_OR_ASN];
-    expression->op_map[JLT_SYM_LEFT_SHIFT_ASSIGNMENT] = expression->definition[OPID_SHIFT_L_ASN];
-    expression->op_map[JLT_SYM_RIGHT_SHIFT_ASSIGNMENT] = expression->definition[OPID_SHIFT_R_ASN];
-    expression->op_map[JLT_SYM_RIGHT_SHIFT_UNSIGNED_ASSIGNMENT] = expression->definition[OPID_SHIFT_UR_ASN];
-    expression->op_map[JLT_SYM_ARROW] = expression->definition[OPID_LAMBDA];
+    expression->op_map[JLT_SYM_ASTERISK] = OPID_MUL;
+    expression->op_map[JLT_SYM_FORWARD_SLASH] = OPID_DIV;
+    expression->op_map[JLT_SYM_PERCENT] = OPID_MOD;
+    expression->op_map[JLT_SYM_PLUS] = OPID_ADD;
+    expression->op_map[JLT_SYM_MINUS] = OPID_SUB;
+    expression->op_map[JLT_SYM_LEFT_SHIFT] = OPID_SHIFT_L;
+    expression->op_map[JLT_SYM_RIGHT_SHIFT] = OPID_SHIFT_R;
+    expression->op_map[JLT_SYM_RIGHT_SHIFT_UNSIGNED] = OPID_SHIFT_UR;
+    expression->op_map[JLT_SYM_ANGLE_BRACKET_OPEN] = OPID_LESS;
+    expression->op_map[JLT_SYM_LESS_EQUAL] = OPID_LESS_EQ;
+    expression->op_map[JLT_SYM_ANGLE_BRACKET_CLOSE] = OPID_GREAT;
+    expression->op_map[JLT_SYM_GREATER_EQUAL] = OPID_GREAT_EQ;
+    expression->op_map[JLT_RWD_INSTANCEOF] = OPID_INSTANCE_OF;
+    expression->op_map[JLT_SYM_RELATIONAL_EQUAL] = OPID_EQ;
+    expression->op_map[JLT_SYM_NOT_EQUAL] = OPID_NOT_EQ;
+    expression->op_map[JLT_SYM_AMPERSAND] = OPID_BIT_AND;
+    expression->op_map[JLT_SYM_CARET] = OPID_BIT_XOR;
+    expression->op_map[JLT_SYM_PIPE] = OPID_BIT_OR;
+    expression->op_map[JLT_SYM_LOGIC_AND] = OPID_LOGIC_AND;
+    expression->op_map[JLT_SYM_LOGIC_OR] = OPID_LOGIC_OR;
+    expression->op_map[JLT_SYM_QUESTION] = OPID_TERNARY_1;
+    expression->op_map[JLT_SYM_COLON] = OPID_TERNARY_2;
+    expression->op_map[JLT_SYM_EQUAL] = OPID_ASN;
+    expression->op_map[JLT_SYM_ADD_ASSIGNMENT] = OPID_ADD_ASN;
+    expression->op_map[JLT_SYM_SUBTRACT_ASSIGNMENT] = OPID_SUB_ASN;
+    expression->op_map[JLT_SYM_MULTIPLY_ASSIGNMENT] = OPID_MUL_ASN;
+    expression->op_map[JLT_SYM_DIVIDE_ASSIGNMENT] = OPID_DIV_ASN;
+    expression->op_map[JLT_SYM_MODULO_ASSIGNMENT] = OPID_MOD_ASN;
+    expression->op_map[JLT_SYM_BIT_AND_ASSIGNMENT] = OPID_AND_ASN;
+    expression->op_map[JLT_SYM_BIT_XOR_ASSIGNMENT] = OPID_XOR_ASN;
+    expression->op_map[JLT_SYM_BIT_OR_ASSIGNMENT] = OPID_OR_ASN;
+    expression->op_map[JLT_SYM_LEFT_SHIFT_ASSIGNMENT] = OPID_SHIFT_L_ASN;
+    expression->op_map[JLT_SYM_RIGHT_SHIFT_ASSIGNMENT] = OPID_SHIFT_R_ASN;
+    expression->op_map[JLT_SYM_RIGHT_SHIFT_UNSIGNED_ASSIGNMENT] = OPID_SHIFT_UR_ASN;
+    expression->op_map[JLT_SYM_ARROW] = OPID_LAMBDA;
 }
 
 /**
@@ -174,7 +174,7 @@ void release_expression_worker(java_expression_worker* worker)
  * if push OPID_UNDEFINED, then it means it pushes an operand
  * on stack it is no-op, but state flag will change accordingly
 */
-void expression_stack_push(java_expression_worker* worker, java_operator op)
+void expression_stack_push(java_expression_worker* worker, operator_id op)
 {
     if (op == OPID_UNDEFINED)
     {
@@ -210,9 +210,9 @@ bool expression_stack_pop(java_expression_worker* worker)
 /**
  * peek the top operator
 */
-java_operator expression_stack_top(java_expression_worker* worker)
+operator_id expression_stack_top(java_expression_worker* worker)
 {
-    return worker->operator_stack ? worker->operator_stack->op : OP_INVALID;
+    return worker->operator_stack ? worker->operator_stack->op : OPID_UNDEFINED;
 }
 
 /**
@@ -229,14 +229,15 @@ bool expression_stack_empty(java_expression_worker* worker)
  * if we keep op consistent, for every op before allowing the push,
  * there are 3 conditions we need to pop before push
 */
-bool expression_stack_pop_required(java_expression_worker* worker, java_operator op)
+bool expression_stack_pop_required(java_expression* expression, java_expression_worker* worker, operator_id opid)
 {
     if (!worker->operator_stack)
     {
         return false;
     }
 
-    java_operator op_top = worker->operator_stack->op;
+    java_operator op_top = expression->definition[worker->operator_stack->op];
+    java_operator op = expression->definition[opid];
 
     return OP_PRECD(op) < OP_PRECD(op_top) ||
         (OP_PRECD(op) == OP_PRECD(op_top) && OP_ASSOC(op) == OP_ASSOC_LR);

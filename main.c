@@ -56,7 +56,7 @@ int main(int argc, char* argv[])
 
         if (compile(&compiler, test_paths[i]))
         {
-            debug_ast(compiler.context.ast_root);
+            debug_ast(&compiler.context);
             debug_ir_on_demand_imports(&compiler.ir);
             debug_ir_global_names(&compiler.ir);
             debug_ir_lookup(&compiler.ir);
