@@ -8,6 +8,7 @@ void init_ir(java_ir* ir, java_error* error)
 {
     ir->scope_stack_top = NULL;
     ir->num_methods = 0;
+    ir->arch = NULL;
     ir->error = error;
     ir->code_member_init = NULL;
 

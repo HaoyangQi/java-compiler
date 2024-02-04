@@ -30,7 +30,7 @@ typedef enum
 typedef enum
 {
     /* decimal number (default) */
-    JT_NUM_DEC,
+    JT_NUM_DEC = 0,
     /* headecimal number */
     JT_NUM_HEX,
     /* octal number */
@@ -42,7 +42,7 @@ typedef enum
     /* floating-point number (float) */
     JT_NUM_FP_FLOAT,
     /* not a number */
-    JT_NUM_NONE,
+    JT_NUM_MAX,
 } java_number_type;
 
 /**

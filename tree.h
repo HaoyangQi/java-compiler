@@ -61,9 +61,13 @@ typedef union
     // operator
     struct
     {
-        // let's decouple external definition here
+        // let's decouple external definitions here
         // and use simple type for enum member
-        int id; // operator_id
+
+        // operator id, type: operator_id
+        int id;
+        // IR-use only, type: instruction*
+        void* instruction;
     } operator;
 
     // constructor invocation

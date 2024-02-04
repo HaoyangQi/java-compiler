@@ -660,6 +660,7 @@ tree_node* ast_node_operator()
 
     node->data = ast_node_data_new();
     node->data->operator.id = 0;
+    node->data->operator.instruction = NULL;
 
     return node;
 }

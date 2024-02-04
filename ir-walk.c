@@ -74,7 +74,7 @@ static tree_node* __previous_available_operand(tree_node* from)
     return from;
 }
 
-static void __interpret_operand(tree_node* base)
+static void __interpret_operand(java_ir* ir, tree_node* base)
 {
     // if an operand is refernecing an old OP, it means
     // it referes to that instruction
@@ -102,8 +102,10 @@ static void __interpret_operand(tree_node* base)
         */
         if (token->type == JLT_LTR_NUMBER)
         {
+            uint64_t __n;
+            primitive __p = t2p(ir, token, &__n);
             char* content = t2s(token);
-            printf("%s ", content);
+            printf("%llu(%s) ", __n, content);
             free(content);
         }
         else if (token->class == JT_IDENTIFIER)
@@ -159,8 +161,10 @@ cfg* walk_expression(java_ir* ir, tree_node* expression)
      * base2 base1 op
      *
     */
+    size_t debug_loop_count = 0;
     while (top)
     {
+        debug_loop_count++;
         // locate next operator
         // do NOT set base1 here: because if top is already an OP
         // loop will not run and base1 will not be set
@@ -232,13 +236,14 @@ cfg* walk_expression(java_ir* ir, tree_node* expression)
          *
          * order matters here!
         */
-        __interpret_operand(base2);
-        __interpret_operand(base1);
+        __interpret_operand(ir, base2);
+        __interpret_operand(ir, base1);
         printf("\n");
 
         // reduction of current operator completed, move on
         top = top->next_sibling;
     }
+    printf("expression walked %zd times.\n", debug_loop_count);
 
     return NULL;
 }

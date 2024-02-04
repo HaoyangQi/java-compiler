@@ -106,7 +106,7 @@ bool retask_compiler(compiler* compiler, char* source_path)
 /**
  * Compiler Entry Point
 */
-bool compile(compiler* compiler, char* source_path)
+bool compile(compiler* compiler, architecture* arch, char* source_path)
 {
     if (!retask_compiler(compiler, source_path))
     {
@@ -121,7 +121,7 @@ bool compile(compiler* compiler, char* source_path)
         return false;
     }
 
-    contextualize(&compiler->ir, compiler->context.ast_root);
+    contextualize(&compiler->ir, arch, compiler->context.ast_root);
 
     // check error from parser
     if (error_count(&compiler->error, JEL_ERROR) > 0)

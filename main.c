@@ -39,8 +39,15 @@ static char* test_paths[] = {
 
 int main(int argc, char* argv[])
 {
+    architecture arch;
     compiler compiler;
     int num_source_files = ARRAY_SIZE(test_paths);
+
+    /**
+     * TODO: architecture info
+     * need command line for this
+    */
+    arch.bits = ARCH_64_BIT;
 
     // this is heavy, initialize once and retask
     // compiler for every input file
@@ -54,7 +61,7 @@ int main(int argc, char* argv[])
     {
         printf("\nFile %d: %s\n", i + 1, test_paths[i]);
 
-        if (compile(&compiler, test_paths[i]))
+        if (compile(&compiler, &arch, test_paths[i]))
         {
             debug_ast(&compiler.context);
             debug_ir_on_demand_imports(&compiler.ir);

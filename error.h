@@ -100,6 +100,7 @@ typedef enum
     JAVA_E_MEMBER_NO_NAME,
     JAVA_E_MEMBER_AMBIGUOUS,
     JAVA_E_EXPRESSION_NO_OPERAND,
+    JAVA_E_NUMBER_OVERFLOW,
 
     JAVA_E_MAX,
 } java_error_id;
