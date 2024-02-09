@@ -71,7 +71,7 @@ static big_integer* __bi_substr(const big_integer* b, size_t from, size_t len)
     return n;
 }
 
-static __bi_dup(big_integer* dest, const big_integer* src)
+static void __bi_dup(big_integer* dest, const big_integer* src)
 {
     size_t sz = sizeof(char) * (strlen(src->raw) + 1);
     dest->raw = (char*)malloc_assert(sz);
@@ -82,7 +82,7 @@ static __bi_dup(big_integer* dest, const big_integer* src)
 /**
  * duplicate length of src and fill all digits with same one
 */
-static __bi_dup_shape(big_integer* dest, const big_integer* src, const unsigned int fill)
+static void __bi_dup_shape(big_integer* dest, const big_integer* src, const unsigned int fill)
 {
     if (fill > 9) return;
 
@@ -180,7 +180,7 @@ void bi_dadd(big_integer* dest, const unsigned int digit)
 */
 bool bi_dsub(big_integer* dest, const unsigned int digit)
 {
-    if (digit > 9) return;
+    if (digit > 9) return true;
 
     char* r = dest->raw;
     int carry = digit;
@@ -310,7 +310,7 @@ void bi_mul10(big_integer* dest)
     else
     {
         // otherwise we need to grow
-        __bi_grow(dest->raw, 1, BI_RAW_GROW_RIGHT);
+        __bi_grow(dest, 1, BI_RAW_GROW_RIGHT);
     }
 }
 
@@ -366,7 +366,7 @@ void bi_mulpow10(big_integer* dest, size_t e)
     // grow by delta
     if (i < e)
     {
-        __bi_grow(dest->raw, e - i, BI_RAW_GROW_LEFT);
+        __bi_grow(dest, e - i, BI_RAW_GROW_LEFT);
 
         // align data
         len = strlen(dest->raw);
