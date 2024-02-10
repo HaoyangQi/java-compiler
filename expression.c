@@ -9,19 +9,20 @@
 */
 void init_expression(java_expression* expression)
 {
-    size_t definition_size = sizeof(java_operator) * OPID_MAX;
     size_t map_size = sizeof(operator_id) * JLT_MAX;
 
-    expression->definition = (java_operator*)malloc_assert(definition_size);
+    expression->definition = (java_operator*)malloc_assert(sizeof(java_operator) * OPID_MAX);
     expression->op_map = (operator_id*)malloc_assert(map_size);
+    expression->ir_map = (operation*)malloc_assert(sizeof(operation) * OPID_MAX);
 
     // set default because OPID_UNDEFINED = 0
-    memset(expression->definition, 0, definition_size);
     memset(expression->op_map, 0, map_size);
 
     /**
      * operator definition initialization
     */
+
+    expression->definition[OPID_UNDEFINED] = OP_INVALID;
 
     expression->definition[OPID_POST_INC] = OP(OP_ASSOC_LR, OP_LEVEL_TO_PRECD(14), JLT_SYM_INCREMENT);
     expression->definition[OPID_POST_DEC] = OP(OP_ASSOC_LR, OP_LEVEL_TO_PRECD(14), JLT_SYM_DECREMENT);
@@ -138,6 +139,58 @@ void init_expression(java_expression* expression)
     expression->op_map[JLT_SYM_RIGHT_SHIFT_ASSIGNMENT] = OPID_SHIFT_R_ASN;
     expression->op_map[JLT_SYM_RIGHT_SHIFT_UNSIGNED_ASSIGNMENT] = OPID_SHIFT_UR_ASN;
     expression->op_map[JLT_SYM_ARROW] = OPID_LAMBDA;
+
+    /**
+     * OPID to IROP map
+     *
+     * NOTE: composite assignment operators are reduced by stripping the
+     * "assignment" part
+    */
+
+    expression->ir_map[0] = IROP_UNDEFINED;
+    expression->ir_map[OPID_POST_INC] = IROP_AINC;
+    expression->ir_map[OPID_POST_DEC] = IROP_ADEC;
+    expression->ir_map[OPID_SIGN_POS] = IROP_POS;
+    expression->ir_map[OPID_SIGN_NEG] = IROP_NEG;
+    expression->ir_map[OPID_LOGIC_NOT] = IROP_LNEG;
+    expression->ir_map[OPID_BIT_NOT] = IROP_BNEG;
+    expression->ir_map[OPID_PRE_INC] = IROP_BINC;
+    expression->ir_map[OPID_PRE_DEC] = IROP_BDEC;
+    expression->ir_map[OPID_MUL] = IROP_MUL;
+    expression->ir_map[OPID_DIV] = IROP_DIV;
+    expression->ir_map[OPID_MOD] = IROP_MOD;
+    expression->ir_map[OPID_ADD] = IROP_ADD;
+    expression->ir_map[OPID_SUB] = IROP_SUB;
+    expression->ir_map[OPID_SHIFT_L] = IROP_SLS;
+    expression->ir_map[OPID_SHIFT_R] = IROP_SRS;
+    expression->ir_map[OPID_SHIFT_UR] = IROP_URS;
+    expression->ir_map[OPID_LESS] = IROP_LT;
+    expression->ir_map[OPID_LESS_EQ] = IROP_LE;
+    expression->ir_map[OPID_GREAT] = IROP_GT;
+    expression->ir_map[OPID_GREAT_EQ] = IROP_GE;
+    expression->ir_map[OPID_INSTANCE_OF] = IROP_IO;
+    expression->ir_map[OPID_EQ] = IROP_EQ;
+    expression->ir_map[OPID_NOT_EQ] = IROP_NE;
+    expression->ir_map[OPID_BIT_AND] = IROP_BAND;
+    expression->ir_map[OPID_BIT_XOR] = IROP_XOR;
+    expression->ir_map[OPID_BIT_OR] = IROP_BOR;
+    expression->ir_map[OPID_LOGIC_AND] = IROP_LAND;
+    expression->ir_map[OPID_LOGIC_OR] = IROP_LOR;
+    expression->ir_map[OPID_TERNARY_1] = IROP_TC;
+    expression->ir_map[OPID_TERNARY_2] = IROP_TB;
+    expression->ir_map[OPID_ASN] = IROP_ASN;
+    expression->ir_map[OPID_ADD_ASN] = IROP_ADD;
+    expression->ir_map[OPID_SUB_ASN] = IROP_SUB;
+    expression->ir_map[OPID_MUL_ASN] = IROP_MUL;
+    expression->ir_map[OPID_DIV_ASN] = IROP_DIV;
+    expression->ir_map[OPID_MOD_ASN] = IROP_MOD;
+    expression->ir_map[OPID_AND_ASN] = IROP_LAND;
+    expression->ir_map[OPID_XOR_ASN] = IROP_XOR;
+    expression->ir_map[OPID_OR_ASN] = IROP_LOR;
+    expression->ir_map[OPID_SHIFT_L_ASN] = IROP_SLS;
+    expression->ir_map[OPID_SHIFT_R_ASN] = IROP_SRS;
+    expression->ir_map[OPID_SHIFT_UR_ASN] = IROP_URS;
+    expression->ir_map[OPID_LAMBDA] = IROP_LMD;
 }
 
 /**
@@ -147,6 +200,31 @@ void release_expression(java_expression* expression)
 {
     free(expression->op_map);
     free(expression->definition);
+    free(expression->ir_map);
+}
+
+/**
+ * map OPID to op definition
+*/
+java_operator expr_opid2def(const java_expression* expression, operator_id opid)
+{
+    return expression->definition[opid];
+}
+
+/**
+ * map token id to OPID
+*/
+java_operator expr_tid2opid(const java_expression* expression, java_lexeme_type tid)
+{
+    return expression->op_map[tid];
+}
+
+/**
+ * map OPID to IROP
+*/
+java_operator expr_opid2irop(const java_expression* expression, operator_id opid)
+{
+    return expression->ir_map[opid];
 }
 
 /**
@@ -236,8 +314,8 @@ bool expression_stack_pop_required(java_expression* expression, java_expression_
         return false;
     }
 
-    java_operator op_top = expression->definition[worker->operator_stack->op];
-    java_operator op = expression->definition[opid];
+    java_operator op_top = expr_opid2def(expression, worker->operator_stack->op);
+    java_operator op = expr_opid2def(expression, opid);
 
     return OP_PRECD(op) < OP_PRECD(op_top) ||
         (OP_PRECD(op) == OP_PRECD(op_top) && OP_ASSOC(op) == OP_ASSOC_LR);

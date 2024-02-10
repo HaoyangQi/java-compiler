@@ -4,16 +4,19 @@
 /**
  * initialize semantic analysis
 */
-void init_ir(java_ir* ir, java_error* error)
+void init_ir(java_ir* ir, java_expression* expression, java_error* error)
 {
     ir->scope_stack_top = NULL;
     ir->num_methods = 0;
     ir->arch = NULL;
+    ir->expression = expression;
     ir->error = error;
-    ir->code_member_init = NULL;
 
     init_hash_table(&ir->tbl_on_demand_packages, HASH_TABLE_DEFAULT_BUCKET_SIZE);
     init_hash_table(&ir->tbl_global, HASH_TABLE_DEFAULT_BUCKET_SIZE);
+    init_hash_table(&ir->tbl_literal, HASH_TABLE_DEFAULT_BUCKET_SIZE);
+
+    init_cfg(&ir->code_member_init);
 }
 
 /**
@@ -25,10 +28,12 @@ void release_ir(java_ir* ir)
     release_hash_table(&ir->tbl_on_demand_packages, &pair_data_delete_key);
     // delete global name lookup
     release_hash_table(&ir->tbl_global, &lookup_scope_deleter);
+    // delete literal lookup
+    release_hash_table(&ir->tbl_literal, &lookup_scope_deleter);
     // delete entire lookup stack
     while (lookup_pop_scope(ir, false));
     // delete member init code
-    release_cfg(ir->code_member_init);
+    release_cfg(&ir->code_member_init);
 }
 
 /**

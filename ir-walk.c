@@ -8,7 +8,7 @@
 
 #include "ir.h"
 
-static size_t get_required_operand_count(operator_id opid)
+static size_t __count_operands(operator_id opid)
 {
     switch (opid)
     {
@@ -74,17 +74,32 @@ static tree_node* __previous_available_operand(tree_node* from)
     return from;
 }
 
-static void __interpret_operand(java_ir* ir, tree_node* base)
+/**
+ * parse an operand and fill the provided reference object
+*/
+static reference* __interpret_operand(java_ir* ir, basic_block* block, tree_node* base)
 {
+    // this is not a guard: an operand can be marked as not-needed (thus NULL)
+    // if so, the function is no-op
+    if (!base)
+    {
+        return NULL;
+    }
+
+    reference* ref = new_reference();
+
     // if an operand is refernecing an old OP, it means
     // it referes to that instruction
     if (base->type == JNT_OPERATOR)
     {
         /**
-         * TODO: get that instruction
+         * TODO: should we include JNT_EXPRESSION here for ( Expression ) ?
         */
         printf("OP[%d] ", base->data->operator.id);
-        return;
+        ref->type = IR_ASN_REF_INSTRUCTION;
+        ref->doi = base->data->operator.instruction;
+
+        return ref;
     }
 
     tree_node* primary = base->first_child;
@@ -97,15 +112,20 @@ static void __interpret_operand(java_ir* ir, tree_node* base)
     {
         token = primary->data->id.complex;
 
+        // try get literal definition
+        // if token is not literal, funtion is no-op and NULL is returned
+        definition* __def = def_li(ir, token);
+
         /**
          * TODO: interpret all token types
         */
         if (token->type == JLT_LTR_NUMBER)
         {
-            uint64_t __n;
-            primitive __p = t2p(ir, token, &__n);
+            ref->type = IR_ASN_REF_LITERAL;
+            ref->doi = __def;
+
             char* content = t2s(token);
-            printf("%llu(%s) ", __n, content);
+            printf("%llu(%s) ", __def->li_number.imm, content);
             free(content);
         }
         else if (token->class == JT_IDENTIFIER)
@@ -123,24 +143,135 @@ static void __interpret_operand(java_ir* ir, tree_node* base)
     {
         printf("TODO ");
     }
+
+    return ref;
+}
+
+/**
+ * finalize instruction
+ *
+ * lvalue <- operand_1 op operand_2
+ *
+ * TODO: validate lvalue here
+ * we must validate lvalue here because this is the last place
+ * we know if the operation involves an assignment
+ * (at lease we need to do NULL check for lvalue)
+ *
+ * NOTE: lvalue reference must be copied from an operand!
+ * because the version number will be different
+ *
+ * op: JNT_OPERATOR
+*/
+static bool __execute_instruction(
+    java_ir* ir,
+    basic_block* block,
+    tree_node* op,
+    reference* operand_1,
+    reference* operand_2
+)
+{
+    instruction* inst = new_instruction();
+    operator_id id = op->data->operator.id;
+    bool validate_lvalue = false;
+
+    /**
+     * reduce composite assignment operators
+     *
+     * for composite assignment operators, lvalue needs to be set
+    */
+    switch (id)
+    {
+        case OPID_ASN:
+            // simply move
+            inst->lvalue = operand_1;
+            operand_1 = operand_2;
+            operand_2 = NULL;
+            validate_lvalue = true;
+            break;
+        case OPID_ADD_ASN:
+        case OPID_SUB_ASN:
+        case OPID_MUL_ASN:
+        case OPID_DIV_ASN:
+        case OPID_MOD_ASN:
+        case OPID_AND_ASN:
+        case OPID_XOR_ASN:
+        case OPID_OR_ASN:
+        case OPID_SHIFT_L_ASN:
+        case OPID_SHIFT_R_ASN:
+        case OPID_SHIFT_UR_ASN:
+            // need topy because use version will differ
+            inst->lvalue = copy_reference(operand_1);
+            validate_lvalue = true;
+            break;
+        default:
+            inst->lvalue = NULL;
+            break;
+    }
+
+    // fill
+    inst->op = expr_opid2irop(ir->expression, id);
+    inst->operand_1 = operand_1;
+    inst->operand_2 = operand_2;
+
+    /**
+     * validate lvalue
+     *
+     * NOTE: other 2 types of reference is hard to validate here
+     * because we do not know if it infers a valid lvalue
+     * so we do it somewhere else
+    */
+    if (validate_lvalue)
+    {
+        if (!inst->lvalue)
+        {
+            ir_error(ir, JAVA_E_EXPRESSION_NO_LVALUE);
+        }
+        else if (inst->lvalue->type == IR_ASN_REF_LITERAL)
+        {
+            ir_error(ir, JAVA_E_EXPRESSION_NO_LVALUE);
+        }
+        else
+        {
+            validate_lvalue = false;
+        }
+    }
+
+    // append instruction & validation
+    if (validate_lvalue || !instruction_push_back(block, inst))
+    {
+        delete_instruction(inst, false);
+        return false;
+    }
+    else
+    {
+        // link the instruction to this op
+        op->data->operator.instruction = inst;
+        return true;
+    }
 }
 
 /**
  * TODO: Expression AST Walk
  *
+ * It walks the expression and convert it into a series of instructions
+ * all instructions will be in single block
+ *
+ * Putting everything in single block reduces complexity of the recursion
+ * and also can sever the ties with AST completely, so that second pass
+ * does not have to worry about AST anymore
+ *
  * node: JNT_EXPRESSION
 */
-cfg* walk_expression(java_ir* ir, tree_node* expression)
+bool __expression_to_block(java_ir* ir, basic_block* block, tree_node* expression)
 {
+    bool ret = true;
+
     // if start is OP, expression is invalid
     if (!expression->first_child || expression->first_child->type == JNT_OPERATOR)
     {
         ir_error(ir, JAVA_E_EXPRESSION_NO_OPERAND);
-        return NULL;
+        return false;
     }
-
-    // cfg* g = (cfg*)malloc_assert(sizeof(cfg));
-    // init_cfg(g);
 
     // stack control
     tree_node* base1;
@@ -188,11 +319,12 @@ cfg* walk_expression(java_ir* ir, tree_node* expression)
         if (!base1)
         {
             ir_error(ir, JAVA_E_EXPRESSION_NO_OPERAND);
+            ret = false;
             break;
         }
 
         // adjust base2 if needed
-        if (get_required_operand_count(top->data->operator.id) == 2)
+        if (__count_operands(top->data->operator.id) == 2)
         {
             // see the NOTE below for reasoning
             base2 = base1->prev_sibling;
@@ -201,6 +333,7 @@ cfg* walk_expression(java_ir* ir, tree_node* expression)
             if (!base2)
             {
                 ir_error(ir, JAVA_E_EXPRESSION_NO_OPERAND);
+                ret = false;
                 break;
             }
         }
@@ -232,12 +365,16 @@ cfg* walk_expression(java_ir* ir, tree_node* expression)
         printf("instruction: OP[%d] ", top->data->operator.id);
 
         /**
-         * TODO:Operand Code Generation
+         * Code Generation
          *
          * order matters here!
         */
-        __interpret_operand(ir, base2);
-        __interpret_operand(ir, base1);
+        __execute_instruction(
+            ir, block, top,
+            __interpret_operand(ir, block, base2),
+            __interpret_operand(ir, block, base1)
+        );
+
         printf("\n");
 
         // reduction of current operator completed, move on
@@ -245,7 +382,36 @@ cfg* walk_expression(java_ir* ir, tree_node* expression)
     }
     printf("expression walked %zd times.\n", debug_loop_count);
 
-    return NULL;
+    return ret;
+}
+
+/**
+ * TODO: Expression AST Walk
+ *
+ * It walks an expression, and sanitize the expression block
+ * so it does not contain and syntatic sugar
+ *
+ * so far: we only have ternary operator (? :) to be converted
+ *
+ * node: JNT_EXPRESSION
+*/
+void walk_expression(java_ir* ir, cfg* g, tree_node* expression)
+{
+    basic_block* b = cfg_new_basic_block(g);
+
+    /**
+     * TODO: shall we handle return value being false?
+    */
+    __expression_to_block(ir, b, expression);
+
+    /**
+     * sanitize the block
+     *
+     * this may cause the block be transformed into a graph
+     *
+     * TODO: transform ternary operators (? :)
+     * TODO: in future, we probably need to do something for lambda
+    */
 }
 
 /**
@@ -253,7 +419,6 @@ cfg* walk_expression(java_ir* ir, tree_node* expression)
  *
  * node: JNT_BLOCK
 */
-cfg* walk_block(java_ir* ir, tree_node* block)
+void walk_block(java_ir* ir, cfg* g, tree_node* block)
 {
-    return NULL;
 }
