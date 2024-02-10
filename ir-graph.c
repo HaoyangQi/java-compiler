@@ -16,25 +16,6 @@
 #define NODE_ARRAY_SIZE_INCREMENT_FACTOR (2)
 
 /**
- * instruction data deletion
-*/
-static void instruction_data_delete(instruction* inst)
-{
-    for (size_t i = 0; i < 3; i++)
-    {
-        switch (inst->ref[i].type)
-        {
-            case IR_ASN_REF_LITERAL:
-                free(inst->ref[i].ref);
-                break;
-            default:
-                // no-op
-                break;
-        }
-    }
-}
-
-/**
  * edge instance deletion
  *
  * nodes in edge are only refernce, so we only need to free the element
@@ -59,8 +40,7 @@ static void node_delete(basic_block* block)
         instruction* c = inst;
         inst = inst->next;
 
-        instruction_data_delete(c);
-        free(c);
+        delete_instruction(c, true);
     }
 
     // edges in node are only references, so we only need to free the array
@@ -368,25 +348,74 @@ instruction* new_instruction()
  * delete an instruction
  *
  * this routine will maintain integrity of the instruction sequence
- * do NOT use this for complete deletion
+ *
+ * if destructive is set to true, it only deletes inst, the list
+ * will be broken
 */
-void delete_instruction(instruction* inst)
+void delete_instruction(instruction* inst, bool destructive)
 {
-    instruction* prev = inst->prev;
-    instruction* next = inst->next;
-
-    if (prev)
+    if (destructive)
     {
-        prev->next = next;
+        instruction* prev = inst->prev;
+        instruction* next = inst->next;
+
+        if (prev)
+        {
+            prev->next = next;
+        }
+
+        if (next)
+        {
+            next->prev = prev;
+        }
     }
 
-    if (next)
-    {
-        next->prev = prev;
-    }
+    delete_reference(inst->lvalue);
+    delete_reference(inst->operand_1);
+    delete_reference(inst->operand_2);
 
-    instruction_data_delete(inst);
     free(inst);
+}
+
+/**
+ * new reference
+*/
+reference* new_reference()
+{
+    reference* ref = (reference*)malloc_assert(sizeof(reference));
+
+    ref->type = IR_ASN_REF_UNDEFINED;
+    ref->doi = NULL;
+    ref->ver = 0;
+
+    return ref;
+}
+
+/**
+ * copy reference
+ *
+ * doi is not the case here (they are references anyway)
+ * the case is the version number
+*/
+reference* copy_reference(const reference* r)
+{
+    if (!r)
+    {
+        return NULL;
+    }
+
+    reference* ref = (reference*)malloc_assert(sizeof(reference));
+    memcpy(ref, r, sizeof(reference));
+    return ref;
+}
+
+/**
+ * delete reference
+*/
+void delete_reference(reference* ref)
+{
+    // so far all doi will be referenced, so no deletion
+    free(ref);
 }
 
 /**
@@ -399,12 +428,12 @@ void delete_instruction(instruction* inst)
  * NOTE: it is only valid for single instruction insertion
  * except when prev->next is NULL
 */
-void instruction_insert(basic_block* node, instruction* prev, instruction* inst)
+bool instruction_insert(basic_block* node, instruction* prev, instruction* inst)
 {
     // guard: sequence insertion not allowed if instruction is part of a list
-    if (inst->prev || inst->next)
+    if (!node || inst->prev || inst->next)
     {
-        return;
+        return false;
     }
 
     inst->prev = prev;
@@ -424,20 +453,22 @@ void instruction_insert(basic_block* node, instruction* prev, instruction* inst)
     {
         node->inst_last = inst;
     }
+
+    return true;
 }
 
 /**
  * append instruction at the end
 */
-void instruction_push_back(basic_block* node, instruction* inst)
+bool instruction_push_back(basic_block* node, instruction* inst)
 {
-    instruction_insert(node, node->inst_last, inst);
+    return instruction_insert(node, node->inst_last, inst);
 }
 
 /**
  * push instruction at the beginning
 */
-void instruction_push_front(basic_block* node, instruction* inst)
+bool instruction_push_front(basic_block* node, instruction* inst)
 {
-    instruction_insert(node, NULL, inst);
+    return instruction_insert(node, NULL, inst);
 }

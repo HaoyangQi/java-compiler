@@ -164,6 +164,7 @@ definition* new_definition(java_node_query type)
     definition* v = (definition*)malloc_assert(sizeof(definition));
 
     v->type = type;
+    v->li_type = JLT_MAX;
     v->next = NULL;
 
     switch (type)
@@ -181,9 +182,11 @@ definition* new_definition(java_node_query type)
             v->variable.modifier = 0;
             v->variable.version = 0;
             __init_type_name(&v->variable.type);
+            break;
         case JNT_METHOD_DECL:
             v->method.modifier = 0;
             __init_type_name(&v->method.return_type);
+            break;
         default:
             break;
     }
@@ -408,4 +411,52 @@ definition* use(java_ir* ir, tree_node* declarator, java_error_id err_undef)
     }
 
     return p->value;
+}
+
+/**
+ * generate definition for literal
+ *
+ * if token is not literal, funtion is no-op and NULL is returned
+ *
+ * TODO: other literals
+ * for string literals, we probably need string->definition map
+ * and definition reference back to the key string,
+ * because we need definition object in instruction
+*/
+definition* def_li(java_ir* ir, java_token* token)
+{
+    definition* v = NULL;
+    char* content = NULL;
+    hash_pair* pair = NULL;
+
+    if (token->type == JLT_LTR_NUMBER)
+    {
+        // get the literal
+        uint64_t __n;
+        primitive __p = t2p(ir, token, &__n);
+
+        // lookup
+        content = t2s(token);
+        pair = shash_table_get(&ir->tbl_literal, content);
+
+        // if key exists, we use; otherwise create
+        if (pair)
+        {
+            v = pair->value;
+        }
+        else
+        {
+            // number literal definition
+            v = (definition*)malloc_assert(sizeof(definition));
+            v->type = JNT_PRIMARY_COMPLEX;
+            v->li_type = JLT_LTR_NUMBER;
+            v->next = NULL;
+            v->li_number.type = __p;
+            v->li_number.imm = __n;
+
+            shash_table_insert(&ir->tbl_literal, content, v);
+        }
+    }
+
+    return v;
 }

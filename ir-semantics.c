@@ -321,7 +321,7 @@ static void ctx_class(java_ir* ir, tree_node* node)
                 {
                     if (declaration->type == JNT_EXPRESSION)
                     {
-                        ir->code_member_init = cfg_connect(ir->code_member_init, walk_expression(ir, declaration));
+                        walk_expression(ir, &ir->code_member_init, declaration);
                     }
                     else if (declaration->type == JNT_ARRAY_INIT)
                     {

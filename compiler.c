@@ -45,7 +45,7 @@ bool init_compiler(compiler* compiler)
         &compiler->error
     );
 
-    init_ir(&compiler->ir, &compiler->error);
+    init_ir(&compiler->ir, &compiler->expression, &compiler->error);
 
     return true;
 }
@@ -91,7 +91,7 @@ bool retask_compiler(compiler* compiler, char* source_path)
         &compiler->expression,
         &compiler->error
     );
-    init_ir(&compiler->ir, &compiler->error);
+    init_ir(&compiler->ir, &compiler->expression, &compiler->error);
 
     /**
      * load file last

@@ -44,6 +44,8 @@ void init_error(java_error* error)
     error->definition[JAVA_E_MEMBER_NO_NAME] = DEFINE_SYNTAX_ERROR;
     error->definition[JAVA_E_MEMBER_AMBIGUOUS] = DEFINE_SYNTAX_ERROR;
     error->definition[JAVA_E_EXPRESSION_NO_OPERAND] = DEFINE_SYNTAX_ERROR;
+    error->definition[JAVA_E_EXPRESSION_NO_LVALUE] = DEFINE_SYNTAX_ERROR;
+    error->definition[JAVA_E_EXPRESSION_LITERAL_LVALUE] = DEFINE_SYNTAX_ERROR;
     error->definition[JAVA_E_NUMBER_OVERFLOW] = DEFINE_CONTEXT_ERROR;
     error->definition[JAVA_E_PART_EXPONENT_OVERFLOW] = DEFINE_CONTEXT_ERROR;
     error->definition[JAVA_E_PART_INTEGER_OVERFLOW] = DEFINE_CONTEXT_ERROR;
@@ -73,6 +75,8 @@ void init_error(java_error* error)
     error->message[JAVA_E_MEMBER_NO_NAME] = "Expected 'name' in member declaration.";
     error->message[JAVA_E_MEMBER_AMBIGUOUS] = "Incomplete member declaration.";
     error->message[JAVA_E_EXPRESSION_NO_OPERAND] = "Invalid expression: expected operand.";
+    error->message[JAVA_E_EXPRESSION_NO_LVALUE] = "Invalid expression: expected lvalue.";
+    error->message[JAVA_E_EXPRESSION_LITERAL_LVALUE] = "Invalid expression: literal cannot be used as lvalue.";
     error->message[JAVA_E_NUMBER_OVERFLOW] = "Invalid number: number overflows.";
     error->message[JAVA_E_PART_EXPONENT_OVERFLOW] = "Invalid number: exponent part overflows.";
     error->message[JAVA_E_PART_INTEGER_OVERFLOW] = "Invalid number: too many digits.";

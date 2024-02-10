@@ -150,6 +150,129 @@ typedef enum
 } operator_id;
 
 /**
+ * IR OP CODE
+ *
+ * every operation has unique identifier, despite what form it has
+ *
+ * The following operator id does not have specific operation:
+ * 1. composite assignment operators will not be modelled here because it is
+ *    implicitly supported by the assignment form
+ *
+ * The following operator id looks unecessary but still modelled for consistency
+ * 1. arithmetic unary sign "+" and "-" are modelled for consistency
+ *
+ * The following operator id is modelled but not allowed in final code:
+ * 1. operator "? :", because it is an syntatic sugar which should be
+ *    expanded in "if-else" form in code graph
+ *
+ * IROP_POS     sign +
+ * IROP_NEG     sign -
+ * IROP_ADD     addition
+ * IROP_SUB     subtraction
+ * IROP_MUL     multiplication
+ * IROP_DIV     division
+ * IROP_MOD     modulo
+ * IROP_BINC    pre-increment
+ * IROP_AINC    post-increment
+ * IROP_BDEC    pre-decrement
+ * IROP_ADEC    post-decrement
+ * IROP_SLS     left shift
+ * IROP_SRS     right shift
+ * IROP_URS     unsigned right shift
+ * IROP_LT      less than
+ * IROP_GT      greater than
+ * IROP_LE      less or equal
+ * IROP_GE      greater or equal
+ * IROP_EQ      equal
+ * IROP_NE      not equal
+ * IROP_IO      instance of
+ * IROP_LNEG    logical negation
+ * IROP_LAND    logical and
+ * IROP_LOR     logical or
+ * IROP_BNEG    bit-wise negation
+ * IROP_BAND    bit-wise and
+ * IROP_BOR     bit-wise or
+ * IROP_XOR     bit-wise exclusive or
+ * IROP_ASN     assignment
+ * IROP_TC      ternary: condition part (a ? TB)
+ * IROP_TB,     ternary: branch part (c : d)
+ * IROP_LMD     lambda
+ * IROP_JMP     jump
+ * IROP_RET     return
+ * IROP_TEST    test-and-jump
+*/
+typedef enum
+{
+    // undefined value
+    IROP_UNDEFINED = 0,
+
+    /* Sign */
+
+    IROP_POS,
+    IROP_NEG,
+
+    /* Arithmetic */
+
+    IROP_ADD,
+    IROP_SUB,
+    IROP_MUL,
+    IROP_DIV,
+    IROP_MOD,
+    IROP_BINC,
+    IROP_AINC,
+    IROP_BDEC,
+    IROP_ADEC,
+    IROP_SLS,
+    IROP_SRS,
+    IROP_URS,
+
+    /* Relational */
+
+    IROP_LT,
+    IROP_GT,
+    IROP_LE,
+    IROP_GE,
+    IROP_EQ,
+    IROP_NE,
+    IROP_IO,
+
+    /* Logical */
+
+    IROP_LNEG,
+    IROP_LAND,
+    IROP_LOR,
+
+    /* Bit-wise */
+
+    IROP_BNEG,
+    IROP_BAND,
+    IROP_BOR,
+    IROP_XOR,
+
+    /* Assignment */
+
+    IROP_ASN,
+
+    /* Ternary (internal-use ONLY) */
+
+    IROP_TC,
+    IROP_TB,
+
+    /* Lambda */
+
+    IROP_LMD,
+
+    /* IR-specific */
+
+    IROP_JMP,
+    IROP_RET,
+    IROP_TEST,
+    IROP_PHI,
+
+    IROP_MAX,
+} operation;
+
+/**
  * Java Expression Definition
  *
  * static data used for expression parsing
@@ -160,10 +283,16 @@ typedef struct
     java_operator* definition;
     /* token-to-operator map */
     operator_id* op_map;
+    /* static map from OPID to IROP */
+    operation* ir_map;
 } java_expression;
 
 void init_expression(java_expression* expression);
 void release_expression(java_expression* expression);
+
+java_operator expr_opid2def(const java_expression* expression, operator_id opid);
+java_operator expr_tid2opid(const java_expression* expression, java_lexeme_type tid);
+java_operator expr_opid2irop(const java_expression* expression, operator_id opid);
 
 /**
  * Operator Stack

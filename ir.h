@@ -113,6 +113,7 @@ typedef enum
 typedef struct _definition
 {
     java_node_query type;
+    java_lexeme_type li_type;
     struct _definition* next;
 
     union
@@ -171,112 +172,16 @@ typedef struct _definition
             primitive type;
             // literal value
             uint64_t imm;
-        } literal;
+        } li_number;
     };
 } definition;
 
 /**
- * IR OP CODE
- *
- * every operation has unique identifier, despite what
- * form it has
- *
- * 1. assignment operator will not be modelled here because it is implicitly
- *    supported by the assignment form
- * 2. arithmetic unary sign "+" and "-" are not modelled because they can be
- *    done at compile-time
- * 3. operator "? :" is not modelled because it is an syntatic sugar which
- *    should be expanded in "if-else" form in code graph
- *
- * IROP_ADD     addition
- * IROP_SUB     subtraction
- * IROP_MUL     multiplication
- * IROP_DIV     division
- * IROP_MOD     modulo
- * IROP_BINC    pre-increment
- * IROP_AINC    post-increment
- * IROP_BDEC    pre-decrement
- * IROP_ADEC    post-decrement
- * IROP_SLS     left shift
- * IROP_SRS     right shift
- * IROP_URS     unsigned right shift
- * IROP_LT      less than
- * IROP_GT      greater than
- * IROP_LE      less or equal
- * IROP_GE      greater or equal
- * IROP_EQ      equal
- * IROP_NE      not equal
- * IROP_IO      instance of
- * IROP_LNEG    logical negation
- * IROP_LAND    logicl and
- * IROP_LOR     logical or
- * IROP_BNEG    bit-wise negation
- * IROP_BAND    bit-wise and
- * IROP_BOR     bit-wise or
- * IROP_XOR     bit-wise exclusive or
- * IROP_GOTO    jump
- * IROP_RETURN  return
- * IROP_TEST    test-and-jump
-*/
-typedef enum
-{
-    // undefined value
-    IROP_UNDEFINED = 0,
-
-    /* arithmetic */
-
-    IROP_ADD,
-    IROP_SUB,
-    IROP_MUL,
-    IROP_DIV,
-    IROP_MOD,
-    IROP_BINC,
-    IROP_AINC,
-    IROP_BDEC,
-    IROP_ADEC,
-    IROP_SLS,
-    IROP_SRS,
-    IROP_URS,
-
-    /* Relational */
-
-    IROP_LT,
-    IROP_GT,
-    IROP_LE,
-    IROP_GE,
-    IROP_EQ,
-    IROP_NE,
-    IROP_IO,
-
-    /* Logical */
-
-    IROP_LNEG,
-    IROP_LAND,
-    IROP_LOR,
-
-    /* Bit-wise */
-
-    IROP_BNEG,
-    IROP_BAND,
-    IROP_BOR,
-    IROP_XOR,
-
-    /* IR-specific */
-
-    IROP_GOTO,
-    IROP_RETURN,
-    IROP_TEST,
-    IROP_PHI,
-
-    IROP_MAX,
-} operation;
-
-/**
  * reference type
  *
- * IR_ASN_REF_DEFINITION: definition
+ * IR_ASN_REF_DEFINITION: definition from scope tables
  * IR_ASN_REF_INSTRUCTION: instruction
- * IR_ASN_REF_LITERAL: definition copy
+ * IR_ASN_REF_LITERAL: definition from tbl_literal
 */
 typedef enum
 {
@@ -289,13 +194,17 @@ typedef enum
 
 /**
  * assignment reference
+ *
+ * NOTE: doi must stay as reference at all times
+ * (hence: no copy/allocation for doi is allowed)
+ * because same doi may be reference in multiple places
 */
 typedef struct
 {
     // type selector
     reference_type type;
-    // definition OR instruction
-    void* ref;
+    // Definition Or Instruction
+    void* doi;
     // version of reference, used only for definition
     size_t ver;
 } reference;
@@ -306,15 +215,16 @@ typedef struct
  * It is generalized as a "single instruction"
  * a sequence of instructions defines a node
  *
- * max form: ref[0] = ref[1] op ref[2]
- * only ref[0] can be lvalue
+ * max form: lvalue <- operand_1 op operand_2
 */
 typedef struct _instruction
 {
     // opcode
     operation op;
     // value reference
-    reference ref[3];
+    reference* lvalue;
+    reference* operand_1;
+    reference* operand_2;
 
     // previous instruction
     struct _instruction* prev;
@@ -420,6 +330,8 @@ typedef struct
     hash_table tbl_on_demand_packages;
     // other global names
     hash_table tbl_global;
+    // literal lookup table
+    hash_table tbl_literal;
     // stack top symbol lookup
     scope_frame* scope_stack_top;
     // toplevel block count
@@ -427,11 +339,13 @@ typedef struct
 
     // architecture info
     architecture* arch;
+    // expression-related info
+    java_expression* expression;
     // error data
     java_error* error;
 
     // member declarator initialization code
-    cfg* code_member_init;
+    cfg code_member_init;
 } java_ir;
 
 char* t2s(java_token* token);
@@ -460,6 +374,7 @@ bool def(
     java_error_id err_dim_dup
 );
 definition* use(java_ir* ir, tree_node* declarator, java_error_id err_undef);
+definition* def_li(java_ir* ir, java_token* token);
 
 definition* new_definition(java_node_query type);
 void definition_concat(definition* dest, definition* src);
@@ -472,16 +387,20 @@ basic_block* cfg_new_basic_block(cfg* g);
 void cfg_new_edge(cfg* g, basic_block* from, basic_block* to);
 cfg* cfg_connect(cfg* g, cfg* src_graph);
 
+reference* new_reference();
+reference* copy_reference(const reference* r);
+void delete_reference(reference* ref);
+
 instruction* new_instruction();
-void delete_instruction(instruction* inst);
-void instruction_insert(basic_block* node, instruction* prev, instruction* inst);
-void instruction_push_back(basic_block* node, instruction* inst);
-void instruction_push_front(basic_block* node, instruction* inst);
+void delete_instruction(instruction* inst, bool destructive);
+bool instruction_insert(basic_block* node, instruction* prev, instruction* inst);
+bool instruction_push_back(basic_block* node, instruction* inst);
+bool instruction_push_front(basic_block* node, instruction* inst);
 
-cfg* walk_expression(java_ir* ir, tree_node* expression);
-cfg* walk_block(java_ir* ir, tree_node* block);
+void walk_expression(java_ir* ir, cfg* g, tree_node* expression);
+void walk_block(java_ir* ir, cfg* g, tree_node* block);
 
-void init_ir(java_ir* ir, java_error* error);
+void init_ir(java_ir* ir, java_expression* expression, java_error* error);
 void release_ir(java_ir* ir);
 void contextualize(java_ir* ir, architecture* arch, tree_node* compilation_unit);
 void ir_error(java_ir* ir, java_error_id id);

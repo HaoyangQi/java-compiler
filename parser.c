@@ -3508,7 +3508,7 @@ static tree_node* parse_expression(java_parser* parser)
     while (true)
     {
         token_type = peek_token_type(parser, TOKEN_PEEK_1st);
-        op_type = parser->expression->op_map[token_type];
+        op_type = expr_tid2opid(parser->expression, token_type);
         next_is_operator = true;
 
         // token-operator preprocessing: 1-1 mapping
