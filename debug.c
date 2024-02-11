@@ -44,7 +44,12 @@ void debug_report(compiler* compiler)
     printf("Language version: %d\n", compiler->version);
     debug_report_hash_table_summary(&compiler->rw_lookup_table, "Reserved word");
     printf("Expression static data size: %zd bytes\n",
-        sizeof(java_operator) * OPID_MAX + sizeof(operator_id) * JLT_MAX);
+        sizeof(java_expression) +
+        sizeof(java_operator) * OPID_MAX +
+        sizeof(operator_id) * JLT_MAX +
+        sizeof(operation) * OPID_MAX +
+        sizeof(size_t) * OPID_MAX
+    );
     printf("Error static data size: %zd bytes\n",
         sizeof(error_definiton) * JAVA_E_MAX + sizeof(char*) * JAVA_E_MAX);
 

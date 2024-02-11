@@ -8,62 +8,6 @@
 
 #include "ir.h"
 
-static size_t __count_operands(operator_id opid)
-{
-    switch (opid)
-    {
-        case OPID_POST_INC:
-        case OPID_POST_DEC:
-        case OPID_SIGN_POS:
-        case OPID_SIGN_NEG:
-        case OPID_LOGIC_NOT:
-        case OPID_BIT_NOT:
-        case OPID_PRE_INC:
-        case OPID_PRE_DEC:
-            return 1;
-        case OPID_MUL:
-        case OPID_DIV:
-        case OPID_MOD:
-        case OPID_ADD:
-        case OPID_SUB:
-        case OPID_SHIFT_L:
-        case OPID_SHIFT_R:
-        case OPID_SHIFT_UR:
-        case OPID_LESS:
-        case OPID_LESS_EQ:
-        case OPID_GREAT:
-        case OPID_GREAT_EQ:
-        case OPID_INSTANCE_OF:
-        case OPID_EQ:
-        case OPID_NOT_EQ:
-        case OPID_BIT_AND:
-        case OPID_BIT_XOR:
-        case OPID_BIT_OR:
-        case OPID_LOGIC_AND:
-        case OPID_LOGIC_OR:
-        case OPID_TERNARY_1:
-        case OPID_TERNARY_2:
-        case OPID_ASN:
-        case OPID_ADD_ASN:
-        case OPID_SUB_ASN:
-        case OPID_MUL_ASN:
-        case OPID_DIV_ASN:
-        case OPID_MOD_ASN:
-        case OPID_AND_ASN:
-        case OPID_XOR_ASN:
-        case OPID_OR_ASN:
-        case OPID_SHIFT_L_ASN:
-        case OPID_SHIFT_R_ASN:
-        case OPID_SHIFT_UR_ASN:
-        case OPID_LAMBDA:
-            return 2;
-        default:
-            break;
-    }
-
-    return 0;
-}
-
 static tree_node* __previous_available_operand(tree_node* from)
 {
     while (from && from->type != JNT_OPERATOR)
@@ -151,11 +95,6 @@ static reference* __interpret_operand(java_ir* ir, basic_block* block, tree_node
  * finalize instruction
  *
  * lvalue <- operand_1 op operand_2
- *
- * TODO: validate lvalue here
- * we must validate lvalue here because this is the last place
- * we know if the operation involves an assignment
- * (at lease we need to do NULL check for lvalue)
  *
  * NOTE: lvalue reference must be copied from an operand!
  * because the version number will be different
@@ -292,10 +231,8 @@ bool __expression_to_block(java_ir* ir, basic_block* block, tree_node* expressio
      * base2 base1 op
      *
     */
-    size_t debug_loop_count = 0;
     while (top)
     {
-        debug_loop_count++;
         // locate next operator
         // do NOT set base1 here: because if top is already an OP
         // loop will not run and base1 will not be set
@@ -324,7 +261,7 @@ bool __expression_to_block(java_ir* ir, basic_block* block, tree_node* expressio
         }
 
         // adjust base2 if needed
-        if (__count_operands(top->data->operator.id) == 2)
+        if (expr_opid_operand_count(ir->expression, top->data->operator.id) == 2)
         {
             // see the NOTE below for reasoning
             base2 = base1->prev_sibling;
@@ -357,11 +294,6 @@ bool __expression_to_block(java_ir* ir, basic_block* block, tree_node* expressio
         */
         top->prev_sibling = base2 ? base2->prev_sibling : base1->prev_sibling;
 
-        /**
-         * TODO:Operator Code Generation
-         * TODO:in AST node level or data level (better be data level), add a void*
-         * reference to the instruction
-        */
         printf("instruction: OP[%d] ", top->data->operator.id);
 
         /**
@@ -380,7 +312,6 @@ bool __expression_to_block(java_ir* ir, basic_block* block, tree_node* expressio
         // reduction of current operator completed, move on
         top = top->next_sibling;
     }
-    printf("expression walked %zd times.\n", debug_loop_count);
 
     return ret;
 }

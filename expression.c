@@ -14,6 +14,7 @@ void init_expression(java_expression* expression)
     expression->definition = (java_operator*)malloc_assert(sizeof(java_operator) * OPID_MAX);
     expression->op_map = (operator_id*)malloc_assert(map_size);
     expression->ir_map = (operation*)malloc_assert(sizeof(operation) * OPID_MAX);
+    expression->irop_operand_count = (size_t*)malloc_assert(sizeof(size_t) * OPID_MAX);
 
     // set default because OPID_UNDEFINED = 0
     memset(expression->op_map, 0, map_size);
@@ -191,6 +192,58 @@ void init_expression(java_expression* expression)
     expression->ir_map[OPID_SHIFT_R_ASN] = IROP_SRS;
     expression->ir_map[OPID_SHIFT_UR_ASN] = IROP_URS;
     expression->ir_map[OPID_LAMBDA] = IROP_LMD;
+
+    /**
+     * OPID operand count
+     *
+     * this info can definitely be merged into ir_map using bit mask,
+     * but to maintain faster access, let's just waste some memory
+    */
+
+    expression->irop_operand_count[0] = 0;
+    expression->irop_operand_count[OPID_POST_INC] = 1;
+    expression->irop_operand_count[OPID_POST_DEC] = 1;
+    expression->irop_operand_count[OPID_SIGN_POS] = 1;
+    expression->irop_operand_count[OPID_SIGN_NEG] = 1;
+    expression->irop_operand_count[OPID_LOGIC_NOT] = 1;
+    expression->irop_operand_count[OPID_BIT_NOT] = 1;
+    expression->irop_operand_count[OPID_PRE_INC] = 1;
+    expression->irop_operand_count[OPID_PRE_DEC] = 1;
+    expression->irop_operand_count[OPID_MUL] = 2;
+    expression->irop_operand_count[OPID_DIV] = 2;
+    expression->irop_operand_count[OPID_MOD] = 2;
+    expression->irop_operand_count[OPID_ADD] = 2;
+    expression->irop_operand_count[OPID_SUB] = 2;
+    expression->irop_operand_count[OPID_SHIFT_L] = 2;
+    expression->irop_operand_count[OPID_SHIFT_R] = 2;
+    expression->irop_operand_count[OPID_SHIFT_UR] = 2;
+    expression->irop_operand_count[OPID_LESS] = 2;
+    expression->irop_operand_count[OPID_LESS_EQ] = 2;
+    expression->irop_operand_count[OPID_GREAT] = 2;
+    expression->irop_operand_count[OPID_GREAT_EQ] = 2;
+    expression->irop_operand_count[OPID_INSTANCE_OF] = 2;
+    expression->irop_operand_count[OPID_EQ] = 2;
+    expression->irop_operand_count[OPID_NOT_EQ] = 2;
+    expression->irop_operand_count[OPID_BIT_AND] = 2;
+    expression->irop_operand_count[OPID_BIT_XOR] = 2;
+    expression->irop_operand_count[OPID_BIT_OR] = 2;
+    expression->irop_operand_count[OPID_LOGIC_AND] = 2;
+    expression->irop_operand_count[OPID_LOGIC_OR] = 2;
+    expression->irop_operand_count[OPID_TERNARY_1] = 2;
+    expression->irop_operand_count[OPID_TERNARY_2] = 2;
+    expression->irop_operand_count[OPID_ASN] = 2;
+    expression->irop_operand_count[OPID_ADD_ASN] = 2;
+    expression->irop_operand_count[OPID_SUB_ASN] = 2;
+    expression->irop_operand_count[OPID_MUL_ASN] = 2;
+    expression->irop_operand_count[OPID_DIV_ASN] = 2;
+    expression->irop_operand_count[OPID_MOD_ASN] = 2;
+    expression->irop_operand_count[OPID_AND_ASN] = 2;
+    expression->irop_operand_count[OPID_XOR_ASN] = 2;
+    expression->irop_operand_count[OPID_OR_ASN] = 2;
+    expression->irop_operand_count[OPID_SHIFT_L_ASN] = 2;
+    expression->irop_operand_count[OPID_SHIFT_R_ASN] = 2;
+    expression->irop_operand_count[OPID_SHIFT_UR_ASN] = 2;
+    expression->irop_operand_count[OPID_LAMBDA] = 2;
 }
 
 /**
@@ -201,6 +254,7 @@ void release_expression(java_expression* expression)
     free(expression->op_map);
     free(expression->definition);
     free(expression->ir_map);
+    free(expression->irop_operand_count);
 }
 
 /**
@@ -214,7 +268,7 @@ java_operator expr_opid2def(const java_expression* expression, operator_id opid)
 /**
  * map token id to OPID
 */
-java_operator expr_tid2opid(const java_expression* expression, java_lexeme_type tid)
+operator_id expr_tid2opid(const java_expression* expression, java_lexeme_type tid)
 {
     return expression->op_map[tid];
 }
@@ -222,9 +276,25 @@ java_operator expr_tid2opid(const java_expression* expression, java_lexeme_type 
 /**
  * map OPID to IROP
 */
-java_operator expr_opid2irop(const java_expression* expression, operator_id opid)
+operation expr_opid2irop(const java_expression* expression, operator_id opid)
 {
     return expression->ir_map[opid];
+}
+
+/**
+ * map IROP to operand count
+*/
+size_t expr_irop_operand_count(const java_expression* expression, operation irop)
+{
+    return expression->irop_operand_count[irop];
+}
+
+/**
+ * map OPID to operand count
+*/
+size_t expr_opid_operand_count(const java_expression* expression, operator_id opid)
+{
+    return expression->irop_operand_count[expression->ir_map[opid]];
 }
 
 /**

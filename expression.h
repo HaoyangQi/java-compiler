@@ -276,6 +276,10 @@ typedef enum
  * Java Expression Definition
  *
  * static data used for expression parsing
+ *
+ * ONLYSTATIC: do NOT include any run-time instance-specific data
+ * in this struct, use java_expression_worker instead; because
+ * this struct is designed to stay active for all compile tasks
 */
 typedef struct
 {
@@ -285,14 +289,18 @@ typedef struct
     operator_id* op_map;
     /* static map from OPID to IROP */
     operation* ir_map;
+    /* #operand needed for each IROP */
+    size_t* irop_operand_count;
 } java_expression;
 
 void init_expression(java_expression* expression);
 void release_expression(java_expression* expression);
 
 java_operator expr_opid2def(const java_expression* expression, operator_id opid);
-java_operator expr_tid2opid(const java_expression* expression, java_lexeme_type tid);
-java_operator expr_opid2irop(const java_expression* expression, operator_id opid);
+operator_id expr_tid2opid(const java_expression* expression, java_lexeme_type tid);
+operation expr_opid2irop(const java_expression* expression, operator_id opid);
+size_t expr_irop_operand_count(const java_expression* expression, operation irop);
+size_t expr_opid_operand_count(const java_expression* expression, operator_id opid);
 
 /**
  * Operator Stack
