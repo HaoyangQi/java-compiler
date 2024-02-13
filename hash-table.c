@@ -224,7 +224,7 @@ void bhash_table_insert(hash_table* table, void* k, bytes_length len, void* v)
 /**
  * update existing pair
 */
-bool bhash_table_update(hash_table* table, void* k, bytes_length len, void* v)
+bool bhash_table_update(hash_table* table, const void* k, bytes_length len, void* v)
 {
     size_t index = bhash(k, len) % table->bucket_size;
     hash_pair* b = table->bucket[index];
@@ -232,7 +232,7 @@ bool bhash_table_update(hash_table* table, void* k, bytes_length len, void* v)
     // lookup with collision check
     while (b)
     {
-        if (strcmp(b->key, k) == 0)
+        if (memcmp(b->key, k, len) == 0)
         {
             b->value = v;
             return true;
@@ -247,7 +247,7 @@ bool bhash_table_update(hash_table* table, void* k, bytes_length len, void* v)
 /**
  * key test
 */
-bool bhash_table_test(hash_table* table, void* k, bytes_length len)
+bool bhash_table_test(hash_table* table, const void* k, bytes_length len)
 {
     size_t index = bhash(k, len) % table->bucket_size;
     hash_pair* b = table->bucket[index];
@@ -255,7 +255,7 @@ bool bhash_table_test(hash_table* table, void* k, bytes_length len)
     // lookup with collision check
     while (b)
     {
-        if (strcmp(b->key, k) == 0)
+        if (memcmp(b->key, k, len) == 0)
         {
             return true;
         }
@@ -273,7 +273,7 @@ bool bhash_table_test(hash_table* table, void* k, bytes_length len)
  * corresponding to a key in stor is designed to be empty
  * use test function to do key test
 */
-void* bhash_table_find(hash_table* table, void* k, bytes_length len)
+void* bhash_table_find(hash_table* table, const void* k, bytes_length len)
 {
     size_t index = bhash(k, len) % table->bucket_size;
     hash_pair* b = table->bucket[index];
@@ -281,7 +281,7 @@ void* bhash_table_find(hash_table* table, void* k, bytes_length len)
     // lookup with collision check
     while (b)
     {
-        if (strcmp(b->key, k) == 0)
+        if (memcmp(b->key, k, len) == 0)
         {
             return b->value;
         }
@@ -297,7 +297,7 @@ void* bhash_table_find(hash_table* table, void* k, bytes_length len)
  *
  * NULL returned from this method is unambiguous: means key does not exist
 */
-hash_pair* bhash_table_get(hash_table* table, void* k, bytes_length len)
+hash_pair* bhash_table_get(hash_table* table, const void* k, bytes_length len)
 {
     size_t index = bhash(k, len) % table->bucket_size;
     hash_pair* b = table->bucket[index];
@@ -305,7 +305,7 @@ hash_pair* bhash_table_get(hash_table* table, void* k, bytes_length len)
     // lookup with collision check
     while (b)
     {
-        if (strcmp(b->key, k) == 0)
+        if (memcmp(b->key, k, len) == 0)
         {
             return b;
         }
@@ -327,7 +327,7 @@ void shash_table_insert(hash_table* table, char* k, void* v)
 /**
  * string key pair update
 */
-bool shash_table_update(hash_table* table, char* k, void* v)
+bool shash_table_update(hash_table* table, const char* k, void* v)
 {
     return bhash_table_update(table, k, strlen(k), v);
 }
@@ -335,7 +335,7 @@ bool shash_table_update(hash_table* table, char* k, void* v)
 /**
  * string key test
 */
-bool shash_table_test(hash_table* table, char* k)
+bool shash_table_test(hash_table* table, const char* k)
 {
     return bhash_table_test(table, k, strlen(k));
 }
@@ -343,7 +343,7 @@ bool shash_table_test(hash_table* table, char* k)
 /**
  * string key find
 */
-void* shash_table_find(hash_table* table, char* k)
+void* shash_table_find(hash_table* table, const char* k)
 {
     return bhash_table_find(table, k, strlen(k));
 }
@@ -351,7 +351,7 @@ void* shash_table_find(hash_table* table, char* k)
 /**
  * string key get
 */
-hash_pair* shash_table_get(hash_table* table, char* k)
+hash_pair* shash_table_get(hash_table* table, const char* k)
 {
     return bhash_table_get(table, k, strlen(k));
 }
@@ -374,7 +374,7 @@ void shash_table_bl_insert(hash_table* table, char* k, size_t v)
 /**
  * bit-length data & string key pair update
 */
-bool shash_table_bl_update(hash_table* table, char* k, size_t v)
+bool shash_table_bl_update(hash_table* table, const char* k, size_t v)
 {
     return bhash_table_update(table, k, strlen(k), (void*)v);
 }
@@ -382,7 +382,7 @@ bool shash_table_bl_update(hash_table* table, char* k, size_t v)
 /**
  * bit-length data & string key test
 */
-bool shash_table_bl_test(hash_table* table, char* k)
+bool shash_table_bl_test(hash_table* table, const char* k)
 {
     return bhash_table_test(table, k, strlen(k));
 }
@@ -393,7 +393,7 @@ bool shash_table_bl_test(hash_table* table, char* k)
  * since we use the pointer itself to store the data so
  * the cast is safe here
 */
-size_t shash_table_bl_find(hash_table* table, char* k)
+size_t shash_table_bl_find(hash_table* table, const char* k)
 {
     return (size_t)bhash_table_find(table, k, strlen(k));
 }

@@ -350,6 +350,16 @@ void walk_expression(java_ir* ir, cfg* g, tree_node* expression)
  *
  * node: JNT_BLOCK
 */
-void walk_block(java_ir* ir, cfg* g, tree_node* block)
+void walk_block(java_ir* ir, cfg* g, tree_node* block, bool use_new_scope)
 {
+    hash_table* scope = use_new_scope ? lookup_new_scope(ir, LST_NONE) : lookup_top_scope(ir);
+
+    /**
+     * TODO:
+    */
+
+    if (use_new_scope)
+    {
+        lookup_pop_scope(ir, true);
+    }
 }

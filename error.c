@@ -288,7 +288,7 @@ static java_error_entry* error_new_entry(java_error_id id, size_t ln, size_t col
 */
 void error_log(java_error_stack* error, java_error_id id, size_t ln, size_t col)
 {
-    if (!error)
+    if (!error || id == JAVA_E_MAX)
     {
         return;
     }
