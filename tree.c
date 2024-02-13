@@ -6,7 +6,6 @@
 void init_tree_node(tree_node* node)
 {
     node->type = JNT_MAX;
-    node->valid = true;
     node->ambiguous = true;
     node->data = NULL;
     node->first_child = NULL;
@@ -40,7 +39,6 @@ void tree_node_add_child(tree_node* node, tree_node* child)
     }
 
     node->last_child = child;
-    node->valid = node->valid && child->valid;
     node->ambiguous = node->ambiguous || child->ambiguous;
 }
 

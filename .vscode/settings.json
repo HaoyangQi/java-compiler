@@ -29,6 +29,7 @@
         "symtbl.h": "c",
         "utils.h": "c",
         "compiler.h": "c",
-        "ir.h": "c"
+        "ir.h": "c",
+        "node.h": "c"
     }
 }

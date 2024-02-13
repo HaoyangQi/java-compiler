@@ -88,10 +88,50 @@ bool peek_token_type_is(java_parser* parser, size_t idx, java_lexeme_type type)
     return peek->type == type;
 }
 
-bool peek_token_is_type_word(java_parser* parser, size_t idx)
+bool peek_token_is_primitive_type(java_parser* parser, size_t idx)
 {
-    java_lexeme_type type = peek_token_type(parser, idx);
-    return type >= JLT_RWD_BOOLEAN && type <= JLT_RWD_FLOAT;
+    return is_lexeme_primitive_type(peek_token_type(parser, idx));
+}
+
+bool peek_token_is_literal(java_parser* parser, size_t idx)
+{
+    return is_lexeme_literal(peek_token_type(parser, idx));
+}
+
+bool is_lexeme_primitive_type(java_lexeme_type type)
+{
+    switch (type)
+    {
+        case JLT_RWD_BOOLEAN:
+        case JLT_RWD_DOUBLE:
+        case JLT_RWD_BYTE:
+        case JLT_RWD_INT:
+        case JLT_RWD_SHORT:
+        case JLT_RWD_VOID:
+        case JLT_RWD_CHAR:
+        case JLT_RWD_LONG:
+        case JLT_RWD_FLOAT:
+            return true;
+        default:
+            break;
+    }
+
+    return false;
+}
+
+bool is_lexeme_literal(java_lexeme_type type)
+{
+    switch (type)
+    {
+        case JLT_LTR_NUMBER:
+        case JLT_LTR_CHARACTER:
+        case JLT_LTR_STRING:
+            return true;
+        default:
+            break;
+    }
+
+    return false;
 }
 
 /**

@@ -342,7 +342,7 @@ typedef struct
     // expression-related info
     java_expression* expression;
     // error data
-    java_error* error;
+    java_error_stack* error;
 
     // member declarator initialization code
     cfg code_member_init;
@@ -400,7 +400,7 @@ bool instruction_push_front(basic_block* node, instruction* inst);
 void walk_expression(java_ir* ir, cfg* g, tree_node* expression);
 void walk_block(java_ir* ir, cfg* g, tree_node* block);
 
-void init_ir(java_ir* ir, java_expression* expression, java_error* error);
+void init_ir(java_ir* ir, java_expression* expression, java_error_stack* error);
 void release_ir(java_ir* ir);
 void contextualize(java_ir* ir, architecture* arch, tree_node* compilation_unit);
 void ir_error(java_ir* ir, java_error_id id);

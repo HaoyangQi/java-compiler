@@ -4,7 +4,7 @@
 /**
  * initialize semantic analysis
 */
-void init_ir(java_ir* ir, java_expression* expression, java_error* error)
+void init_ir(java_ir* ir, java_expression* expression, java_error_stack* error)
 {
     ir->scope_stack_top = NULL;
     ir->num_methods = 0;

@@ -6,6 +6,7 @@
 #include "langspec.h"
 #include "token.h"
 #include "node.h"
+#include "error.h"
 
 /**
  * Aux Data: ID
@@ -83,6 +84,13 @@ typedef union
         /* true if default label, case label otherwise */
         bool is_default;
     } switch_label;
+
+    // ambiguity data
+    struct
+    {
+        // pointer to JAVA_E_AMBIGUITY_START
+        java_error_entry* error;
+    } ambiguity;
 } tree_node_data;
 
 /**
@@ -112,8 +120,6 @@ typedef struct _tree_node
 {
     /* node type */
     java_node_query type;
-    /* true if production completes */
-    bool valid;
     /* false if production uniquely determines input */
     bool ambiguous;
     /* aux data */
