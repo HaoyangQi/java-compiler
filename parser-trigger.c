@@ -24,7 +24,7 @@ bool parser_trigger_interface_type(java_parser* parser, size_t peek_from)
 
 bool parser_trigger_type(java_parser* parser, size_t peek_from)
 {
-    return peek_token_is_type_word(parser, peek_from) ||
+    return peek_token_is_primitive_type(parser, peek_from) ||
         peek_token_class_is(parser, peek_from, JT_IDENTIFIER);
 }
 

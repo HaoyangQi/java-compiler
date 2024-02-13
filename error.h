@@ -17,13 +17,13 @@
  * both parts are described as integer index value,
  * numbered from 0 to 15 (0xF) consecutively
 */
-typedef unsigned char error_definiton;
+typedef unsigned char error_descriptor;
 
 /**
  * Definition Mask
 */
-#define ERR_DEF_MASK_LEVEL ((error_definiton)(0xF0))
-#define ERR_DEF_MASK_SCOPE ((error_definiton)(0x0F))
+#define ERR_DEF_MASK_LEVEL ((error_descriptor)(0xF0))
+#define ERR_DEF_MASK_SCOPE ((error_descriptor)(0x0F))
 
 /**
  * Error Type
@@ -31,9 +31,9 @@ typedef unsigned char error_definiton;
  * index value
 */
 #define JEL_UNDEFINED 0
-#define JEL_INFORMATION ((error_definiton)(0x10))
-#define JEL_WARNING ((error_definiton)(0x20))
-#define JEL_ERROR ((error_definiton)(0x30))
+#define JEL_INFORMATION ((error_descriptor)(0x10))
+#define JEL_WARNING ((error_descriptor)(0x20))
+#define JEL_ERROR ((error_descriptor)(0x30))
 
 /**
  * Error Scope
@@ -50,23 +50,23 @@ typedef unsigned char error_definiton;
  * BUILD: error from building process
 */
 #define JES_UNDEFINED 0
-#define JES_INTERNAL ((error_definiton)(0x01))
-#define JES_RUNTIME ((error_definiton)(0x02))
-#define JES_LEXICAL ((error_definiton)(0x03))
-#define JES_SYNTAX ((error_definiton)(0x04))
-#define JES_CONTEXT ((error_definiton)(0x05))
-#define JES_OPTIMIZATION ((error_definiton)(0x06))
-#define JES_LINKER ((error_definiton)(0x07))
-#define JES_BUILD ((error_definiton)(0x08))
+#define JES_INTERNAL ((error_descriptor)(0x01))
+#define JES_RUNTIME ((error_descriptor)(0x02))
+#define JES_LEXICAL ((error_descriptor)(0x03))
+#define JES_SYNTAX ((error_descriptor)(0x04))
+#define JES_CONTEXT ((error_descriptor)(0x05))
+#define JES_OPTIMIZATION ((error_descriptor)(0x06))
+#define JES_LINKER ((error_descriptor)(0x07))
+#define JES_BUILD ((error_descriptor)(0x08))
 
 /**
  * Definition helpers
 */
 #define DEFINE_ERROR(l, s) ((l) | (s))
-#define JEL_TO_INDEX(l) (((error_definiton)(l)) >> 4)
+#define JEL_TO_INDEX(l) (((error_descriptor)(l)) >> 4)
 #define DEFINE_RESERVED_ERROR 0
-#define DEFINE_SYNTAX_ERROR ((error_definiton)(0x34))
-#define DEFINE_CONTEXT_ERROR ((error_definiton)(0x35))
+#define DEFINE_SYNTAX_ERROR ((error_descriptor)(0x34))
+#define DEFINE_CONTEXT_ERROR ((error_descriptor)(0x35))
 
 /**
  * Error Message ID
@@ -106,8 +106,54 @@ typedef enum
     JAVA_E_PART_EXPONENT_OVERFLOW,
     JAVA_E_PART_INTEGER_OVERFLOW,
 
+    /**
+     * Ambiguity Error Flags
+     *
+     * INTERNAL:
+     * the following are not errors
+     * they are placeholders for
+     * error parser
+     *
+     * JAVA_E_AMBIGUITY_START
+     * Err |
+     * Err |---JAVA_E_AMBIGUITY_PATH_1
+     * ... |
+     * JAVA_E_AMBIGUITY_SEPARATOR
+     * Err |
+     * Err |---JAVA_E_AMBIGUITY_PATH_2
+     * ... |
+     * JAVA_E_AMBIGUITY_END
+     *
+     * If ambiguity is resolved, the ID
+     * JAVA_E_AMBIGUITY_START will be changed
+     * into JAVA_E_AMBIGUITY_PATH_1 or
+     * JAVA_E_AMBIGUITY_PATH_2 accordingly
+    */
+
+    JAVA_E_AMBIGUITY_START,
+    JAVA_E_AMBIGUITY_PATH_1,
+    JAVA_E_AMBIGUITY_PATH_2,
+    JAVA_E_AMBIGUITY_SEPARATOR,
+    JAVA_E_AMBIGUITY_END,
+
     JAVA_E_MAX,
 } java_error_id;
+
+/**
+ * Error Definitions
+ *
+ * ONLYSTATIC: this instance contains static data
+ * shared across all compile tasks
+ *
+ * use java_error_stack for task-specific data
+*/
+typedef struct
+{
+    /* ID-to-descriptor mapping */
+    error_descriptor* descriptor;
+    /* ID-to-message mapping */
+    char** message;
+} java_error_definition;
 
 /**
  * Error Entry
@@ -131,10 +177,8 @@ typedef struct _java_error_entry
 */
 typedef struct
 {
-    /* ID-to-definition mapping */
-    error_definiton* definition;
-    /* ID-to-message mapping */
-    char** message;
+    /* error definitions */
+    java_error_definition* def;
     /* error stack */
     java_error_entry* data;
     /* error stack top */
@@ -145,19 +189,24 @@ typedef struct
     size_t num_warn;
     /* number of errors */
     size_t num_err;
-} java_error;
+} java_error_stack;
 
-void init_error(java_error* error);
-void release_error(java_error* error);
-void clear_error(java_error* error);
+void init_error_definition(java_error_definition* err_def);
+void release_error_definition(java_error_definition* err_def);
 
-java_error_entry* error_stack_top(java_error* error);
-bool error_stack_empty(java_error* error);
-void error_stack_rewind(java_error* error, java_error_entry* new_top);
-bool error_stack_pop(java_error* error);
-void error_stack_push(java_error* error, java_error_entry* item);
+void init_error_stack(java_error_stack* error, java_error_definition* def);
+void release_error_stack(java_error_stack* error);
+void clear_error_stack(java_error_stack* error);
 
-void error_log(java_error* error, java_error_id id, size_t ln, size_t col);
-size_t error_count(java_error* error, error_definiton error_level);
+java_error_entry* error_stack_top(java_error_stack* error);
+bool error_stack_empty(java_error_stack* error);
+void error_stack_rewind(java_error_stack* error, java_error_entry* new_top);
+bool error_stack_pop(java_error_stack* error);
+void error_stack_push(java_error_stack* error, java_error_entry* item);
+void error_stack_concat(java_error_stack* dest, java_error_stack* src);
+void error_stack_entry_delete(java_error_stack* error, java_error_entry* entry);
+
+void error_log(java_error_stack* error, java_error_id id, size_t ln, size_t col);
+size_t error_count(java_error_stack* error, error_descriptor error_level);
 
 #endif

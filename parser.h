@@ -43,7 +43,7 @@ typedef struct _java_parser
     /* expression definition */
     java_expression* expression;
     /* error data */
-    java_error* error;
+    java_error_stack* error;
 } java_parser;
 
 void init_parser(
@@ -51,10 +51,10 @@ void init_parser(
     file_buffer* buffer,
     hash_table* rw,
     java_expression* expr,
-    java_error* err
+    java_error_stack* err
 );
 void copy_parser(java_parser* from, java_parser* to);
-void swap_parser(java_parser* parser, java_parser* copy);
+void mutate_parser(java_parser* parser, java_parser* copy);
 void release_parser(java_parser* parser, bool is_copy);
 
 void parse(java_parser* parser);
@@ -65,7 +65,11 @@ java_token_class peek_token_class(java_parser* parser, size_t idx);
 java_lexeme_type peek_token_type(java_parser* parser, size_t idx);
 bool peek_token_class_is(java_parser* parser, size_t idx, java_token_class class);
 bool peek_token_type_is(java_parser* parser, size_t idx, java_lexeme_type type);
-bool peek_token_is_type_word(java_parser* parser, size_t idx);
+bool peek_token_is_primitive_type(java_parser* parser, size_t idx);
+bool peek_token_is_literal(java_parser* parser, size_t idx);
+
+bool is_lexeme_primitive_type(java_lexeme_type type);
+bool is_lexeme_literal(java_lexeme_type type);
 
 bool parser_trigger_name(java_parser* parser, size_t peek_from);
 bool parser_trigger_class_type(java_parser* parser, size_t peek_from);

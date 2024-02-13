@@ -1,6 +1,6 @@
 #include "file.h"
 
-void init_file_buffer(file_buffer* buffer, java_error* error_logger)
+void init_file_buffer(file_buffer* buffer, java_error_stack* error_logger)
 {
     buffer->size = 0;
     buffer->base = NULL;

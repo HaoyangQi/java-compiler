@@ -18,9 +18,10 @@ typedef struct
     file_buffer reader;
     hash_table rw_lookup_table;
     java_expression expression;
+    java_error_definition err_def;
     java_parser context;
     java_ir ir;
-    java_error error;
+    java_error_stack error;
 } compiler;
 
 bool init_compiler(compiler* compiler);

@@ -51,7 +51,10 @@ void debug_report(compiler* compiler)
         sizeof(size_t) * OPID_MAX
     );
     printf("Error static data size: %zd bytes\n",
-        sizeof(error_definiton) * JAVA_E_MAX + sizeof(char*) * JAVA_E_MAX);
+        sizeof(java_error_definition) +
+        sizeof(error_descriptor) * JAVA_E_MAX +
+        sizeof(char*) * JAVA_E_MAX
+    );
 
     printf("===== END OF REPORT =====\n");
 }

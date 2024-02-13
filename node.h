@@ -2,9 +2,6 @@
 #ifndef __COMPILER_TREE_NODE_H__
 #define __COMPILER_TREE_NODE_H__
 
-#include "types.h"
-#include "token.h"
-
 /**
  * ast node data query
  *

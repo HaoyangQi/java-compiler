@@ -7,95 +7,120 @@ static char* ERR_MSG_NO_SEMICOLON = "Expected ';'.";
 static char* ERR_MSG_NO_RIGHT_BRACE = "Expected '}'.";
 
 /**
+ * Initialize Error Definitions
+*/
+void init_error_definition(java_error_definition* err_def)
+{
+    err_def->descriptor = (error_descriptor*)malloc_assert(sizeof(error_descriptor) * JAVA_E_MAX);
+    err_def->message = (char**)malloc_assert(sizeof(char*) * JAVA_E_MAX);
+
+    /* Error Definitions */
+
+    err_def->descriptor[JAVA_E_RESERVED] = DEFINE_RESERVED_ERROR;
+    err_def->descriptor[JAVA_E_FILE_NO_PATH] = DEFINE_ERROR(JEL_ERROR, JES_RUNTIME);
+    err_def->descriptor[JAVA_E_FILE_OPEN_FAILED] = DEFINE_ERROR(JEL_ERROR, JES_RUNTIME);
+    err_def->descriptor[JAVA_E_FILE_SIZE_NOT_MATCH] = DEFINE_ERROR(JEL_ERROR, JES_RUNTIME);
+    err_def->descriptor[JAVA_E_TRAILING_CONTENT] = DEFINE_ERROR(JEL_WARNING, JES_LEXICAL);
+    err_def->descriptor[JAVA_E_PKG_DECL_NO_NAME] = DEFINE_SYNTAX_ERROR;
+    err_def->descriptor[JAVA_E_PKG_DECL_NO_SEMICOLON] = DEFINE_SYNTAX_ERROR;
+    err_def->descriptor[JAVA_E_IMPORT_NO_NAME] = DEFINE_SYNTAX_ERROR;
+    err_def->descriptor[JAVA_E_IMPORT_NO_SEMICOLON] = DEFINE_SYNTAX_ERROR;
+    err_def->descriptor[JAVA_E_IMPORT_AMBIGUOUS] = DEFINE_CONTEXT_ERROR;
+    err_def->descriptor[JAVA_E_IMPORT_DUPLICATE] = DEFINE_ERROR(JEL_WARNING, JES_CONTEXT);
+    err_def->descriptor[JAVA_E_CLASS_NO_NAME] = DEFINE_SYNTAX_ERROR;
+    err_def->descriptor[JAVA_E_CLASS_NO_BODY] = DEFINE_SYNTAX_ERROR;
+    err_def->descriptor[JAVA_E_CLASS_NAME_DUPLICATE] = DEFINE_CONTEXT_ERROR;
+    err_def->descriptor[JAVA_E_CLASS_BODY_ENCLOSE] = DEFINE_CONTEXT_ERROR;
+    err_def->descriptor[JAVA_E_MEMBER_VAR_DUPLICATE] = DEFINE_CONTEXT_ERROR;
+    err_def->descriptor[JAVA_E_MEMBER_VAR_DIM_AMBIGUOUS] = DEFINE_CONTEXT_ERROR;
+    err_def->descriptor[JAVA_E_MEMBER_VAR_DIM_DUPLICATE] = DEFINE_ERROR(JEL_WARNING, JES_CONTEXT);
+    err_def->descriptor[JAVA_E_MEMBER_VAR_NO_SEMICOLON] = DEFINE_SYNTAX_ERROR;
+    err_def->descriptor[JAVA_E_MEMBER_NO_TYPE] = DEFINE_SYNTAX_ERROR;
+    err_def->descriptor[JAVA_E_MEMBER_NO_NAME] = DEFINE_SYNTAX_ERROR;
+    err_def->descriptor[JAVA_E_MEMBER_AMBIGUOUS] = DEFINE_SYNTAX_ERROR;
+    err_def->descriptor[JAVA_E_EXPRESSION_NO_OPERAND] = DEFINE_SYNTAX_ERROR;
+    err_def->descriptor[JAVA_E_EXPRESSION_NO_LVALUE] = DEFINE_SYNTAX_ERROR;
+    err_def->descriptor[JAVA_E_EXPRESSION_LITERAL_LVALUE] = DEFINE_SYNTAX_ERROR;
+    err_def->descriptor[JAVA_E_NUMBER_OVERFLOW] = DEFINE_CONTEXT_ERROR;
+    err_def->descriptor[JAVA_E_PART_EXPONENT_OVERFLOW] = DEFINE_CONTEXT_ERROR;
+    err_def->descriptor[JAVA_E_PART_INTEGER_OVERFLOW] = DEFINE_CONTEXT_ERROR;
+    err_def->descriptor[JAVA_E_AMBIGUITY_START] = DEFINE_RESERVED_ERROR;
+    err_def->descriptor[JAVA_E_AMBIGUITY_PATH_1] = DEFINE_RESERVED_ERROR;
+    err_def->descriptor[JAVA_E_AMBIGUITY_PATH_2] = DEFINE_RESERVED_ERROR;
+    err_def->descriptor[JAVA_E_AMBIGUITY_SEPARATOR] = DEFINE_RESERVED_ERROR;
+    err_def->descriptor[JAVA_E_AMBIGUITY_END] = DEFINE_RESERVED_ERROR;
+
+    /* Error Messages */
+
+    err_def->message[JAVA_E_RESERVED] = "(Unregistered error)";
+    err_def->message[JAVA_E_FILE_NO_PATH] = "File name is not valid.";
+    err_def->message[JAVA_E_FILE_OPEN_FAILED] = "File '%s' failed to open.";
+    err_def->message[JAVA_E_FILE_SIZE_NOT_MATCH] = "File '%s' has incorrect loading size comparing to what is reported from file system.";
+    err_def->message[JAVA_E_TRAILING_CONTENT] = "Unrecognized trailing content.";
+    err_def->message[JAVA_E_PKG_DECL_NO_NAME] = "Expected 'name' in package declaration.";
+    err_def->message[JAVA_E_PKG_DECL_NO_SEMICOLON] = ERR_MSG_NO_SEMICOLON;
+    err_def->message[JAVA_E_IMPORT_NO_NAME] = "Expected 'name' in import declaration.";
+    err_def->message[JAVA_E_IMPORT_NO_SEMICOLON] = ERR_MSG_NO_SEMICOLON;
+    err_def->message[JAVA_E_IMPORT_AMBIGUOUS] = "Ambiguous import type name, resolution of same type diverges.";
+    err_def->message[JAVA_E_IMPORT_DUPLICATE] = "Duplicated import, discarded.";
+    err_def->message[JAVA_E_CLASS_NO_NAME] = "Expected 'name' in class declaration.";
+    err_def->message[JAVA_E_CLASS_NO_BODY] = "Expected class body in class declaration.";
+    err_def->message[JAVA_E_CLASS_NAME_DUPLICATE] = "Duplicated class name.";
+    err_def->message[JAVA_E_CLASS_BODY_ENCLOSE] = ERR_MSG_NO_RIGHT_BRACE;
+    err_def->message[JAVA_E_MEMBER_VAR_DUPLICATE] = "Duplicated member variable.";
+    err_def->message[JAVA_E_MEMBER_VAR_DIM_AMBIGUOUS] = "Dimension definition mismatched.";
+    err_def->message[JAVA_E_MEMBER_VAR_DIM_DUPLICATE] = "Duplicated dimension definition.";
+    err_def->message[JAVA_E_MEMBER_VAR_NO_SEMICOLON] = ERR_MSG_NO_SEMICOLON;
+    err_def->message[JAVA_E_MEMBER_NO_TYPE] = "Expected 'type' in member declaration.";
+    err_def->message[JAVA_E_MEMBER_NO_NAME] = "Expected 'name' in member declaration.";
+    err_def->message[JAVA_E_MEMBER_AMBIGUOUS] = "Incomplete member declaration.";
+    err_def->message[JAVA_E_EXPRESSION_NO_OPERAND] = "Invalid expression: expected operand.";
+    err_def->message[JAVA_E_EXPRESSION_NO_LVALUE] = "Invalid expression: expected lvalue.";
+    err_def->message[JAVA_E_EXPRESSION_LITERAL_LVALUE] = "Invalid expression: literal cannot be used as lvalue.";
+    err_def->message[JAVA_E_NUMBER_OVERFLOW] = "Invalid number: number overflows.";
+    err_def->message[JAVA_E_PART_EXPONENT_OVERFLOW] = "Invalid number: exponent part overflows.";
+    err_def->message[JAVA_E_PART_INTEGER_OVERFLOW] = "Invalid number: too many digits.";
+    err_def->message[JAVA_E_AMBIGUITY_START] = NULL;
+    err_def->message[JAVA_E_AMBIGUITY_PATH_1] = NULL;
+    err_def->message[JAVA_E_AMBIGUITY_PATH_2] = NULL;
+    err_def->message[JAVA_E_AMBIGUITY_SEPARATOR] = NULL;
+    err_def->message[JAVA_E_AMBIGUITY_END] = NULL;
+}
+
+/**
+ * Release Error Definitions
+*/
+void release_error_definition(java_error_definition* err_def)
+{
+    free(err_def->descriptor);
+    free(err_def->message);
+}
+
+/**
  * Initialize Error Manager
 */
-void init_error(java_error* error)
+void init_error_stack(java_error_stack* error, java_error_definition* def)
 {
-    error->definition = (error_definiton*)malloc_assert(sizeof(error_definiton) * JAVA_E_MAX);
-    error->message = (char**)malloc_assert(sizeof(char*) * JAVA_E_MAX);
+    error->def = def;
     error->data = NULL;
     error->top = NULL;
     error->num_info = 0;
     error->num_warn = 0;
     error->num_err = 0;
-
-    /* Error Definitions */
-
-    error->definition[JAVA_E_RESERVED] = DEFINE_RESERVED_ERROR;
-    error->definition[JAVA_E_FILE_NO_PATH] = DEFINE_ERROR(JEL_ERROR, JES_RUNTIME);
-    error->definition[JAVA_E_FILE_OPEN_FAILED] = DEFINE_ERROR(JEL_ERROR, JES_RUNTIME);
-    error->definition[JAVA_E_FILE_SIZE_NOT_MATCH] = DEFINE_ERROR(JEL_ERROR, JES_RUNTIME);
-    error->definition[JAVA_E_TRAILING_CONTENT] = DEFINE_ERROR(JEL_WARNING, JES_LEXICAL);
-    error->definition[JAVA_E_PKG_DECL_NO_NAME] = DEFINE_SYNTAX_ERROR;
-    error->definition[JAVA_E_PKG_DECL_NO_SEMICOLON] = DEFINE_SYNTAX_ERROR;
-    error->definition[JAVA_E_IMPORT_NO_NAME] = DEFINE_SYNTAX_ERROR;
-    error->definition[JAVA_E_IMPORT_NO_SEMICOLON] = DEFINE_SYNTAX_ERROR;
-    error->definition[JAVA_E_IMPORT_AMBIGUOUS] = DEFINE_CONTEXT_ERROR;
-    error->definition[JAVA_E_IMPORT_DUPLICATE] = DEFINE_ERROR(JEL_WARNING, JES_CONTEXT);
-    error->definition[JAVA_E_CLASS_NO_NAME] = DEFINE_SYNTAX_ERROR;
-    error->definition[JAVA_E_CLASS_NO_BODY] = DEFINE_SYNTAX_ERROR;
-    error->definition[JAVA_E_CLASS_NAME_DUPLICATE] = DEFINE_CONTEXT_ERROR;
-    error->definition[JAVA_E_CLASS_BODY_ENCLOSE] = DEFINE_CONTEXT_ERROR;
-    error->definition[JAVA_E_MEMBER_VAR_DUPLICATE] = DEFINE_CONTEXT_ERROR;
-    error->definition[JAVA_E_MEMBER_VAR_DIM_AMBIGUOUS] = DEFINE_CONTEXT_ERROR;
-    error->definition[JAVA_E_MEMBER_VAR_DIM_DUPLICATE] = DEFINE_ERROR(JEL_WARNING, JES_CONTEXT);
-    error->definition[JAVA_E_MEMBER_VAR_NO_SEMICOLON] = DEFINE_SYNTAX_ERROR;
-    error->definition[JAVA_E_MEMBER_NO_TYPE] = DEFINE_SYNTAX_ERROR;
-    error->definition[JAVA_E_MEMBER_NO_NAME] = DEFINE_SYNTAX_ERROR;
-    error->definition[JAVA_E_MEMBER_AMBIGUOUS] = DEFINE_SYNTAX_ERROR;
-    error->definition[JAVA_E_EXPRESSION_NO_OPERAND] = DEFINE_SYNTAX_ERROR;
-    error->definition[JAVA_E_EXPRESSION_NO_LVALUE] = DEFINE_SYNTAX_ERROR;
-    error->definition[JAVA_E_EXPRESSION_LITERAL_LVALUE] = DEFINE_SYNTAX_ERROR;
-    error->definition[JAVA_E_NUMBER_OVERFLOW] = DEFINE_CONTEXT_ERROR;
-    error->definition[JAVA_E_PART_EXPONENT_OVERFLOW] = DEFINE_CONTEXT_ERROR;
-    error->definition[JAVA_E_PART_INTEGER_OVERFLOW] = DEFINE_CONTEXT_ERROR;
-
-    /* Error Messages */
-
-    error->message[JAVA_E_RESERVED] = "(Unregistered error)";
-    error->message[JAVA_E_FILE_NO_PATH] = "File name is not valid.";
-    error->message[JAVA_E_FILE_OPEN_FAILED] = "File '%s' failed to open.";
-    error->message[JAVA_E_FILE_SIZE_NOT_MATCH] = "File '%s' has incorrect loading size comparing to what is reported from file system.";
-    error->message[JAVA_E_TRAILING_CONTENT] = "Unrecognized trailing content.";
-    error->message[JAVA_E_PKG_DECL_NO_NAME] = "Expected 'name' in package declaration.";
-    error->message[JAVA_E_PKG_DECL_NO_SEMICOLON] = ERR_MSG_NO_SEMICOLON;
-    error->message[JAVA_E_IMPORT_NO_NAME] = "Expected 'name' in import declaration.";
-    error->message[JAVA_E_IMPORT_NO_SEMICOLON] = ERR_MSG_NO_SEMICOLON;
-    error->message[JAVA_E_IMPORT_AMBIGUOUS] = "Ambiguous import type name, resolution of same type diverges.";
-    error->message[JAVA_E_IMPORT_DUPLICATE] = "Duplicated import, discarded.";
-    error->message[JAVA_E_CLASS_NO_NAME] = "Expected 'name' in class declaration.";
-    error->message[JAVA_E_CLASS_NO_BODY] = "Expected class body in class declaration.";
-    error->message[JAVA_E_CLASS_NAME_DUPLICATE] = "Duplicated class name.";
-    error->message[JAVA_E_CLASS_BODY_ENCLOSE] = ERR_MSG_NO_RIGHT_BRACE;
-    error->message[JAVA_E_MEMBER_VAR_DUPLICATE] = "Duplicated member variable.";
-    error->message[JAVA_E_MEMBER_VAR_DIM_AMBIGUOUS] = "Dimension definition mismatched.";
-    error->message[JAVA_E_MEMBER_VAR_DIM_DUPLICATE] = "Duplicated dimension definition.";
-    error->message[JAVA_E_MEMBER_VAR_NO_SEMICOLON] = ERR_MSG_NO_SEMICOLON;
-    error->message[JAVA_E_MEMBER_NO_TYPE] = "Expected 'type' in member declaration.";
-    error->message[JAVA_E_MEMBER_NO_NAME] = "Expected 'name' in member declaration.";
-    error->message[JAVA_E_MEMBER_AMBIGUOUS] = "Incomplete member declaration.";
-    error->message[JAVA_E_EXPRESSION_NO_OPERAND] = "Invalid expression: expected operand.";
-    error->message[JAVA_E_EXPRESSION_NO_LVALUE] = "Invalid expression: expected lvalue.";
-    error->message[JAVA_E_EXPRESSION_LITERAL_LVALUE] = "Invalid expression: literal cannot be used as lvalue.";
-    error->message[JAVA_E_NUMBER_OVERFLOW] = "Invalid number: number overflows.";
-    error->message[JAVA_E_PART_EXPONENT_OVERFLOW] = "Invalid number: exponent part overflows.";
-    error->message[JAVA_E_PART_INTEGER_OVERFLOW] = "Invalid number: too many digits.";
 }
 
 /**
  * Release Error Manager
 */
-void release_error(java_error* error)
+void release_error_stack(java_error_stack* error)
 {
-    free(error->definition);
-    free(error->message);
-    clear_error(error);
+    clear_error_stack(error);
 }
 
 /**
  * Clear Error Stack
 */
-void clear_error(java_error* error)
+void clear_error_stack(java_error_stack* error)
 {
     java_error_entry* cur = error->data;
 
@@ -113,7 +138,7 @@ void clear_error(java_error* error)
 /**
  * Get error stack state
 */
-java_error_entry* error_stack_top(java_error* error)
+java_error_entry* error_stack_top(java_error_stack* error)
 {
     return error->top;
 }
@@ -121,7 +146,7 @@ java_error_entry* error_stack_top(java_error* error)
 /**
  * Check is stack is empty
 */
-bool error_stack_empty(java_error* error)
+bool error_stack_empty(java_error_stack* error)
 {
     return error->data == NULL;
 }
@@ -129,7 +154,7 @@ bool error_stack_empty(java_error* error)
 /**
  * Stack rewind to a new top
 */
-void error_stack_rewind(java_error* error, java_error_entry* new_top)
+void error_stack_rewind(java_error_stack* error, java_error_entry* new_top)
 {
     while (error->top != new_top && error_stack_pop(error));
 }
@@ -137,7 +162,7 @@ void error_stack_rewind(java_error* error, java_error_entry* new_top)
 /**
  * Pop stack top element
 */
-bool error_stack_pop(java_error* error)
+bool error_stack_pop(java_error_stack* error)
 {
     if (error->top == NULL)
     {
@@ -164,7 +189,7 @@ bool error_stack_pop(java_error* error)
 /**
  * Push an entry to error stack
 */
-void error_stack_push(java_error* error, java_error_entry* item)
+void error_stack_push(java_error_stack* error, java_error_entry* item)
 {
     if (!item)
     {
@@ -182,6 +207,64 @@ void error_stack_push(java_error* error, java_error_entry* item)
     }
 
     error->top = item;
+}
+
+/**
+ * Merge two error stacks
+*/
+void error_stack_concat(java_error_stack* dest, java_error_stack* src)
+{
+    if (!dest || !src || !src->data)
+    {
+        return;
+    }
+
+    if (dest->data)
+    {
+        dest->top->next = src->data;
+    }
+    else
+    {
+        dest->data = src->data;
+    }
+
+    dest->top = src->top;
+    dest->num_err += src->num_err;
+    dest->num_warn += src->num_warn;
+    dest->num_info += src->num_info;
+
+    // detach
+    src->data = NULL;
+    src->top = NULL;
+}
+
+/**
+ * Delete error entry
+ *
+ * WARNING: make sure the entry is in the list, otherwise it will cause
+ * memory leak
+*/
+void error_stack_entry_delete(java_error_stack* error, java_error_entry* entry)
+{
+    if (entry->prev)
+    {
+        entry->prev->next = entry->next;
+    }
+    else
+    {
+        error->data = entry->next;
+    }
+
+    if (entry->next)
+    {
+        entry->next->prev = entry->prev;
+    }
+    else
+    {
+        error->top = entry->prev;
+    }
+
+    free(entry);
 }
 
 /**
@@ -203,7 +286,7 @@ static java_error_entry* error_new_entry(java_error_id id, size_t ln, size_t col
 /**
  * Log an error
 */
-void error_log(java_error* error, java_error_id id, size_t ln, size_t col)
+void error_log(java_error_stack* error, java_error_id id, size_t ln, size_t col)
 {
     if (!error)
     {
@@ -212,7 +295,7 @@ void error_log(java_error* error, java_error_id id, size_t ln, size_t col)
 
     error_stack_push(error, error_new_entry(id, ln, col));
 
-    switch (error->definition[id] & ERR_DEF_MASK_LEVEL)
+    switch (error->def->descriptor[id] & ERR_DEF_MASK_LEVEL)
     {
         case JEL_INFORMATION:
             error->num_info++;
@@ -231,7 +314,7 @@ void error_log(java_error* error, java_error_id id, size_t ln, size_t col)
 /**
  * count specific level
 */
-size_t error_count(java_error* error, error_definiton error_level)
+size_t error_count(java_error_stack* error, error_descriptor error_level)
 {
     switch (error_level)
     {

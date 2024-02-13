@@ -50,7 +50,7 @@ void init_parser(
     file_buffer* buffer,
     hash_table* rw,
     java_expression* expr,
-    java_error* err
+    java_error_stack* err
 )
 {
     // tokens contains garbage data if not used
@@ -83,6 +83,14 @@ void copy_parser(java_parser* from, java_parser* to)
     to->ast_root = NULL;
 
     /**
+     * error stack needs to be isolated
+     *
+     * but error definitions are still shared
+    */
+    to->error = (java_error_stack*)malloc_assert(sizeof(java_error_stack));
+    init_error_stack(to->error, from->error->def);
+
+    /**
      * file buffer state needs to be isolated
      *
      * the content buffer though does not need deep copy because
@@ -90,18 +98,22 @@ void copy_parser(java_parser* from, java_parser* to)
     */
     to->buffer = (file_buffer*)malloc_assert(sizeof(file_buffer));
     memcpy(to->buffer, from->buffer, sizeof(file_buffer));
+    to->buffer->error = to->error; // redirect error stack
 }
 
 /**
- * Swap Parser Instance
+ * Mutate Parser Instance
  *
- * Swap parser instance with a copy instance
+ * Mutate main instance with copy instance
+ * and copy instance will override the parser state
+ *
+ * NOTE: copied fields are released by calling release_parser
  *
  * WARNING: the parser instance has shallow reference of data
  * by definition, so during swap all pointer references must
  * stay the same and perform deep copy as needed
 */
-void swap_parser(java_parser* parser, java_parser* copy)
+void mutate_parser(java_parser* parser, java_parser* copy)
 {
     // lookaheads: deep copy
     memcpy(parser->tokens, copy->tokens, sizeof(java_token) * 4);
@@ -110,6 +122,9 @@ void swap_parser(java_parser* parser, java_parser* copy)
     // file buffer deep copy
     // only cur pointer is isolated, others are static so no copy
     parser->buffer->cur = copy->buffer->cur;
+
+    // error stack should be merged
+    error_stack_concat(parser->error, copy->error);
 
     // reserved words and expression data are static, so no copy
 
@@ -135,7 +150,12 @@ void release_parser(java_parser* parser, bool is_copy)
         }
 
         // a copy of instance has isolated file buffer
+        // no need to release, because only the struct is the copy
         free(parser->buffer);
+
+        // delete error stack
+        release_error_stack(parser->error);
+        free(parser->error);
     }
     else
     {
@@ -144,6 +164,8 @@ void release_parser(java_parser* parser, bool is_copy)
 }
 
 /* HELPER FUNCTIONS */
+
+typedef tree_node* (*parser_func)(java_parser*);
 
 /**
  * Parser wrapper with ambiguity resolution
@@ -157,7 +179,6 @@ void release_parser(java_parser* parser, bool is_copy)
  *
  * TODO: we probably need a clever way to propagate error messages
 */
-typedef tree_node* (*parser_func)(java_parser*);
 static tree_node* parse_binary_ambiguity(
     java_parser* parser,
     parser_func f1,
@@ -171,81 +192,90 @@ static tree_node* parse_binary_ambiguity(
     bool n2_valid = false;
 
     // copy parser instance
-    java_parser* parser_copy = (java_parser*)malloc_assert(sizeof(java_parser));
-    copy_parser(parser, parser_copy);
+    java_parser* parser_1 = (java_parser*)malloc_assert(sizeof(java_parser));
+    java_parser* parser_2 = (java_parser*)malloc_assert(sizeof(java_parser));
+    copy_parser(parser, parser_1);
+    copy_parser(parser, parser_2);
 
-    // parse
+    // parse path 1
     n1 = (*f1)(parser);
-    n2 = (*f2)(parser_copy);
+    n1_valid = parser_1->error->num_err > 0;
+
+    // parse path 2
+    n2 = (*f2)(parser_2);
+    n2_valid = parser_2->error->num_err > 0;
 
     // verify terminator and determine final validity status
-    n1_valid = n1->valid &&
+    n1_valid = n1_valid &&
         (terminator == JLT_MAX || peek_token_type_is(parser, TOKEN_PEEK_1st, terminator));
-    n2_valid = n2->valid &&
-        (terminator == JLT_MAX || peek_token_type_is(parser_copy, TOKEN_PEEK_1st, terminator));
+    n2_valid = n1_valid &&
+        (terminator == JLT_MAX || peek_token_type_is(parser_2, TOKEN_PEEK_1st, terminator));
 
-    if (n1_valid)
+    if (n1_valid && n2_valid)
     {
-        if (n2_valid)
-        {
-            // keep both
-            node = ast_node_ambiguous();
-            tree_node_add_child(node, n1);
-            tree_node_add_child(node, n2);
+        // keep both: mutate using n1
+        node = ast_node_ambiguous();
+        tree_node_add_child(node, n1);
+        tree_node_add_child(node, n2);
 
-            if (parser->buffer->cur != parser_copy->buffer->cur)
-            {
-                fprintf(stderr, "TODO error: internal error: ambiguity diverges: termination differs.\n");
-            }
-        }
-        else
+        // convergence test
+        if (parser->buffer->cur != parser_2->buffer->cur)
         {
-            // keep n1
-            node = n1;
-            tree_node_delete(n2);
+            fprintf(stderr, "TODO error: internal error: ambiguity diverges: termination differs.\n");
         }
+
+        /**
+         * when keeping both, error stack will enclose errors from both paths
+         * with special flags
+         *
+         * for convenience, parser will be mutated using n1
+        */
+
+        // first pathway
+        parser_error(parser, JAVA_E_AMBIGUITY_START);
+        node->data->ambiguity.error = error_stack_top(parser->error);
+        mutate_parser(parser, parser_1);
+
+        // second pathway
+        parser_error(parser, JAVA_E_AMBIGUITY_SEPARATOR);
+        error_stack_concat(parser->error, parser_2->error);
+        parser_error(parser, JAVA_E_AMBIGUITY_END);
     }
-    else if (n2_valid)
+    else if (n2_valid || !n2->ambiguous)
     {
-        // keep n2, need parser state swap
+        /**
+         * if n2 is valid OR
+         * n2 pathway is uniquely deducted
+         *
+         * keep n2
+        */
         node = n2;
         tree_node_delete(n1);
-        swap_parser(parser, parser_copy);
-    }
-    else if (!n1->ambiguous)
-    {
-        // no correct pathway but n1 is uniquely determined
-        // generate n1 error and keep n1
-        // TODO: retrive n1 error from node
-        node = n1;
-        tree_node_delete(n2);
-        fprintf(stderr, "TODO error: n1 error\n");
-    }
-    else if (!n2->ambiguous)
-    {
-        // no correct pathway but n2 is uniquely determined
-        // generate n2 error and keep n2
-        // TODO: retrive n2 error from node
-        node = n2;
-        tree_node_delete(n1);
-        swap_parser(parser, parser_copy);
-        fprintf(stderr, "TODO error: n2 error\n");
     }
     else
     {
-        // no correct pathway and ambiguous
-        // keep randomly and move on
-        //
-        // save n1 to save some time
-        // TODO: error message
+        /**
+         * if n1 is valid OR
+         * n1 pathway is uniquely deducted OR
+         * no correct pathway
+         *
+         * keep n1
+        */
         node = n1;
         tree_node_delete(n2);
-        fprintf(stderr, "TODO error: no correct pathway (n1 n2 ambiguous)\n");
+    }
+
+    // mutate parser accordingly
+    if (node->type != JNT_AMBIGUOUS)
+    {
+        mutate_parser(parser, node == n1 ? parser_1 : parser_2);
     }
 
     // delete parser instance copy
-    release_parser(parser_copy, true);
-    free(parser_copy);
+    release_parser(parser_1, true);
+    release_parser(parser_2, true);
+    free(parser_1);
+    free(parser_2);
 
     return node;
 }
@@ -1385,12 +1415,10 @@ static tree_node* parse_expression_statement(java_parser* parser)
     if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_SEMICOLON))
     {
         consume_token(parser, NULL);
-        node->valid = true;
     }
     else
     {
         fprintf(stderr, "TODO error: expected ';' at the end of expression statement.\n");
-        node->valid = false;
     }
 
     return node;
@@ -1412,12 +1440,10 @@ static tree_node* parse_local_variable_declaration(java_parser* parser)
     if (peek_token_class_is(parser, TOKEN_PEEK_1st, JT_IDENTIFIER))
     {
         tree_node_add_child(node, parse_variable_declarators(parser));
-        node->valid = true;
     }
     else
     {
         fprintf(stderr, "TODO error: expected variable declarator.\n");
-        node->valid = false;
     }
 
     return node;
@@ -1439,12 +1465,10 @@ static tree_node* parse_local_variable_declaration_statement(java_parser* parser
     if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_SEMICOLON))
     {
         consume_token(parser, NULL);
-        node->valid = true;
     }
     else
     {
         fprintf(stderr, "TODO error: expected ';' at the end of local variable declaration statement.\n");
-        node->valid = false;
     }
 
     return node;
@@ -2347,7 +2371,7 @@ static tree_node* parse_for_init(java_parser* parser)
     tree_node* node = ast_node_for_init();
 
     // optimization: for some cases, trigger will not cause ambiguity
-    if (peek_token_is_type_word(parser, TOKEN_PEEK_1st))
+    if (peek_token_is_primitive_type(parser, TOKEN_PEEK_1st))
     {
         // LocalVariableDeclaration
         tree_node_add_child(node, parse_local_variable_declaration(parser));
@@ -2457,7 +2481,7 @@ static tree_node* parse_type(java_parser* parser)
      * That is why we do not have 'else' clause here
      * for error check
     */
-    if (peek_token_is_type_word(parser, TOKEN_PEEK_1st))
+    if (peek_token_is_primitive_type(parser, TOKEN_PEEK_1st))
     {
         // primitive type word makes a Type uniquely produced
         node->ambiguous = false;
@@ -3343,6 +3367,9 @@ static tree_node* parse_primary(java_parser* parser)
 
     while (accepting)
     {
+        // here we buffer 2 tokens to speed up during "( Expression/Type" ambiguity resolution
+        token_peek(parser, TOKEN_PEEK_2nd);
+
         peek = peek_token_type(parser, TOKEN_PEEK_1st);
         is_separator = peek == JLT_SYM_DOT || peek == JLT_SYM_METHOD_REFERENCE;
 
@@ -3371,12 +3398,18 @@ static tree_node* parse_primary(java_parser* parser)
 
                 // (
                 consume_token(parser, NULL);
+                peek = peek_token_type(parser, TOKEN_PEEK_1st);
 
                 // optimization: for some cases, trigger will not cause ambiguity
-                if (peek_token_is_type_word(parser, TOKEN_PEEK_1st))
+                if (is_lexeme_primitive_type(peek))
                 {
                     // Type
                     tree_node_add_child(node, parse_type(parser));
+                }
+                else if (is_lexeme_literal(peek))
+                {
+                    // Expression
+                    tree_node_add_child(node, parse_expression(parser));
                 }
                 else
                 {

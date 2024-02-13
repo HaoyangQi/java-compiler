@@ -30,13 +30,16 @@ bool init_compiler(compiler* compiler)
 {
     compiler->version = 1;
 
-    // special global instance
-    init_error(&compiler->error);
-
-    init_file_buffer(&compiler->reader, &compiler->error);
+    // static data: init only once
     init_symbol_table(&compiler->rw_lookup_table);
     init_expression(&compiler->expression);
+    init_error_definition(&compiler->err_def);
 
+    // high-priority instance
+    init_error_stack(&compiler->error, &compiler->err_def);
+
+    // compiler framework
+    init_file_buffer(&compiler->reader, &compiler->error);
     init_parser(
         &compiler->context,
         &compiler->reader,
@@ -44,7 +47,6 @@ bool init_compiler(compiler* compiler)
         &compiler->expression,
         &compiler->error
     );
-
     init_ir(&compiler->ir, &compiler->expression, &compiler->error);
 
     return true;
@@ -58,7 +60,8 @@ void release_compiler(compiler* compiler)
     release_file_buffer(&compiler->reader);
     release_symbol_table(&compiler->rw_lookup_table);
     release_expression(&compiler->expression);
-    release_error(&compiler->error);
+    release_error_definition(&compiler->err_def);
+    release_error_stack(&compiler->error);
     release_parser(&compiler->context, false);
     release_ir(&compiler->ir);
 }
@@ -69,7 +72,7 @@ void release_compiler(compiler* compiler)
 void detask_compiler(compiler* compiler)
 {
     release_file_buffer(&compiler->reader);
-    clear_error(&compiler->error);
+    clear_error_stack(&compiler->error);
     release_parser(&compiler->context, false);
     release_ir(&compiler->ir);
 }
@@ -129,6 +132,12 @@ bool compile(compiler* compiler, architecture* arch, char* source_path)
         return false;
     }
 
+    /**
+     * TODO:
+     * also: before we return, we need to check if error stack
+     * has ambiguity left. if so, then it is an error
+    */
+
     return true;
 }
 
@@ -149,13 +158,13 @@ void compiler_error_format_print(compiler* compiler)
     // <file name>:<ln>:<col>: <error level> <error code>: 
     static char* msg_header_full = "%s:%zd:%zd: %s %s%04d: ";
 
-    java_error* error = &compiler->error;
+    java_error_stack* error = &compiler->error;
     java_error_entry* cur = error->data;
-    error_definiton def, level, scope;
+    error_descriptor def, level, scope;
 
     while (cur)
     {
-        def = error->definition[cur->id];
+        def = error->def->descriptor[cur->id];
         level = def & ERR_DEF_MASK_LEVEL;
         scope = def & ERR_DEF_MASK_SCOPE;
 
@@ -202,10 +211,10 @@ void compiler_error_format_print(compiler* compiler)
         {
             case JAVA_E_FILE_OPEN_FAILED:
             case JAVA_E_FILE_SIZE_NOT_MATCH:
-                fprintf(stderr, error->message[cur->id], compiler->source_file_name);
+                fprintf(stderr, error->def->message[cur->id], compiler->source_file_name);
                 break;
             default:
-                fprintf(stderr, error->message[cur->id]);
+                fprintf(stderr, error->def->message[cur->id]);
                 break;
         }
 

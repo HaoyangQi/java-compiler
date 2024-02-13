@@ -752,6 +752,9 @@ tree_node* ast_node_ambiguous()
 {
     tree_node* node = ast_node_new(JNT_AMBIGUOUS);
 
+    node->data = ast_node_data_new();
+    node->data->ambiguity.error = NULL;
+
     return node;
 }
 
