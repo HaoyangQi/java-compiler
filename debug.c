@@ -1209,11 +1209,13 @@ static void debug_print_definition(definition* v)
             printf("import");
             break;
         case JNT_CLASS_DECL:
-            printf("class ");
-            debug_print_modifier_bit_flag(v->class.modifier);
+            printf("class");
             break;
         case JNT_VAR_DECL:
             printf("def %s", v->variable.is_class_member ? "member var" : "var");
+            break;
+        case JNT_METHOD_DECL:
+            printf("def method");
             break;
         default:
             // no-op
@@ -1228,6 +1230,8 @@ static void debug_print_definition(definition* v)
             printf(" FROM %s\n", v->import.package_name);
             break;
         case JNT_CLASS_DECL:
+            printf(" Access: ");
+            debug_print_modifier_bit_flag(v->class.modifier);
             if (v->class.extend)
             {
                 printf(" extends %s", v->class.extend);
@@ -1249,6 +1253,20 @@ static void debug_print_definition(definition* v)
             else
             {
                 printf("%s", v->variable.type.reference);
+            }
+            printf("\n");
+            break;
+        case JNT_METHOD_DECL:
+            printf(" Access: ");
+            debug_print_modifier_bit_flag(v->method.modifier);
+            printf(", Return: ");
+            if (v->method.return_type.primitive != JLT_MAX)
+            {
+                debug_print_lexeme_type(v->method.return_type.primitive);
+            }
+            else
+            {
+                printf("%s", v->method.return_type.reference);
             }
             printf("\n");
             break;
@@ -1315,6 +1333,9 @@ void debug_ir_lookup(java_ir* ir)
                 break;
             case LST_INTERFACE:
                 printf("Interface Scope\n");
+                break;
+            case LST_METHOD:
+                printf("Method Scope\n");
                 break;
             case LST_NONE:
                 printf("Scope\n");

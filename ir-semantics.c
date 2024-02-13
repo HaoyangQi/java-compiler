@@ -92,6 +92,166 @@ static char* __name_unit_concat(tree_node* from, tree_node* stop_before)
 }
 
 /**
+ * interpret "type"
+ *
+ * it returns a definition regarding the type
+ * modifier is optional, pass 0 by default
+ *
+ * TODO: pass 0 into it is incorrect, default access
+ * could be "package-private", which needs to be modelled
+ *
+ * node: JNT_TYPE
+*/
+static definition* type2def(
+    tree_node* node,
+    java_node_query type,
+    lbit_flag modifier,
+    bool is_member
+)
+{
+    definition* desc = new_definition(type);
+
+    switch (type)
+    {
+        case JNT_VAR_DECL:
+            desc->variable.is_class_member = is_member;
+            desc->variable.modifier = modifier;
+            desc->variable.type.primitive = node->data->declarator.id.simple;
+            desc->variable.type.dim = node->data->declarator.dimension;
+
+            // if not primitive type, then it must be a reference type
+            if (desc->variable.type.primitive == JLT_MAX)
+            {
+                // type->class_type->unit
+                desc->variable.type.reference = __name_unit_concat(node->first_child->first_child, NULL);
+            }
+            break;
+        case JNT_METHOD_DECL:
+            desc->method.modifier = modifier;
+            desc->method.return_type.primitive = node->data->declarator.id.simple;
+            desc->method.return_type.dim = node->data->declarator.dimension;
+
+            // if not primitive type, then it must be a reference type
+            if (desc->method.return_type.primitive == JLT_MAX)
+            {
+                // type->class_type->unit
+                desc->method.return_type.reference = __name_unit_concat(node->first_child->first_child, NULL);
+            }
+            break;
+        default:
+            break;
+    }
+
+    return desc;
+}
+
+/**
+ * register a member variable in lookup table
+ *
+ * node: JNT_TYPE---JNT_VAR_DECLARATORS
+*/
+static void def_member_var(java_ir* ir, tree_node* node, lbit_flag modifier)
+{
+    definition* desc = type2def(
+        node,
+        JNT_VAR_DECL,
+        modifier,
+        true
+    );
+
+    /**
+     * type
+     * |
+     * variable declarators
+     * |
+     * +--- declarator 1
+     * |    |
+     * |    +--- expr
+     * |
+     * +--- declarator 2
+     * |    |
+     * |    +--- expr
+     * |
+     * +--- ...
+    */
+    node = node->next_sibling->first_child;
+
+    // register, every id has same type
+    while (node)
+    {
+        char* name = t2s(node->data->declarator.id.complex);
+
+        def(
+            ir, &name, &desc,
+            node->data->declarator.dimension,
+            DU_CTL_DATA_COPY | DU_CTL_LOOKUP_GLOBAL,
+            JAVA_E_MEMBER_VAR_DUPLICATE,
+            JAVA_E_MEMBER_VAR_DIM_AMBIGUOUS,
+            JAVA_E_MEMBER_VAR_DIM_DUPLICATE
+        );
+
+        // if succeeds, name is NULL here so it is safe
+        free(name);
+
+        node = node->next_sibling;
+    }
+
+    // cleanup
+    definition_delete(desc);
+}
+
+/**
+ * register a method in lookup table
+ *
+ * TODO: method overloadiing
+ * we need name mangling algorithm to encode parameter types into name string
+ *
+ * node: JNT_TYPE---JNT_METHOD_DECL
+*/
+static void def_method(java_ir* ir, tree_node* node, lbit_flag modifier)
+{
+    definition* desc = type2def(
+        node,
+        JNT_METHOD_DECL,
+        modifier,
+        true
+    );
+
+    /**
+     * type
+     * |
+     * method declaration
+     * |
+     * +--- header
+     * |    |
+     * |    +--- param list
+     * |         |
+     * |         +--- param 1
+     * |         +--- ...
+     * |
+     * +--- body
+    */
+    node = node->next_sibling->first_child;
+
+    // get name
+    char* name = t2s(node->data->declarator.id.complex);
+
+    // register
+    def(
+        ir, &name, &desc,
+        node->data->declarator.dimension,
+        DU_CTL_LOOKUP_GLOBAL,
+        JAVA_E_MEMBER_VAR_DUPLICATE,
+        JAVA_E_MEMBER_VAR_DIM_AMBIGUOUS,
+        JAVA_E_MEMBER_VAR_DIM_DUPLICATE
+    );
+
+    // cleanup
+    free(name);
+    definition_delete(desc);
+}
+
+/**
  * contextualize "import"
  *
  * import goes into global scope
@@ -232,47 +392,16 @@ static void ctx_class(java_ir* ir, tree_node* node)
             /**
              * Type as starter, it can be method/variable declarator
             */
-
-            if (declaration->next_sibling->type == JNT_VAR_DECLARATORS)
+            switch (declaration->next_sibling->type)
             {
-                desc = new_definition(JNT_VAR_DECL);
-
-                desc->variable.is_class_member = true;
-                desc->variable.modifier = part->data->top_level_declaration.modifier;
-                desc->variable.type.primitive = declaration->data->declarator.id.simple;
-                desc->variable.type.dim = declaration->data->declarator.dimension;
-
-                // if not primitive type, then it must be a reference type
-                if (desc->variable.type.primitive == JLT_MAX)
-                {
-                    // type->class_type->unit
-                    desc->variable.type.reference = __name_unit_concat(declaration->first_child->first_child, NULL);
-                }
-
-                // variable declarators -> [var, var, ...]
-                declaration = declaration->next_sibling->first_child;
-
-                // register, every id has same type
-                while (declaration)
-                {
-                    def(
-                        ir, desc, declaration,
-                        JAVA_E_MEMBER_VAR_DUPLICATE,
-                        JAVA_E_MEMBER_VAR_DIM_AMBIGUOUS,
-                        JAVA_E_MEMBER_VAR_DIM_DUPLICATE
-                    );
-
-                    declaration = declaration->next_sibling;
-                }
-
-                // cleanup
-                definition_delete(desc);
-            }
-            else if (declaration->next_sibling->type == JNT_METHOD_DECL)
-            {
-                /**
-                 * TODO: method declarator
-                */
+                case JNT_VAR_DECLARATORS:
+                    def_member_var(ir, declaration, part->data->top_level_declaration.modifier);
+                    break;
+                case JNT_METHOD_DECL:
+                    def_method(ir, declaration, part->data->top_level_declaration.modifier);
+                    break;
+                default:
+                    break;
             }
         }
 

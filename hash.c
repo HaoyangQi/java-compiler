@@ -13,7 +13,7 @@
  * Hash function (djb2)
  * http://www.cse.yorku.ca/~oz/hash.html
  */
-uint32_t hash_djb2(void* stream, size_t len)
+uint32_t hash_djb2(const void* stream, size_t len)
 {
     const char* buf = (const char*)stream;
     uint32_t hash = 5381;
@@ -30,7 +30,7 @@ uint32_t hash_djb2(void* stream, size_t len)
  * Hash function (sdbm)
  * http://www.cse.yorku.ca/~oz/hash.html
  */
-uint32_t hash_sdbm(void* stream, size_t len)
+uint32_t hash_sdbm(const void* stream, size_t len)
 {
     const char* buf = (const char*)stream;
     uint32_t hash = 0;
@@ -47,7 +47,7 @@ uint32_t hash_sdbm(void* stream, size_t len)
  * Jenkins OAAT (One-At-A-Time) Hash
  * https://en.wikipedia.org/wiki/Jenkins_hash_function
 */
-uint32_t hash_jenkins(void* stream, size_t len)
+uint32_t hash_jenkins(const void* stream, size_t len)
 {
     const char* buf = (const char*)stream;
     uint32_t hash = 0;
@@ -72,7 +72,7 @@ uint32_t hash_jenkins(void* stream, size_t len)
  * Algorithm from GCC library:
  * https://github.com/gcc-mirror/gcc/blob/master/libstdc%2B%2B-v3/libsupc%2B%2B/hash_bytes.cc#L74
 */
-uint32_t hash_murmur32(void* stream, uint32_t len, uint32_t seed)
+uint32_t hash_murmur32(const void* stream, uint32_t len, uint32_t seed)
 {
     const uint32_t m = 0x5bd1e995;
     uint32_t hash = seed ^ len;
@@ -133,7 +133,7 @@ static uint64_t murmur64_shift_scramble(uint64_t v)
  * Algorithm from GCC library:
  * https://github.com/gcc-mirror/gcc/blob/master/libstdc%2B%2B-v3/libsupc%2B%2B/hash_bytes.cc#L138
 */
-uint64_t hash_murmur64(void* stream, uint64_t len, uint64_t seed)
+uint64_t hash_murmur64(const void* stream, uint64_t len, uint64_t seed)
 {
     static const uint64_t mul = (((uint64_t)0xc6a4a793UL) << 32UL) + (uint64_t)0x5bd1e995UL;
     const char* const buf = (const char*)stream;
@@ -183,7 +183,7 @@ uint64_t hash_murmur64(void* stream, uint64_t len, uint64_t seed)
 
 static unsigned long __hash_seed = 0xc70f6907UL;
 
-hash shash(char* str)
+hash shash(const char* str)
 {
 #ifdef COMPILER_32
     return hash_murmur32(str, strlen(str), (uint32_t)__hash_seed);
@@ -192,7 +192,7 @@ hash shash(char* str)
 #endif
 }
 
-hash bhash(void* bytes, bytes_length len)
+hash bhash(const void* bytes, bytes_length len)
 {
 #ifdef COMPILER_32
     return hash_murmur32(bytes, len, (uint32_t)__hash_seed);

@@ -16,6 +16,28 @@
 #define HT_STR2DEF(t, s) ((definition*)shash_table_find(t, s))
 
 /**
+ * def/use control bit flags
+ *
+ * from LSB:
+ * -----+
+ *  bit |
+ * -----+
+ *   1  | copy data (default move)
+ *   2  | lookup global scope (default no global lookup)
+ *   3  |
+ *   4  |
+ *   5  |
+ *   6  |
+ *   7  |
+ *   8  |
+*/
+typedef unsigned char def_use_control;
+
+#define DU_CTL_DEFAULT (0)
+#define DU_CTL_DATA_COPY (0x01)
+#define DU_CTL_LOOKUP_GLOBAL (0x02)
+
+/**
  * Primitive Value Bit Size
 */
 
@@ -31,6 +53,7 @@ typedef enum
     LST_COMPILATION_UNIT,
     LST_CLASS,
     LST_INTERFACE,
+    LST_METHOD,
     LST_NONE, // just a scope, no header
     LST_IF,
     LST_ELSE,
@@ -154,8 +177,6 @@ typedef struct _definition
             lbit_flag modifier;
             // type
             type_name type;
-            // current version
-            size_t version;
         } variable;
 
         struct
@@ -367,13 +388,20 @@ bool lookup_register(
 );
 bool def(
     java_ir* ir,
-    definition* type_def,
-    tree_node* declarator,
+    char** name,
+    definition** type_def,
+    size_t name_dims,
+    def_use_control duc,
     java_error_id err_dup,
     java_error_id err_dim_amb,
     java_error_id err_dim_dup
 );
-definition* use(java_ir* ir, tree_node* declarator, java_error_id err_undef);
+definition* use(
+    java_ir* ir,
+    const char* name,
+    def_use_control duc,
+    java_error_id err_undef
+);
 definition* def_li(java_ir* ir, java_token* token);
 
 definition* new_definition(java_node_query type);
@@ -398,7 +426,7 @@ bool instruction_push_back(basic_block* node, instruction* inst);
 bool instruction_push_front(basic_block* node, instruction* inst);
 
 void walk_expression(java_ir* ir, cfg* g, tree_node* expression);
-void walk_block(java_ir* ir, cfg* g, tree_node* block);
+void walk_block(java_ir* ir, cfg* g, tree_node* block, bool use_new_scope);
 
 void init_ir(java_ir* ir, java_expression* expression, java_error_stack* error);
 void release_ir(java_ir* ir);

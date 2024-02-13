@@ -141,11 +141,7 @@ bool lookup_register(
 {
     if (shash_table_test(table, name))
     {
-        if (err != JAVA_E_MAX)
-        {
-            ir_error(ir, err);
-        }
-
+        ir_error(ir, err);
         definition_delete(desc);
         return false;
     }
@@ -180,7 +176,6 @@ definition* new_definition(java_node_query type)
         case JNT_VAR_DECL:
             v->variable.is_class_member = false;
             v->variable.modifier = 0;
-            v->variable.version = 0;
             __init_type_name(&v->variable.type);
             break;
         case JNT_METHOD_DECL:
@@ -195,7 +190,7 @@ definition* new_definition(java_node_query type)
 }
 
 /**
- * im-place concatenate two definition chain
+ * in-place concatenate two definition chain
 */
 void definition_concat(definition* dest, definition* src)
 {
@@ -314,30 +309,59 @@ definition* definition_copy(definition* v)
 /**
  * hierarchical name register routine
  *
- * NOTE: type_def will be copied to table
+ * if name has conflict, funtions ignores def_data_control
+ * and keeps type_def as-is;
+ * otherwise type_def will be set to NULL if data control is
+ * DEF_DATA_MOVE
+ *
+ * name will be set to NULL if successful; stay as-is otherwise
  *
  * node: variable declarator
 */
 bool def(
     java_ir* ir,
-    definition* type_def,
-    tree_node* declarator,
+    char** name,
+    definition** type_def,
+    size_t name_dims,
+    def_use_control duc,
     java_error_id err_dup,
     java_error_id err_dim_amb,
     java_error_id err_dim_dup
 )
 {
-    // test if exists
-    bool success = use(ir, declarator, JAVA_E_MAX) == NULL;
     hash_table* table = lookup_working_scope(ir);
+    char* n = *name;
+    bool copy_def = duc & DU_CTL_DATA_COPY;
+    definition* tdef = copy_def ? definition_copy(*type_def) : *type_def;
 
+    // test if exists
+    bool success = use(ir, n, duc, JAVA_E_MAX) == NULL;
+
+    // test if declarator can be registered
     if (success)
     {
-        shash_table_insert(table, t2s(declarator->data->declarator.id.complex), definition_copy(type_def));
+        // we always move name, so no need to free if successful
+        shash_table_insert(table, n, tdef);
+
+        // we always move name, so simply detach
+        *name = NULL;
+
+        // only detach if the reference is moved successfully
+        if (!copy_def)
+        {
+            *type_def = NULL;
+        }
     }
     else
     {
         ir_error(ir, err_dup);
+
+        // we do not know if rejected moved data will be reused
+        // but copied data can, and should be deleted on failure 
+        if (copy_def)
+        {
+            definition_delete(tdef);
+        }
     }
 
     /**
@@ -350,9 +374,9 @@ bool def(
      * but not both, so if dimension matches, warning will be issued;
      * otherwise it is an error
     */
-    if (declarator->data->declarator.dimension > 0)
+    if (name_dims > 0)
     {
-        if (type_def->variable.type.dim != declarator->data->declarator.dimension)
+        if (tdef->variable.type.dim != name_dims)
         {
             ir_error(ir, err_dim_amb);
         }
@@ -374,11 +398,10 @@ bool def(
  *
  * node: variable declarator
 */
-definition* use(java_ir* ir, tree_node* declarator, java_error_id err_undef)
+definition* use(java_ir* ir, const char* name, def_use_control duc, java_error_id err_undef)
 {
     scope_frame* cur = ir->scope_stack_top;
     hash_pair* p;
-    char* name = t2s(declarator->data->declarator.id.complex);
 
     // first we go through hierarchy
     while (cur)
@@ -394,19 +417,15 @@ definition* use(java_ir* ir, tree_node* declarator, java_error_id err_undef)
     }
 
     // if nothing we try global
-    p = shash_table_get(&ir->tbl_global, name);
-
-    // cleanup
-    free(name);
+    if (duc & DU_CTL_LOOKUP_GLOBAL)
+    {
+        p = shash_table_get(&ir->tbl_global, name);
+    }
 
     // error check
     if (!p)
     {
-        if (err_undef != JAVA_E_MAX)
-        {
-            ir_error(ir, err_undef);
-        }
-
+        ir_error(ir, err_undef);
         return NULL;
     }
 
