@@ -80,3 +80,26 @@ definition* t2d(hash_table* table, java_token* token)
 
     return def;
 }
+
+/**
+ * name unit concatenation routine
+*/
+char* name_unit_concat(tree_node* from, tree_node* stop_before)
+{
+    string_list sl;
+    char* s;
+
+    // construct package name list
+    init_string_list(&sl);
+    while (from != stop_before)
+    {
+        string_list_append(&sl, t2s(from->data->id.complex));
+        from = from->next_sibling;
+    }
+
+    // now we concat the package name
+    s = string_list_concat(&sl, ".");
+    release_string_list(&sl);
+
+    return s;
+}

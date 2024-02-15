@@ -127,27 +127,33 @@ static void __init_type_name(type_name* t)
 /**
  * name lookup register
  *
+ * do NOT use this method if you are not sure which table to use
+ *
  * when passing error code JAVA_E_MAX, no error will be logged
  *
- * NOTE: if failed, desc will be deleted
+ * NOTE: if failed, name and desc will stay as-is
 */
 bool lookup_register(
     java_ir* ir,
     hash_table* table,
-    char* name,
-    definition* desc,
+    char** name,
+    definition** desc,
     java_error_id err
 )
 {
-    if (shash_table_test(table, name))
+    if (shash_table_test(table, *name))
     {
         ir_error(ir, err);
-        definition_delete(desc);
         return false;
     }
     else
     {
-        shash_table_insert(table, name, desc);
+        shash_table_insert(table, *name, *desc);
+
+        // detach
+        *name = NULL;
+        *desc = NULL;
+
         return true;
     }
 }
@@ -337,177 +343,4 @@ bool is_definition_valid(const definition* d)
         default:
             return false;
     }
-}
-
-/**
- * hierarchical name register routine
- *
- * if name has conflict, funtions ignores def_data_control
- * and keeps type_def as-is;
- * otherwise type_def will be set to NULL if data control is
- * DEF_DATA_MOVE
- *
- * name will be set to NULL if successful; stay as-is otherwise
- *
- * node: variable declarator
-*/
-bool def(
-    java_ir* ir,
-    char** name,
-    definition** type_def,
-    size_t name_dims,
-    def_use_control duc,
-    java_error_id err_dup,
-    java_error_id err_dim_amb,
-    java_error_id err_dim_dup
-)
-{
-    hash_table* table = lookup_working_scope(ir);
-    char* n = *name;
-    bool copy_def = duc & DU_CTL_DATA_COPY;
-    definition* tdef = copy_def ? definition_copy(*type_def) : *type_def;
-
-    // test if exists
-    bool success = use(ir, n, duc, JAVA_E_MAX) == NULL;
-
-    // test if declarator can be registered
-    if (success)
-    {
-        // we always move name, so no need to free if successful
-        shash_table_insert(table, n, tdef);
-
-        // we always move name, so simply detach
-        *name = NULL;
-
-        // only detach if the reference is moved successfully
-        if (!copy_def)
-        {
-            *type_def = NULL;
-        }
-    }
-    else
-    {
-        ir_error(ir, err_dup);
-
-        // we do not know if rejected moved data will be reused
-        // but copied data can, and should be deleted on failure 
-        if (copy_def)
-        {
-            definition_delete(tdef);
-        }
-    }
-
-    /**
-     * dimension check
-     *
-     * Java allows any of the array declaration form:
-     * 1. Type[] Name;
-     * 2. Type Name[];
-     *
-     * but not both, so if dimension matches, warning will be issued;
-     * otherwise it is an error
-    */
-    if (name_dims > 0)
-    {
-        if (tdef->variable.type.dim != name_dims)
-        {
-            ir_error(ir, err_dim_amb);
-        }
-        else
-        {
-            ir_error(ir, err_dim_dup);
-        }
-    }
-
-    return success;
-}
-
-/**
- * hierarchical name lookup routine
- *
- * NOTE: on-demand imports are not checked here, meaning definitions
- * are prioritized local definitions, and during linking, names
- * will be imported and check for ambiguity
- *
- * node: variable declarator
-*/
-definition* use(java_ir* ir, const char* name, def_use_control duc, java_error_id err_undef)
-{
-    scope_frame* cur = ir->scope_stack_top;
-    hash_pair* p;
-
-    // first we go through hierarchy
-    while (cur)
-    {
-        p = shash_table_get(cur->table, name);
-
-        if (p)
-        {
-            return p->value;
-        }
-
-        cur = cur->next;
-    }
-
-    // if nothing we try global
-    if (duc & DU_CTL_LOOKUP_GLOBAL)
-    {
-        p = shash_table_get(&ir->tbl_global, name);
-    }
-
-    // error check
-    if (!p)
-    {
-        ir_error(ir, err_undef);
-        return NULL;
-    }
-
-    return p->value;
-}
-
-/**
- * generate definition for literal
- *
- * if token is not literal, funtion is no-op and NULL is returned
- *
- * TODO: other literals
- * for string literals, we probably need string->definition map
- * and definition reference back to the key string,
- * because we need definition object in instruction
-*/
-definition* def_li(java_ir* ir, java_token* token)
-{
-    definition* v = NULL;
-    char* content = NULL;
-    hash_pair* pair = NULL;
-
-    if (token->type == JLT_LTR_NUMBER)
-    {
-        // get the literal
-        uint64_t __n;
-        primitive __p = t2p(ir, token, &__n);
-
-        // lookup
-        content = t2s(token);
-        pair = shash_table_get(&ir->tbl_literal, content);
-
-        // if key exists, we use; otherwise create
-        if (pair)
-        {
-            v = pair->value;
-        }
-        else
-        {
-            // number literal definition
-            v = new_definition(JNT_PRIMARY_COMPLEX);
-            v->li_type = JLT_LTR_NUMBER;
-            v->next = NULL;
-            v->li_number.type = __p;
-            v->li_number.imm = __n;
-
-            shash_table_insert(&ir->tbl_literal, content, v);
-        }
-    }
-
-    return v;
 }
