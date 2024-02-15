@@ -246,7 +246,20 @@ typedef enum
 /**
  * CFG Entry Point
  *
- * CFG is always one-way-in, one-way-out
+ * CFG is always one-way-in, but multi-way-out
+ *
+ * why multi-way-out? think about how we use "return" statement
+ * how to determine one-way-in? what about traverse and find the
+ * one without inbound edges?
+ *
+ * well... it will not work: e.g. a loop
+ *        +--->A
+ *        |   / \
+ *        +--B   C
+ *
+ * so, we do that manually, and chronologically
+ * that is: the very first node we created during parsing, IS the
+ * entry node we want to have
  *
  * nodes and edges are managed here as the source of all references
  * and as the aid for deletion process
@@ -370,6 +383,7 @@ typedef struct
 char* t2s(java_token* token);
 definition* t2d(hash_table* table, java_token* token);
 primitive t2p(java_ir* ir, java_token* t, uint64_t* n);
+char* name_unit_concat(tree_node* from, tree_node* stop_before);
 
 void lookup_scope_deleter(char* k, definition* v);
 hash_table* lookup_new_scope(java_ir* ir, lookup_scope_type type);
@@ -380,10 +394,11 @@ hash_table* lookup_top_scope(java_ir* ir);
 bool lookup_register(
     java_ir* ir,
     hash_table* table,
-    char* name,
-    definition* desc,
+    char** name,
+    definition** desc,
     java_error_id err
 );
+
 bool def(
     java_ir* ir,
     char** name,
@@ -401,6 +416,16 @@ definition* use(
     java_error_id err_undef
 );
 definition* def_li(java_ir* ir, java_token* token);
+definition* type2def(
+    tree_node* node,
+    java_node_query type,
+    lbit_flag modifier,
+    bool is_member
+);
+void def_var(java_ir* ir, tree_node* node, lbit_flag modifier, bool is_member);
+void def_params(java_ir* ir, tree_node* node);
+void def_method(java_ir* ir, tree_node* node, lbit_flag modifier);
+void def_class(java_ir* ir, tree_node* node);
 
 definition* new_definition(java_node_query type);
 void definition_concat(definition* dest, definition* src);
