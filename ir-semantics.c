@@ -95,10 +95,7 @@ static char* __name_unit_concat(tree_node* from, tree_node* stop_before)
  * interpret "type"
  *
  * it returns a definition regarding the type
- * modifier is optional, pass 0 by default
- *
- * TODO: pass 0 into it is incorrect, default access
- * could be "package-private", which needs to be modelled
+ * modifier is optional, pass JLT_UNDEFINED
  *
  * node: JNT_TYPE
 */
@@ -146,18 +143,13 @@ static definition* type2def(
 }
 
 /**
- * register a member variable in lookup table
+ * register a variable in lookup table
  *
  * node: JNT_TYPE---JNT_VAR_DECLARATORS
 */
-static void def_member_var(java_ir* ir, tree_node* node, lbit_flag modifier)
+static void def_var(java_ir* ir, tree_node* node, lbit_flag modifier, bool is_member)
 {
-    definition* desc = type2def(
-        node,
-        JNT_VAR_DECL,
-        modifier,
-        true
-    );
+    definition* desc = type2def(node, JNT_VAR_DECL, modifier, is_member);
 
     /**
      * type
@@ -185,9 +177,9 @@ static void def_member_var(java_ir* ir, tree_node* node, lbit_flag modifier)
             ir, &name, &desc,
             node->data->declarator.dimension,
             DU_CTL_DATA_COPY | DU_CTL_LOOKUP_GLOBAL,
-            JAVA_E_MEMBER_VAR_DUPLICATE,
-            JAVA_E_MEMBER_VAR_DIM_AMBIGUOUS,
-            JAVA_E_MEMBER_VAR_DIM_DUPLICATE
+            is_member ? JAVA_E_MEMBER_VAR_DUPLICATE : JAVA_E_LOCAL_VAR_DUPLICATE,
+            is_member ? JAVA_E_MEMBER_VAR_DIM_AMBIGUOUS : JAVA_E_LOCAL_VAR_DIM_AMBIGUOUS,
+            is_member ? JAVA_E_MEMBER_VAR_DIM_DUPLICATE : JAVA_E_LOCAL_VAR_DIM_DUPLICATE
         );
 
         // if succeeds, name is NULL here so it is safe
@@ -198,6 +190,60 @@ static void def_member_var(java_ir* ir, tree_node* node, lbit_flag modifier)
 
     // cleanup
     definition_delete(desc);
+}
+
+/**
+ * register a variable in lookup table
+ *
+ * node: JNT_FORMAL_PARAM_LIST
+*/
+static void def_params(java_ir* ir, tree_node* node)
+{
+    if (!node)
+    {
+        return;
+    }
+
+    /**
+     * JNT_FORMAL_PARAM_LIST
+     * |
+     * +--- JNT_FORMAL_PARAM
+     * |    |
+     * |    +--- Type
+     * |
+     * +--- JNT_FORMAL_PARAM
+     * |    |
+     * |    +--- Type
+     * |
+     * +--- ...
+    */
+    node = node->first_child;
+
+    while (node)
+    {
+        definition* desc = type2def(node->first_child, JNT_VAR_DECL, JLT_UNDEFINED, false);
+        char* name = t2s(node->data->declarator.id.complex);
+
+        /**
+         * 1. move name and desc
+         * 2. do NOT lookup global scope: parameter name is scoped so it can co-exist
+         *    with class member with same name
+        */
+        def(
+            ir, &name, &desc,
+            node->data->declarator.dimension,
+            DU_CTL_DEFAULT,
+            JAVA_E_PARAM_DUPLICATE,
+            JAVA_E_PARAM_DIM_AMBIGUOUS,
+            JAVA_E_PARAM_DUPLICATE
+        );
+
+        // cleanup
+        free(name);
+        definition_delete(desc);
+
+        node = node->next_sibling;
+    }
 }
 
 /**
@@ -241,9 +287,9 @@ static void def_method(java_ir* ir, tree_node* node, lbit_flag modifier)
         ir, &name, &desc,
         node->data->declarator.dimension,
         DU_CTL_LOOKUP_GLOBAL,
-        JAVA_E_MEMBER_VAR_DUPLICATE,
-        JAVA_E_MEMBER_VAR_DIM_AMBIGUOUS,
-        JAVA_E_MEMBER_VAR_DIM_DUPLICATE
+        JAVA_E_METHOD_DUPLICATE,
+        JAVA_E_METHOD_DIM_AMBIGUOUS,
+        JAVA_E_METHOD_DIM_DUPLICATE
     );
 
     // cleanup
@@ -320,6 +366,11 @@ static void ctx_import(java_ir* ir, tree_node* node)
  * because we flush top-level one by one and class/interface will serve
  * as global by default
  *
+ * this is a 2-pass parsing logic, because use of top level members does
+ * not obey "def before use" rule; and since all definitions (including
+ * local variables) will be flushed into global scope, so it is not safe
+ * to use a dummy definition first then fill when reaching the def
+ *
  * node: top level
 */
 static void ctx_class(java_ir* ir, tree_node* node)
@@ -395,7 +446,7 @@ static void ctx_class(java_ir* ir, tree_node* node)
             switch (declaration->next_sibling->type)
             {
                 case JNT_VAR_DECLARATORS:
-                    def_member_var(ir, declaration, part->data->top_level_declaration.modifier);
+                    def_var(ir, declaration, part->data->top_level_declaration.modifier, true);
                     break;
                 case JNT_METHOD_DECL:
                     def_method(ir, declaration, part->data->top_level_declaration.modifier);
@@ -450,6 +501,7 @@ static void ctx_class(java_ir* ir, tree_node* node)
                 {
                     if (declaration->type == JNT_EXPRESSION)
                     {
+                        // top-level defs do not have order
                         walk_expression(ir, &ir->code_member_init, declaration);
                     }
                     else if (declaration->type == JNT_ARRAY_INIT)
@@ -463,8 +515,35 @@ static void ctx_class(java_ir* ir, tree_node* node)
             else if (declaration->next_sibling->type == JNT_METHOD_DECL)
             {
                 /**
-                 * TODO: method
+                 * type
+                 * |
+                 * method declaration
+                 * |
+                 * +--- header              <--- HERE
+                 * |    |
+                 * |    +--- param list
+                 * |         |
+                 * |         +--- param 1
+                 * |         +--- ...
+                 * |
+                 * +--- body
                 */
+                declaration = declaration->next_sibling->first_child;
+
+                // begin scope
+                hash_table* method_scope = lookup_new_scope(ir, LST_METHOD);
+
+                // on method, we only have global to lookup so no need to call use()
+                desc = t2d(table, declaration->data->declarator.id.complex);
+
+                // fill all parameter declarations
+                def_params(ir, declaration->first_child);
+
+                // parse body
+                walk_block(ir, &desc->method.code, declaration->next_sibling, false);
+
+                // we need to keep all definitions active
+                lookup_pop_scope(ir, true);
             }
         }
 

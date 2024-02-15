@@ -24,22 +24,18 @@
  * -----+
  *   1  | copy data (default move)
  *   2  | lookup global scope (default no global lookup)
- *   3  |
- *   4  |
- *   5  |
- *   6  |
- *   7  |
- *   8  |
+ *   3  | reserved
+ *   4  | reserved
+ *   5  | reserved
+ *   6  | reserved
+ *   7  | reserved
+ *   8  | reserved
 */
 typedef unsigned char def_use_control;
 
 #define DU_CTL_DEFAULT (0)
 #define DU_CTL_DATA_COPY (0x01)
 #define DU_CTL_LOOKUP_GLOBAL (0x02)
-
-/**
- * Primitive Value Bit Size
-*/
 
 /**
  * scope type
@@ -127,75 +123,6 @@ typedef enum
 
     IRPV_MAX,
 } primitive;
-
-/**
- * scope lookup table value descriptor
- *
- * here we use node type for further classification
-*/
-typedef struct _definition
-{
-    java_node_query type;
-    java_lexeme_type li_type;
-    struct _definition* next;
-
-    union
-    {
-        struct
-        {
-            // package name string
-            char* package_name;
-        } import;
-
-        struct
-        {
-            // modifier
-            lbit_flag modifier;
-            // max one super class allowed
-            char* extend;
-            // a list of names, separated by ','
-            char* implement;
-        } class;
-
-        struct
-        {
-            // max one super interface allowed
-            char* extend;
-        } interface;
-
-        struct
-        {
-            // modifier
-            lbit_flag modifier;
-        } constructor;
-
-        struct
-        {
-            // if it is a member variable
-            bool is_class_member;
-            // modifier
-            lbit_flag modifier;
-            // type
-            type_name type;
-        } variable;
-
-        struct
-        {
-            // modifier
-            lbit_flag modifier;
-            // return type
-            type_name return_type;
-        } method;
-
-        struct
-        {
-            // primitive type
-            primitive type;
-            // literal value
-            uint64_t imm;
-        } li_number;
-    };
-} definition;
 
 /**
  * reference type
@@ -324,7 +251,7 @@ typedef enum
  * nodes and edges are managed here as the source of all references
  * and as the aid for deletion process
 */
-typedef struct
+typedef struct _cfg
 {
     // nodes
     node_array nodes;
@@ -335,6 +262,77 @@ typedef struct
     // exit point
     basic_block* exit;
 } cfg;
+
+/**
+ * scope lookup table value descriptor
+ *
+ * here we use node type for further classification
+*/
+typedef struct _definition
+{
+    java_node_query type;
+    java_lexeme_type li_type;
+    struct _definition* next;
+
+    union
+    {
+        struct
+        {
+            // package name string
+            char* package_name;
+        } import;
+
+        struct
+        {
+            // modifier
+            lbit_flag modifier;
+            // max one super class allowed
+            char* extend;
+            // a list of names, separated by ','
+            char* implement;
+        } class;
+
+        struct
+        {
+            // max one super interface allowed
+            char* extend;
+        } interface;
+
+        struct
+        {
+            // modifier
+            lbit_flag modifier;
+        } constructor;
+
+        struct
+        {
+            // if it is a member variable
+            bool is_class_member;
+            // modifier
+            lbit_flag modifier;
+            // type
+            type_name type;
+        } variable;
+
+        struct
+        {
+            // modifier
+            lbit_flag modifier;
+            // return type
+            type_name return_type;
+            // code
+            cfg code;
+        } method;
+
+        struct
+        {
+            // primitive type
+            primitive type;
+            // literal value
+            uint64_t imm;
+        } li_number;
+    };
+} definition;
 
 /**
  * Top Level of Semantics
@@ -406,8 +404,10 @@ definition* def_li(java_ir* ir, java_token* token);
 
 definition* new_definition(java_node_query type);
 void definition_concat(definition* dest, definition* src);
+void definition_move(definition* dest, definition* src);
 void definition_delete(definition* v);
 definition* definition_copy(definition* v);
+bool is_definition_valid(const definition* d);
 
 void init_cfg(cfg* g);
 void release_cfg(cfg* g);

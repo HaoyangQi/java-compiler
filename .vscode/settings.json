@@ -30,6 +30,8 @@
         "utils.h": "c",
         "compiler.h": "c",
         "ir.h": "c",
-        "node.h": "c"
+        "node.h": "c",
+        "token.h": "c",
+        "langspec.h": "c"
     }
 }

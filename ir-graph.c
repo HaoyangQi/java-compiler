@@ -354,7 +354,7 @@ instruction* new_instruction()
 */
 void delete_instruction(instruction* inst, bool destructive)
 {
-    if (destructive)
+    if (!destructive)
     {
         instruction* prev = inst->prev;
         instruction* next = inst->next;

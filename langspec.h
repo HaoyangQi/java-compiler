@@ -62,22 +62,24 @@
  *
  * Modifier words stay on top for bit field data,
  * the number represents which bit (from LSB) it occupies
- * That means we can have at most 64 modifiers, if we
+ * That means we can have at most ~30 modifiers, if we
  * have more than that in the future, we need to redesign
  * this
 */
 typedef enum
 {
+    JLT_UNDEFINED = 0,
+
     // modifier words
-    JLT_RWD_PUBLIC = 0,
-    JLT_RWD_PRIVATE = 1,
-    JLT_RWD_PROTECTED = 2,
-    JLT_RWD_FINAL = 3,
-    JLT_RWD_STATIC = 4,
-    JLT_RWD_ABSTRACT = 5,
-    JLT_RWD_TRANSIENT = 6,
-    JLT_RWD_SYNCHRONIZED = 7,
-    JLT_RWD_VOLATILE = 8,
+    JLT_RWD_PUBLIC = 1,
+    JLT_RWD_PRIVATE = 2,
+    JLT_RWD_PROTECTED = 3,
+    JLT_RWD_FINAL = 4,
+    JLT_RWD_STATIC = 5,
+    JLT_RWD_ABSTRACT = 6,
+    JLT_RWD_TRANSIENT = 7,
+    JLT_RWD_SYNCHRONIZED = 8,
+    JLT_RWD_VOLATILE = 9,
     // type words
     JLT_RWD_BOOLEAN,
     JLT_RWD_DOUBLE,
