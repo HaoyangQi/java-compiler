@@ -5,6 +5,8 @@
 */
 static char* ERR_MSG_NO_SEMICOLON = "Expected ';'.";
 static char* ERR_MSG_NO_RIGHT_BRACE = "Expected '}'.";
+static char* ERR_MSG_DIM_DEF_DIVERGE = "Dimension definition mismatched.";
+static char* ERR_MSG_DIM_DEF_DUPLICATE = "Duplicated dimension definition.";
 
 /**
  * Initialize Error Definitions
@@ -44,6 +46,16 @@ void init_error_definition(java_error_definition* err_def)
     err_def->descriptor[JAVA_E_NUMBER_OVERFLOW] = DEFINE_CONTEXT_ERROR;
     err_def->descriptor[JAVA_E_PART_EXPONENT_OVERFLOW] = DEFINE_CONTEXT_ERROR;
     err_def->descriptor[JAVA_E_PART_INTEGER_OVERFLOW] = DEFINE_CONTEXT_ERROR;
+    err_def->descriptor[JAVA_E_LOCAL_VAR_DUPLICATE] = DEFINE_CONTEXT_ERROR;
+    err_def->descriptor[JAVA_E_LOCAL_VAR_DIM_AMBIGUOUS] = DEFINE_CONTEXT_ERROR;
+    err_def->descriptor[JAVA_E_LOCAL_VAR_DIM_DUPLICATE] = DEFINE_CONTEXT_ERROR;
+    err_def->descriptor[JAVA_E_PARAM_DUPLICATE] = DEFINE_CONTEXT_ERROR;
+    err_def->descriptor[JAVA_E_PARAM_DIM_AMBIGUOUS] = DEFINE_CONTEXT_ERROR;
+    err_def->descriptor[JAVA_E_PARAM_DIM_DUPLICATE] = DEFINE_CONTEXT_ERROR;
+    err_def->descriptor[JAVA_E_METHOD_DUPLICATE] = DEFINE_CONTEXT_ERROR;
+    err_def->descriptor[JAVA_E_METHOD_DIM_AMBIGUOUS] = DEFINE_CONTEXT_ERROR;
+    err_def->descriptor[JAVA_E_METHOD_DIM_DUPLICATE] = DEFINE_CONTEXT_ERROR;
+
     err_def->descriptor[JAVA_E_AMBIGUITY_START] = DEFINE_RESERVED_ERROR;
     err_def->descriptor[JAVA_E_AMBIGUITY_PATH_1] = DEFINE_RESERVED_ERROR;
     err_def->descriptor[JAVA_E_AMBIGUITY_PATH_2] = DEFINE_RESERVED_ERROR;
@@ -68,8 +80,8 @@ void init_error_definition(java_error_definition* err_def)
     err_def->message[JAVA_E_CLASS_NAME_DUPLICATE] = "Duplicated class name.";
     err_def->message[JAVA_E_CLASS_BODY_ENCLOSE] = ERR_MSG_NO_RIGHT_BRACE;
     err_def->message[JAVA_E_MEMBER_VAR_DUPLICATE] = "Duplicated member variable.";
-    err_def->message[JAVA_E_MEMBER_VAR_DIM_AMBIGUOUS] = "Dimension definition mismatched.";
-    err_def->message[JAVA_E_MEMBER_VAR_DIM_DUPLICATE] = "Duplicated dimension definition.";
+    err_def->message[JAVA_E_MEMBER_VAR_DIM_AMBIGUOUS] = ERR_MSG_DIM_DEF_DIVERGE;
+    err_def->message[JAVA_E_MEMBER_VAR_DIM_DUPLICATE] = ERR_MSG_DIM_DEF_DUPLICATE;
     err_def->message[JAVA_E_MEMBER_VAR_NO_SEMICOLON] = ERR_MSG_NO_SEMICOLON;
     err_def->message[JAVA_E_MEMBER_NO_TYPE] = "Expected 'type' in member declaration.";
     err_def->message[JAVA_E_MEMBER_NO_NAME] = "Expected 'name' in member declaration.";
@@ -80,6 +92,16 @@ void init_error_definition(java_error_definition* err_def)
     err_def->message[JAVA_E_NUMBER_OVERFLOW] = "Invalid number: number overflows.";
     err_def->message[JAVA_E_PART_EXPONENT_OVERFLOW] = "Invalid number: exponent part overflows.";
     err_def->message[JAVA_E_PART_INTEGER_OVERFLOW] = "Invalid number: too many digits.";
+    err_def->message[JAVA_E_LOCAL_VAR_DUPLICATE] = "Duplicated local variable name.";
+    err_def->message[JAVA_E_LOCAL_VAR_DIM_AMBIGUOUS] = ERR_MSG_DIM_DEF_DIVERGE;
+    err_def->message[JAVA_E_LOCAL_VAR_DIM_DUPLICATE] = ERR_MSG_DIM_DEF_DUPLICATE;
+    err_def->message[JAVA_E_PARAM_DUPLICATE] = "Duplicated parameter name.";
+    err_def->message[JAVA_E_PARAM_DIM_AMBIGUOUS] = ERR_MSG_DIM_DEF_DIVERGE;
+    err_def->message[JAVA_E_PARAM_DIM_DUPLICATE] = ERR_MSG_DIM_DEF_DUPLICATE;
+    err_def->message[JAVA_E_METHOD_DUPLICATE] = "Duplicated method name.";
+    err_def->message[JAVA_E_METHOD_DIM_AMBIGUOUS] = ERR_MSG_DIM_DEF_DIVERGE;
+    err_def->message[JAVA_E_METHOD_DIM_DUPLICATE] = ERR_MSG_DIM_DEF_DUPLICATE;
+
     err_def->message[JAVA_E_AMBIGUITY_START] = NULL;
     err_def->message[JAVA_E_AMBIGUITY_PATH_1] = NULL;
     err_def->message[JAVA_E_AMBIGUITY_PATH_2] = NULL;

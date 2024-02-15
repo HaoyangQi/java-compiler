@@ -169,18 +169,19 @@ definition* new_definition(java_node_query type)
             v->import.package_name = NULL;
             break;
         case JNT_CLASS_DECL:
-            v->class.modifier = 0;
+            v->class.modifier = JLT_UNDEFINED;
             v->class.extend = NULL;
             v->class.implement = NULL;
             break;
         case JNT_VAR_DECL:
             v->variable.is_class_member = false;
-            v->variable.modifier = 0;
+            v->variable.modifier = JLT_UNDEFINED;
             __init_type_name(&v->variable.type);
             break;
         case JNT_METHOD_DECL:
-            v->method.modifier = 0;
+            v->method.modifier = JLT_UNDEFINED;
             __init_type_name(&v->method.return_type);
+            init_cfg(&v->method.code);
             break;
         default:
             break;
@@ -205,6 +206,15 @@ void definition_concat(definition* dest, definition* src)
 }
 
 /**
+ * move defintion content
+*/
+void definition_move(definition* dest, definition* src)
+{
+    memcpy(dest, src, sizeof(definition));
+    memset(src, 0, sizeof(definition));
+}
+
+/**
  * delete single definition
 */
 static definition* __definition_delete_single(definition* v)
@@ -222,6 +232,10 @@ static definition* __definition_delete_single(definition* v)
             break;
         case JNT_VAR_DECL:
             free(v->variable.type.reference);
+            break;
+        case JNT_METHOD_DECL:
+            free(v->method.return_type.reference);
+            release_cfg(&v->method.code);
             break;
         default:
             // no-op
@@ -304,6 +318,25 @@ definition* definition_copy(definition* v)
     }
 
     return head;
+}
+
+/**
+ * test if a definition is valid
+ *
+ * only specific node types are valid
+*/
+bool is_definition_valid(const definition* d)
+{
+    switch (d->type)
+    {
+        case JNT_IMPORT_DECL:
+        case JNT_CLASS_DECL:
+        case JNT_VAR_DECL:
+        case JNT_METHOD_DECL:
+            return true;
+        default:
+            return false;
+    }
 }
 
 /**
@@ -466,8 +499,7 @@ definition* def_li(java_ir* ir, java_token* token)
         else
         {
             // number literal definition
-            v = (definition*)malloc_assert(sizeof(definition));
-            v->type = JNT_PRIMARY_COMPLEX;
+            v = new_definition(JNT_PRIMARY_COMPLEX);
             v->li_type = JLT_LTR_NUMBER;
             v->next = NULL;
             v->li_number.type = __p;

@@ -18,9 +18,11 @@ class MyPackageClass extends C1 implements C2, C3 {
     //    System.out.println("This is my package!");
     //}
 
-    private int calc(int x, int y) {
+    private int calc(int x, int y, short r2) {
         return 0;
     }
+
+    static public void basic() {}
 
     //short s0 = 9,s1,s2 = 0;
 }

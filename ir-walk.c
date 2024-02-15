@@ -77,6 +77,9 @@ static reference* __interpret_operand(java_ir* ir, basic_block* block, tree_node
             char* content = t2s(token);
             printf("%s ", content);
             free(content);
+
+            // def(__def, move)
+            // definition_delete(__def)
         }
         else
         {

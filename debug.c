@@ -1206,20 +1206,20 @@ static void debug_print_definition(definition* v)
     switch (v->type)
     {
         case JNT_IMPORT_DECL:
-            printf("import");
+            printf("import,");
             break;
         case JNT_CLASS_DECL:
-            printf("class");
+            printf("class,");
             break;
         case JNT_VAR_DECL:
-            printf("def %s", v->variable.is_class_member ? "member var" : "var");
+            printf("def %s,", v->variable.is_class_member ? "member var" : "var");
             break;
         case JNT_METHOD_DECL:
-            printf("def method");
+            printf("def method,");
             break;
         default:
             // no-op
-            printf("(UNREGISTERED: %d)", v->type);
+            printf("(UNREGISTERED: %d),", v->type);
             break;
     }
 
@@ -1288,8 +1288,16 @@ static void debug_print_scope_frame_table(hash_table* table)
             while (p)
             {
                 // key
-                printf("    %s: ", (char*)(p->key));
-                debug_print_definition(p->value);
+                printf("    %s:\n", (char*)(p->key));
+
+                // print all definitions of this name
+                definition* v = p->value;
+                for (size_t j = 0; v != NULL; j++)
+                {
+                    printf("      [%zd]: ", j);
+                    debug_print_definition(v);
+                    v = v->next;
+                }
 
                 p = p->next;
             }
