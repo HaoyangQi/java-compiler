@@ -1418,7 +1418,7 @@ static tree_node* parse_expression_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected ';' at the end of expression statement.\n");
+        parser_error(parser, JAVA_E_LOCAL_VAR_NO_SEMICOLON);
     }
 
     return node;
@@ -1468,7 +1468,7 @@ static tree_node* parse_local_variable_declaration_statement(java_parser* parser
     }
     else
     {
-        fprintf(stderr, "TODO error: expected ';' at the end of local variable declaration statement.\n");
+        parser_error(parser, JAVA_E_LOCAL_VAR_NO_SEMICOLON);
     }
 
     return node;

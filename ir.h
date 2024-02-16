@@ -495,8 +495,9 @@ void init_cfg_worker(cfg_worker* worker);
 void release_cfg_worker(cfg_worker* worker, cfg* move_to);
 basic_block* cfg_worker_current_block(cfg_worker* worker);
 basic_block* cfg_worker_grow(cfg_worker* worker);
+void cfg_worker_next_outbound_strategy(cfg_worker* worker, edge_type type);
 basic_block* cfg_worker_jump(cfg_worker* worker, basic_block* to, bool change_cur, bool edge);
-void cfg_worker_grow_with_graph(cfg_worker* dest, cfg_worker* src);
+void cfg_worker_grow_with_graph(cfg_worker* dest, cfg_worker** src);
 instruction* cfg_worker_execute(
     java_ir* ir,
     cfg_worker* worker,
@@ -516,8 +517,8 @@ bool instruction_insert(basic_block* node, instruction* prev, instruction* inst)
 bool instruction_push_back(basic_block* node, instruction* inst);
 bool instruction_push_front(basic_block* node, instruction* inst);
 
-void walk_expression(java_ir* ir, cfg* container, tree_node* expression);
-void walk_block(java_ir* ir, cfg* g, tree_node* block, bool use_new_scope);
+cfg_worker* walk_expression(java_ir* ir, tree_node* expression);
+cfg_worker* walk_block(java_ir* ir, tree_node* block, bool use_new_scope);
 
 void init_ir(java_ir* ir, java_expression* expression, java_error_stack* error);
 void release_ir(java_ir* ir);

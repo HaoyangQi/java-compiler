@@ -159,6 +159,7 @@ static void ctx_class(java_ir* ir, tree_node* node)
     tree_node* part = NULL;
     tree_node* declaration = NULL;
     definition* desc = NULL;
+    cfg_worker* worker = NULL;
 
     /**
      * JNT_TOP_LEVEL
@@ -240,7 +241,9 @@ static void ctx_class(java_ir* ir, tree_node* node)
                     if (declaration->type == JNT_EXPRESSION)
                     {
                         // top-level defs do not have order
-                        walk_expression(ir, ir->code_member_init, declaration);
+                        worker = walk_expression(ir, declaration);
+                        release_cfg_worker(worker, ir->code_member_init);
+                        free(worker);
                     }
                     else if (declaration->type == JNT_ARRAY_INIT)
                     {
@@ -278,7 +281,9 @@ static void ctx_class(java_ir* ir, tree_node* node)
                 def_params(ir, declaration->first_child);
 
                 // parse body
-                walk_block(ir, &desc->method.code, declaration->next_sibling, false);
+                worker = walk_block(ir, declaration->next_sibling, false);
+                release_cfg_worker(worker, &desc->method.code);
+                free(worker);
 
                 // we need to keep all definitions active
                 lookup_pop_scope(ir, true);

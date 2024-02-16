@@ -1200,6 +1200,291 @@ void debug_ir_on_demand_imports(java_ir* ir)
     }
 }
 
+static void debug_print_irop(operation irop)
+{
+    switch (irop)
+    {
+        case IROP_UNDEFINED:
+            printf("(Invalid: IROP_UNDEFINED)");
+            break;
+        case IROP_POS:
+            printf("IROP_POS");
+            break;
+        case IROP_NEG:
+            printf("IROP_NEG");
+            break;
+        case IROP_ADD:
+            printf("IROP_ADD");
+            break;
+        case IROP_SUB:
+            printf("IROP_SUB");
+            break;
+        case IROP_MUL:
+            printf("IROP_MUL");
+            break;
+        case IROP_DIV:
+            printf("IROP_DIV");
+            break;
+        case IROP_MOD:
+            printf("IROP_MOD");
+            break;
+        case IROP_BINC:
+            printf("IROP_BINC");
+            break;
+        case IROP_AINC:
+            printf("IROP_AINC");
+            break;
+        case IROP_BDEC:
+            printf("IROP_BDEC");
+            break;
+        case IROP_ADEC:
+            printf("IROP_ADEC");
+            break;
+        case IROP_SLS:
+            printf("IROP_SLS");
+            break;
+        case IROP_SRS:
+            printf("IROP_SRS");
+            break;
+        case IROP_URS:
+            printf("IROP_URS");
+            break;
+        case IROP_LT:
+            printf("IROP_LT");
+            break;
+        case IROP_GT:
+            printf("IROP_GT");
+            break;
+        case IROP_LE:
+            printf("IROP_LE");
+            break;
+        case IROP_GE:
+            printf("IROP_GE");
+            break;
+        case IROP_EQ:
+            printf("IROP_EQ");
+            break;
+        case IROP_NE:
+            printf("IROP_NE");
+            break;
+        case IROP_IO:
+            printf("IROP_IO");
+            break;
+        case IROP_LNEG:
+            printf("IROP_LNEG");
+            break;
+        case IROP_LAND:
+            printf("IROP_LAND");
+            break;
+        case IROP_LOR:
+            printf("IROP_LOR");
+            break;
+        case IROP_BNEG:
+            printf("IROP_BNEG");
+            break;
+        case IROP_BAND:
+            printf("IROP_BAND");
+            break;
+        case IROP_BOR:
+            printf("IROP_BOR");
+            break;
+        case IROP_XOR:
+            printf("IROP_XOR");
+            break;
+        case IROP_ASN:
+            printf("IROP_ASN");
+            break;
+        case IROP_TC:
+            printf("IROP_TC");
+            break;
+        case IROP_TB:
+            printf("IROP_TB");
+            break;
+        case IROP_LMD:
+            printf("IROP_LMD");
+            break;
+        case IROP_NONE:
+            printf("IROP_NONE");
+            break;
+        case IROP_JMP:
+            printf("IROP_JMP");
+            break;
+        case IROP_RET:
+            printf("IROP_RET");
+            break;
+        case IROP_TEST:
+            printf("IROP_TEST");
+            break;
+        case IROP_PHI:
+            printf("IROP_PHI");
+            break;
+        case IROP_MAX:
+            printf("(Invalid: IROP_MAX)");
+            break;
+        default:
+            printf("(UNDEFINED IROP: %d)", irop);
+            break;
+    }
+}
+
+static void debug_print_cfg_node_type(block_type type)
+{
+    switch (type)
+    {
+        case BLOCK_ANY:
+            printf("ANY");
+            break;
+        case BLOCK_EXIT:
+            printf("EXIT");
+            break;
+        case BLOCK_TEST:
+            printf("TEST");
+            break;
+        default:
+            printf("(unknown type)");
+            break;
+    }
+}
+
+static void debug_print_reference(reference* r)
+{
+    definition* d;
+    uint64_t n;
+    float nf;
+    double nd;
+
+    if (!r)
+    {
+        printf("(null)");
+        return;
+    }
+
+    switch (r->type)
+    {
+        case IR_ASN_REF_DEFINITION:
+            printf("(def: %p)", r->doi);
+            break;
+        case IR_ASN_REF_INSTRUCTION:
+            printf("(inst: %p)", r->doi);
+            break;
+        case IR_ASN_REF_LITERAL:
+            d = r->doi;
+            n = d->li_number.imm;
+            switch (d->li_number.type)
+            {
+                case IRPV_INTEGER_BIT_8:
+                    printf("(li: 0x%llx{%d})", n, (int8_t)n);
+                    break;
+                case IRPV_INTEGER_BIT_16:
+                    printf("(li: 0x%llx{%d})", n, (int16_t)n);
+                    break;
+                case IRPV_INTEGER_BIT_32:
+                    printf("(li: 0x%llx{%d})", n, (int32_t)n);
+                    break;
+                case IRPV_INTEGER_BIT_64:
+                    printf("(li: 0x%llx{%lld})", n, (int64_t)n);
+                    break;
+                case IRPV_INTEGER_BIT_U16:
+                    printf("(li: 0x%llx{%d})", n, (uint16_t)n);
+                    break;
+                case IRPV_PRECISION_SINGLE:
+                    memcpy(&nf, (byte*)(&n) + 4, sizeof(double));
+                    printf("(li: 0x%llx{%f})", n, nf);
+                    break;
+                case IRPV_PRECISION_DOUBLE:
+                    memcpy(&nd, &n, sizeof(double));
+                    printf("(li: 0x%llx{%lf})", n, nd);
+                    break;
+                case IRPV_BOOLEAN:
+                    printf("(li: 0x%llx{%08x}{%d})", n, (uint32_t)n, (bool)n);
+                    break;
+                default:
+                    printf("(li unknown: 0x%llx)", n);
+                    break;
+            }
+            break;
+        default:
+            printf("(undefined(%d): %p)", r->type, r->doi);
+            break;
+    }
+}
+
+static void debug_print_instructions(instruction* inst)
+{
+    if (!inst)
+    {
+        printf("    (no instructions)\n");
+    }
+
+    while (inst)
+    {
+        printf("    [%p]: ", inst);
+
+        if (inst->lvalue)
+        {
+            debug_print_reference(inst->lvalue);
+            printf(" <- ");
+        }
+
+        debug_print_reference(inst->operand_1);
+        printf(" ");
+        debug_print_irop(inst->op);
+        printf(" ");
+        debug_print_reference(inst->operand_2);
+        printf("\n");
+
+        inst = inst->next;
+    }
+}
+
+static void debug_print_cfg(cfg* g)
+{
+    basic_block* b;
+    instruction* inst;
+    cfg_edge* edge;
+
+    printf("Code:\n");
+
+    if (g->nodes.num == 0)
+    {
+        printf("(no code)\n");
+    }
+
+    for (size_t i = 0; i < g->nodes.num; i++)
+    {
+        b = g->nodes.arr[i];
+
+        // print node header
+        printf("node [%zd](%p)%s", b->id, b, b == g->entry ? " entry point " : " ");
+        debug_print_cfg_node_type(b->type);
+
+        // print node edges
+        // since the graph is directed, so print out edge is sufficient
+        for (size_t j = 0; j < b->out.num; j++)
+        {
+            edge = b->out.arr[j];
+
+            printf(" -> %zd", edge->to->id);
+
+            switch (edge->type)
+            {
+                case EDGE_TRUE:
+                    printf("(TRUE)");
+                    break;
+                case EDGE_FALSE:
+                    printf("(FALSE)");
+                    break;
+                case EDGE_JUMP:
+                default:
+                    break;
+            }
+        }
+        printf("\n");
+
+        debug_print_instructions(b->inst_first);
+    }
+}
+
 static void debug_print_definition(definition* v)
 {
     // header
@@ -1216,6 +1501,9 @@ static void debug_print_definition(definition* v)
             break;
         case JNT_METHOD_DECL:
             printf("def method,");
+            break;
+        case JLT_LTR_NUMBER:
+            printf("number,");
             break;
         default:
             // no-op
@@ -1269,6 +1557,11 @@ static void debug_print_definition(definition* v)
                 printf("%s", v->method.return_type.reference);
             }
             printf("\n");
+            debug_print_cfg(&v->method.code);
+            printf("\n");
+            break;
+        case JLT_LTR_NUMBER:
+            printf("%llx\n", v->li_number.imm);
             break;
         default:
             // no-op
@@ -1314,6 +1607,18 @@ void debug_ir_global_names(java_ir* ir)
     hash_table* table = lookup_global_scope(ir);
 
     printf("===== GLOBAL NAMES =====\n");
+    printf("memory: %zd bytes\n", hash_table_memory_size(table));
+    printf("load factor: %.2f%%\n", hash_table_load_factor(table) * 100.0f);
+    printf("longest chain: %zd\n", hash_table_longest_chain_length(table));
+
+    debug_print_scope_frame_table(table);
+}
+
+void debug_ir_literal(java_ir* ir)
+{
+    hash_table* table = &ir->tbl_literal;
+
+    printf("===== LITERALS =====\n");
     printf("memory: %zd bytes\n", hash_table_memory_size(table));
     printf("load factor: %.2f%%\n", hash_table_load_factor(table) * 100.0f);
     printf("longest chain: %zd\n", hash_table_longest_chain_length(table));
