@@ -411,6 +411,8 @@ typedef struct
     hash_table tbl_global;
     // literal lookup table
     hash_table tbl_literal;
+    // local definition pool
+    definition* local_def_pool;
     // stack top symbol lookup
     scope_frame* scope_stack_top;
     // toplevel block count
@@ -434,7 +436,7 @@ char* name_unit_concat(tree_node* from, tree_node* stop_before);
 
 void lookup_scope_deleter(char* k, definition* v);
 hash_table* lookup_new_scope(java_ir* ir, lookup_scope_type type);
-bool lookup_pop_scope(java_ir* ir, bool merge_global);
+bool lookup_pop_scope(java_ir* ir, bool use_pool);
 hash_table* lookup_global_scope(java_ir* ir);
 hash_table* lookup_working_scope(java_ir* ir);
 hash_table* lookup_top_scope(java_ir* ir);
@@ -475,8 +477,6 @@ void def_method(java_ir* ir, tree_node* node, lbit_flag modifier);
 void def_class(java_ir* ir, tree_node* node);
 
 definition* new_definition(java_node_query type);
-void definition_concat(definition* dest, definition* src);
-void definition_move(definition* dest, definition* src);
 void definition_delete(definition* v);
 definition* definition_copy(definition* v);
 bool is_definition_valid(const definition* d);

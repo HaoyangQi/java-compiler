@@ -22,5 +22,6 @@ void debug_shash_table(hash_table* table);
 void debug_java_symbol_lookup_table_no_collision_test(bool use_prime_size);
 void debug_ir_on_demand_imports(java_ir* ir);
 void debug_ir_global_names(java_ir* ir);
+void debug_print_definition_pool(java_ir* ir);
 
 #endif
