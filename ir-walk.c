@@ -21,7 +21,7 @@ static tree_node* __previous_available_operand(tree_node* from)
 /**
  * parse an operand and fill the provided reference object
 */
-static reference* __interpret_operand(java_ir* ir, basic_block* block, tree_node* base)
+static reference* __interpret_operand(java_ir* ir, tree_node* base)
 {
     // this is not a guard: an operand can be marked as not-needed (thus NULL)
     // if so, the function is no-op
@@ -104,16 +104,16 @@ static reference* __interpret_operand(java_ir* ir, basic_block* block, tree_node
  *
  * op: JNT_OPERATOR
 */
-static bool __execute_instruction(
+static void __execute_instruction(
     java_ir* ir,
-    basic_block* block,
+    cfg_worker* worker,
     tree_node* op,
     reference* operand_1,
     reference* operand_2
 )
 {
-    instruction* inst = new_instruction();
     operator_id id = op->data->operator.id;
+    reference* lvalue = NULL;
     bool validate_lvalue = false;
 
     /**
@@ -125,7 +125,7 @@ static bool __execute_instruction(
     {
         case OPID_ASN:
             // simply move
-            inst->lvalue = operand_1;
+            lvalue = operand_1;
             operand_1 = operand_2;
             operand_2 = NULL;
             validate_lvalue = true;
@@ -142,77 +142,52 @@ static bool __execute_instruction(
         case OPID_SHIFT_R_ASN:
         case OPID_SHIFT_UR_ASN:
             // need topy because use version will differ
-            inst->lvalue = copy_reference(operand_1);
+            lvalue = copy_reference(operand_1);
             validate_lvalue = true;
             break;
         default:
-            inst->lvalue = NULL;
             break;
     }
-
-    // fill
-    inst->op = expr_opid2irop(ir->expression, id);
-    inst->operand_1 = operand_1;
-    inst->operand_2 = operand_2;
 
     /**
      * validate lvalue
      *
-     * NOTE: other 2 types of reference is hard to validate here
-     * because we do not know if it infers a valid lvalue
-     * so we do it somewhere else
+     * NOTE: only cover the case that has to be donw with OPID
+     * the rest is covered somewhere else
     */
-    if (validate_lvalue)
+    if (validate_lvalue && !lvalue)
     {
-        if (!inst->lvalue)
-        {
-            ir_error(ir, JAVA_E_EXPRESSION_NO_LVALUE);
-        }
-        else if (inst->lvalue->type == IR_ASN_REF_LITERAL)
-        {
-            ir_error(ir, JAVA_E_EXPRESSION_NO_LVALUE);
-        }
-        else
-        {
-            validate_lvalue = false;
-        }
+        ir_error(ir, JAVA_E_EXPRESSION_NO_LVALUE);
     }
 
-    // append instruction & validation
-    if (validate_lvalue || !instruction_push_back(block, inst))
-    {
-        delete_instruction(inst, false);
-        return false;
-    }
-    else
-    {
-        // link the instruction to this op
-        op->data->operator.instruction = inst;
-        return true;
-    }
+    // link the instruction to this op
+    op->data->operator.instruction = cfg_worker_execute(
+        ir, worker, expr_opid2irop(ir->expression, id), &lvalue, &operand_1, &operand_2);
+
+    // cleanup
+    delete_reference(lvalue);
+    delete_reference(operand_1);
+    delete_reference(operand_2);
 }
 
 /**
- * TODO: Expression AST Walk
+ * Expression AST Walk
  *
- * It walks the expression and convert it into a series of instructions
- * all instructions will be in single block
- *
- * Putting everything in single block reduces complexity of the recursion
- * and also can sever the ties with AST completely, so that second pass
- * does not have to worry about AST anymore
+ * do not use initialized container, as the data region will be wiped
  *
  * node: JNT_EXPRESSION
 */
-bool __expression_to_block(java_ir* ir, basic_block* block, tree_node* expression)
+void walk_expression(java_ir* ir, cfg* container, tree_node* expression)
 {
-    bool ret = true;
+    cfg_worker worker;
+    init_cfg_worker(&worker);
 
     // if start is OP, expression is invalid
     if (!expression->first_child || expression->first_child->type == JNT_OPERATOR)
     {
         ir_error(ir, JAVA_E_EXPRESSION_NO_OPERAND);
-        return false;
+        release_cfg_worker(&worker, container);
+        return;
     }
 
     // stack control
@@ -259,7 +234,6 @@ bool __expression_to_block(java_ir* ir, basic_block* block, tree_node* expressio
         if (!base1)
         {
             ir_error(ir, JAVA_E_EXPRESSION_NO_OPERAND);
-            ret = false;
             break;
         }
 
@@ -273,7 +247,6 @@ bool __expression_to_block(java_ir* ir, basic_block* block, tree_node* expressio
             if (!base2)
             {
                 ir_error(ir, JAVA_E_EXPRESSION_NO_OPERAND);
-                ret = false;
                 break;
             }
         }
@@ -305,9 +278,9 @@ bool __expression_to_block(java_ir* ir, basic_block* block, tree_node* expressio
          * order matters here!
         */
         __execute_instruction(
-            ir, block, top,
-            __interpret_operand(ir, block, base2),
-            __interpret_operand(ir, block, base1)
+            ir, &worker, top,
+            __interpret_operand(ir, base2),
+            __interpret_operand(ir, base1)
         );
 
         printf("\n");
@@ -316,36 +289,8 @@ bool __expression_to_block(java_ir* ir, basic_block* block, tree_node* expressio
         top = top->next_sibling;
     }
 
-    return ret;
-}
-
-/**
- * TODO: Expression AST Walk
- *
- * It walks an expression, and sanitize the expression block
- * so it does not contain and syntatic sugar
- *
- * so far: we only have ternary operator (? :) to be converted
- *
- * node: JNT_EXPRESSION
-*/
-void walk_expression(java_ir* ir, cfg* g, tree_node* expression)
-{
-    basic_block* b = cfg_new_basic_block(g);
-
-    /**
-     * TODO: shall we handle return value being false?
-    */
-    __expression_to_block(ir, b, expression);
-
-    /**
-     * sanitize the block
-     *
-     * this may cause the block be transformed into a graph
-     *
-     * TODO: transform ternary operators (? :)
-     * TODO: in future, we probably need to do something for lambda
-    */
+    // cleanup
+    release_cfg_worker(&worker, container);
 }
 
 /**

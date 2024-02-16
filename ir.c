@@ -3,6 +3,9 @@
 
 /**
  * initialize semantic analysis
+ *
+ * code_member_init: no init for it here because it data section is only
+ *                   a container for cfg worker
 */
 void init_ir(java_ir* ir, java_expression* expression, java_error_stack* error)
 {
@@ -11,12 +14,11 @@ void init_ir(java_ir* ir, java_expression* expression, java_error_stack* error)
     ir->arch = NULL;
     ir->expression = expression;
     ir->error = error;
+    ir->code_member_init = new_cfg_container();
 
     init_hash_table(&ir->tbl_on_demand_packages, HASH_TABLE_DEFAULT_BUCKET_SIZE);
     init_hash_table(&ir->tbl_global, HASH_TABLE_DEFAULT_BUCKET_SIZE);
     init_hash_table(&ir->tbl_literal, HASH_TABLE_DEFAULT_BUCKET_SIZE);
-
-    init_cfg(&ir->code_member_init);
 }
 
 /**
@@ -33,7 +35,8 @@ void release_ir(java_ir* ir)
     // delete entire lookup stack
     while (lookup_pop_scope(ir, false));
     // delete member init code
-    release_cfg(&ir->code_member_init);
+    release_cfg(ir->code_member_init);
+    free(ir->code_member_init);
 }
 
 /**
