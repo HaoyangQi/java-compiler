@@ -143,7 +143,7 @@ void cfg_worker_grow_with_graph(cfg_worker* dest, cfg_worker* src)
 }
 
 /**
- * Tcode generation interface
+ * code generation interface
  *
  * all operands will be moved, and stay as-is if failed
  *

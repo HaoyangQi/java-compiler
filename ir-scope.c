@@ -35,53 +35,45 @@ hash_table* lookup_new_scope(java_ir* ir, lookup_scope_type type)
  * pop current lookup node
  *
  * if merge_global is true, table contents will be merged into global lookup
+ *
+ * TODO: deprecate merge_global logic
+ * instead of merging into the global table, we merge it into a pool that only contains
+ * local definitions: the pool is a linked list, O(1) insert front and we do not
+ * care the order because we only book-keep the data so that code graphs can reference
+ * from it
 */
-bool lookup_pop_scope(java_ir* ir, bool merge_global)
+bool lookup_pop_scope(java_ir* ir, bool use_pool)
 {
     scope_frame* top = ir->scope_stack_top;
 
-    // merge
-    if (top && merge_global)
+    // flush all definitions into the pool
+    if (top)
     {
         hash_table* table = top->table;
 
-        for (size_t i = 0; i < table->bucket_size; i++)
+        if (use_pool)
         {
-            hash_pair* p = table->bucket[i];
-
-            if (p)
+            for (size_t i = 0; i < table->bucket_size; i++)
             {
+                hash_pair* p = table->bucket[i];
+
                 while (p)
                 {
-                    hash_pair* pair = shash_table_get(&ir->tbl_global, p->key);
+                    definition* local_def = p->value;
 
-                    // if key exists, we merge; otherwise simply insert
-                    if (pair)
-                    {
-                        definition_concat(pair->value, p->value);
-                    }
-                    else
-                    {
-                        shash_table_insert(&ir->tbl_global, p->key, p->value);
-                    }
+                    // move definition to the pool
+                    local_def->next = ir->local_def_pool;
+                    ir->local_def_pool = local_def;
 
-                    /**
-                     * detach all data since we are moving it to global
-                     *
-                     * NOTE: this is destructive and will make the table
-                     * stop functioning
-                    */
-                    p->key = NULL;
+                    // detach
                     p->value = NULL;
 
                     p = p->next;
                 }
             }
         }
-    }
 
-    if (top)
-    {
+        // release table
         release_hash_table(top->table, &lookup_scope_deleter);
         free(top->table);
         ir->scope_stack_top = top->next;
@@ -194,30 +186,6 @@ definition* new_definition(java_node_query type)
     }
 
     return v;
-}
-
-/**
- * in-place concatenate two definition chain
-*/
-void definition_concat(definition* dest, definition* src)
-{
-    // locate the end of chain
-    while (dest->next != NULL)
-    {
-        dest++;
-    }
-
-    // append
-    dest->next = src;
-}
-
-/**
- * move defintion content
-*/
-void definition_move(definition* dest, definition* src)
-{
-    memcpy(dest, src, sizeof(definition));
-    memset(src, 0, sizeof(definition));
 }
 
 /**

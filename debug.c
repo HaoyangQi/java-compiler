@@ -1277,6 +1277,16 @@ static void debug_print_definition(definition* v)
     }
 }
 
+static void debug_print_definitions(definition* v)
+{
+    for (size_t j = 0; v != NULL; j++)
+    {
+        printf("[%zd](%p): ", j, v);
+        debug_print_definition(v);
+        v = v->next;
+    }
+}
+
 static void debug_print_scope_frame_table(hash_table* table)
 {
     for (size_t i = 0; i < table->bucket_size; i++)
@@ -1288,16 +1298,10 @@ static void debug_print_scope_frame_table(hash_table* table)
             while (p)
             {
                 // key
-                printf("    %s:\n", (char*)(p->key));
+                printf("    %s:\n      ", (char*)(p->key));
 
                 // print all definitions of this name
-                definition* v = p->value;
-                for (size_t j = 0; v != NULL; j++)
-                {
-                    printf("      [%zd]: ", j);
-                    debug_print_definition(v);
-                    v = v->next;
-                }
+                debug_print_definitions(p->value);
 
                 p = p->next;
             }
@@ -1319,6 +1323,8 @@ void debug_ir_global_names(java_ir* ir)
 
 void debug_ir_lookup(java_ir* ir)
 {
+    printf("===== LOOKUP STACK =====\n");
+
     scope_frame* lh = ir->scope_stack_top;
 
     if (!lh)
@@ -1329,7 +1335,7 @@ void debug_ir_lookup(java_ir* ir)
 
     while (lh)
     {
-        printf("===== LOOKUP STACK =====\n>>>>>>>>>> ");
+        printf(">>>>>>>>>> ");
 
         switch (lh->type)
         {
@@ -1387,4 +1393,17 @@ void debug_ir_lookup(java_ir* ir)
 
         lh = lh->next;
     }
+}
+
+void debug_print_definition_pool(java_ir* ir)
+{
+    printf("===== DEFINITION POOL =====\n");
+
+    if (!ir->local_def_pool)
+    {
+        printf("(definition pool empty)\n");
+        return;
+    }
+
+    debug_print_definitions(ir->local_def_pool);
 }

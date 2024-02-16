@@ -9,6 +9,7 @@
 */
 void init_ir(java_ir* ir, java_expression* expression, java_error_stack* error)
 {
+    ir->local_def_pool = NULL;
     ir->scope_stack_top = NULL;
     ir->num_methods = 0;
     ir->arch = NULL;
@@ -37,6 +38,8 @@ void release_ir(java_ir* ir)
     // delete member init code
     release_cfg(ir->code_member_init);
     free(ir->code_member_init);
+    // delete definition pool
+    definition_delete(ir->local_def_pool);
 }
 
 /**
