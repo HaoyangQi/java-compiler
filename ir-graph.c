@@ -11,6 +11,9 @@
  * this value is carefully selected because:
  * common branch in CFG is binary, hence 2 edges,
  * with 2 more nodes
+ *
+ * and when size needs to grow, the new size is
+ * calculated by: cur_size * factor
 */
 #define EDGE_ARRAY_SIZE_INCREMENT_FACTOR (2)
 #define NODE_ARRAY_SIZE_INCREMENT_FACTOR (2)
@@ -54,25 +57,32 @@ static void node_delete(basic_block* block)
 /**
  * initialize edge array
 */
-static void edge_array_init(edge_array* edges, size_t s)
+static void edge_array_init(edge_array* edges)
 {
-    edges->arr = (cfg_edge**)malloc_assert(sizeof(cfg_edge*) * s);
+    edges->arr = (cfg_edge**)malloc_assert(sizeof(cfg_edge*) * EDGE_ARRAY_SIZE_INCREMENT_FACTOR);
     edges->num = 0;
-    edges->size = s;
+    edges->size = EDGE_ARRAY_SIZE_INCREMENT_FACTOR;
 
-    memset(edges->arr, 0, sizeof(cfg_edge*) * s);
+    memset(edges->arr, 0, sizeof(cfg_edge*) * EDGE_ARRAY_SIZE_INCREMENT_FACTOR);
 }
 
 /**
  * edge array resize
 */
-static void edge_array_resize(edge_array* edges, size_t s)
+void edge_array_resize(edge_array* edges, size_t by)
 {
-    if (edges->num + 1 > edges->size)
+    if (edges->num + by <= edges->size)
     {
-        edges->size += s;
-        edges->arr = (cfg_edge**)realloc_assert(edges->arr, sizeof(cfg_edge*) * (edges->size));
+        return;
     }
+
+    // yes this is dumb, but let's keep it this way
+    while (edges->num + by > edges->size)
+    {
+        edges->size *= EDGE_ARRAY_SIZE_INCREMENT_FACTOR;
+    }
+
+    edges->arr = (cfg_edge**)realloc_assert(edges->arr, sizeof(cfg_edge*) * (edges->size));
 }
 
 /**
@@ -91,25 +101,32 @@ static void edge_array_delete(edge_array* edges)
 /**
  * initialize node array
 */
-static void node_array_init(node_array* nodes, size_t s)
+static void node_array_init(node_array* nodes)
 {
-    nodes->arr = (basic_block**)malloc_assert(sizeof(basic_block*) * s);
+    nodes->arr = (basic_block**)malloc_assert(sizeof(basic_block*) * NODE_ARRAY_SIZE_INCREMENT_FACTOR);
     nodes->num = 0;
-    nodes->size = s;
+    nodes->size = NODE_ARRAY_SIZE_INCREMENT_FACTOR;
 
-    memset(nodes->arr, 0, sizeof(basic_block*) * s);
+    memset(nodes->arr, 0, sizeof(basic_block*) * NODE_ARRAY_SIZE_INCREMENT_FACTOR);
 }
 
 /**
  * node array resize
 */
-static void node_array_resize(node_array* nodes, size_t s)
+void node_array_resize(node_array* nodes, size_t by)
 {
-    if (nodes->num + 1 > nodes->size)
+    if (nodes->num + by <= nodes->size)
     {
-        nodes->size += s;
-        nodes->arr = (basic_block**)realloc_assert(nodes->arr, sizeof(basic_block*) * (nodes->size));
+        return;
     }
+
+    // yes this is dumb, but let's keep it this way
+    while (nodes->num + by > nodes->size)
+    {
+        nodes->size *= NODE_ARRAY_SIZE_INCREMENT_FACTOR;
+    }
+
+    nodes->arr = (basic_block**)realloc_assert(nodes->arr, sizeof(basic_block*) * (nodes->size));
 }
 
 /**
@@ -127,18 +144,21 @@ static void node_array_delete(node_array* nodes)
 
 /**
  * add inbound edge
+ *
+ * if inbound = true: it is an inbound edge
+ * otherwise: it is an outbound edge
 */
-static void basic_block_add_edge(basic_block* block, cfg_edge* edge, basic_block_edge_type type)
+static void basic_block_add_edge(basic_block* block, cfg_edge* edge, bool inbound)
 {
-    edge_array* edges = type == BLOCK_EDGE_IN ? &block->in : &block->out;
+    edge_array* edges = inbound ? &block->in : &block->out;
 
     if (edges->arr)
     {
-        edge_array_resize(edges, EDGE_ARRAY_SIZE_INCREMENT_FACTOR);
+        edge_array_resize(edges, 1);
     }
     else
     {
-        edge_array_init(edges, EDGE_ARRAY_SIZE_INCREMENT_FACTOR);
+        edge_array_init(edges);
     }
 
     edges->arr[edges->num] = edge;
@@ -146,14 +166,25 @@ static void basic_block_add_edge(basic_block* block, cfg_edge* edge, basic_block
 }
 
 /**
+ * generate a CFG container
+ *
+ * create a CFG memory chunk with all fields set to 0
+*/
+cfg* new_cfg_container()
+{
+    cfg* g = (cfg*)malloc_assert(sizeof(cfg));
+    memset(g, 0, sizeof(cfg));
+    return g;
+}
+
+/**
  * initialize CFG
 */
 void init_cfg(cfg* g)
 {
-    node_array_init(&g->nodes, NODE_ARRAY_SIZE_INCREMENT_FACTOR);
-    edge_array_init(&g->edges, EDGE_ARRAY_SIZE_INCREMENT_FACTOR);
+    node_array_init(&g->nodes);
+    edge_array_init(&g->edges);
     g->entry = NULL;
-    g->exit = NULL;
 }
 
 /**
@@ -177,20 +208,15 @@ void release_cfg(cfg* g)
 basic_block* cfg_new_basic_block(cfg* g)
 {
     // reallocate if reaching maximum
-    node_array_resize(&g->nodes, NODE_ARRAY_SIZE_INCREMENT_FACTOR);
+    node_array_resize(&g->nodes, 1);
 
     // allocate
     basic_block* n = (basic_block*)malloc_assert(sizeof(basic_block));
     memset(n, 0, sizeof(basic_block));
 
-    // align minimum graph case
-    if (g->nodes.num == 0)
-    {
-        g->entry = n;
-        g->exit = n;
-    }
-
     // register
+    n->id = g->nodes.num;
+    n->type = BLOCK_ANY;
     g->nodes.arr[g->nodes.num] = n;
     g->nodes.num++;
 
@@ -200,13 +226,14 @@ basic_block* cfg_new_basic_block(cfg* g)
 /**
  * add an edge to CFG
 */
-void cfg_new_edge(cfg* g, basic_block* from, basic_block* to)
+void cfg_new_edge(cfg* g, basic_block* from, basic_block* to, edge_type type)
 {
     // reallocate if reaching maximum
-    edge_array_resize(&g->edges, EDGE_ARRAY_SIZE_INCREMENT_FACTOR);
+    edge_array_resize(&g->edges, 1);
 
     // new edge
     cfg_edge* edge = (cfg_edge*)malloc_assert(sizeof(cfg_edge));
+    edge->type = type;
     edge->from = from;
     edge->to = to;
 
@@ -215,123 +242,26 @@ void cfg_new_edge(cfg* g, basic_block* from, basic_block* to)
     g->edges.num++;
 
     // connect blocks
-    basic_block_add_edge(from, edge, BLOCK_EDGE_OUT);
-    basic_block_add_edge(to, edge, BLOCK_EDGE_IN);
-
-    // update entry
-    if ((!g->entry || g->entry->in.num != 0) && from->in.num == 0)
-    {
-        // if new from is also an entry candidate, we do NOT update
-        // because old block could like be the entry
-        g->entry = from;
-    }
-    else if (g->entry && g->entry->in.num != 0)
-    {
-        // if old expired, find a new one
-        for (size_t i = 0; i < g->nodes.num; i++)
-        {
-            g->entry = g->nodes.arr[i];
-
-            if (g->entry->in.num == 0)
-            {
-                break;
-            }
-
-            g->entry = NULL;
-        }
-    }
-
-    // update exit
-    if (!g->exit || to->out.num == 0)
-    {
-        // if new to is also an exit candidate, we update
-        // because new block could likely be the exit
-        g->exit = to;
-    }
-    else if (g->exit && g->exit->out.num != 0)
-    {
-        // if old exit expired, find a new one
-        for (size_t i = 0; i < g->nodes.num; i++)
-        {
-            g->exit = g->nodes.arr[i];
-
-            if (g->exit->out.num == 0)
-            {
-                break;
-            }
-
-            g->exit = NULL;
-        }
-    }
+    basic_block_add_edge(from, edge, false);
+    basic_block_add_edge(to, edge, true);
 }
 
 /**
- * connect 2 graphs
+ * detach CFG data
  *
- * if source graph has only one node, it simply merge the block
- * into dest
+ * nodes.arr and edges.arr cannot be set to NULL
+ * because the array itself needs to be freed
  *
- * if dest graph is NULL; source graph will be returned
- * if source graph is NULL, dest graph will be returned
- * otherwise source graph wrapper will be deleted, return dest graph
+ * this is lazy release as node and edge arrays
+ * will not be cleared, based on algorithm in
+ * node_array_delete and edge_array_delete, we
+ * only need to clear the counter
 */
-cfg* cfg_connect(cfg* g, cfg* src_graph)
+void cfg_detach(cfg* g)
 {
-    if (!g)
-    {
-        return src_graph;
-    }
-    else if (!src_graph)
-    {
-        return g;
-    }
-    else if (src_graph->nodes.num == 1)
-    {
-        // if node is the graph, graph merge is block merge
-        basic_block* src = src_graph->entry;
-
-        // append
-        g->exit->inst_last->next = src->inst_first;
-        g->exit->inst_last = src->inst_last;
-
-        // detach
-        src->inst_first = NULL;
-        src->inst_last = NULL;
-    }
-    else
-    {
-        // array resizing
-        node_array_resize(&g->nodes, src_graph->nodes.num);
-        edge_array_resize(&g->edges, src_graph->edges.num);
-
-        size_t node_arr_mem_size = src_graph->nodes.num * sizeof(basic_block*);
-        size_t edge_arr_mem_size = src_graph->edges.num * sizeof(cfg_edge*);
-
-        // merge array
-        memcpy(g->nodes.arr + g->nodes.num, src_graph->nodes.arr, node_arr_mem_size);
-        memcpy(g->edges.arr + g->edges.num, src_graph->edges.arr, edge_arr_mem_size);
-
-        // detach
-        memset(src_graph->nodes.arr, 0, node_arr_mem_size);
-        memset(src_graph->edges.arr, 0, edge_arr_mem_size);
-
-        // roughly estimate new exit to save efforts during edge creation
-        g->exit = src_graph->exit;
-
-        // connect by creating new edge
-        cfg_new_edge(g, g->exit, src_graph->entry);
-
-        // reset source graph for safer deletion
-        src_graph->entry = NULL;
-        src_graph->exit = NULL;
-        src_graph->nodes.num = 0;
-        src_graph->edges.num = 0;
-    }
-
-    // delete
-    release_cfg(src_graph);
-
-    return g;
+    g->entry = NULL;
+    g->nodes.num = 0;
+    g->edges.num = 0;
 }
 
 /**

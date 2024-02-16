@@ -183,10 +183,29 @@ typedef struct _instruction
 struct _basic_block;
 
 /**
+ * block edge type
+ *
+ * EDGE_ANY: no additional info on this edge
+ * EDGE_TRUE: boolean true branch
+ * EDGE_FALSE: boolean false branch
+ * EDGE_JUMP: jump edge, always directs to a previous node
+ *            and this id is used for code generation
+*/
+typedef enum
+{
+    EDGE_ANY,
+    EDGE_TRUE,
+    EDGE_FALSE,
+    EDGE_JUMP,
+} edge_type;
+
+/**
  * CFG Edge Info
 */
 typedef struct _cfg_edge
 {
+    edge_type type;
+
     struct _basic_block* from;
     struct _basic_block* to;
 } cfg_edge;
@@ -202,13 +221,19 @@ typedef struct
 } edge_array;
 
 /**
- * block edge type
+ * Node type
+ *
+ * special IDs for graph manipulation
+ * BLOCK_EXIT: a node that ends with "return"
+ * BLOCK_TEST: a node that ends with a logical test
+ *             which will trigger 2 outbound branches
 */
 typedef enum
 {
-    BLOCK_EDGE_IN,
-    BLOCK_EDGE_OUT,
-} basic_block_edge_type;
+    BLOCK_ANY,
+    BLOCK_EXIT,
+    BLOCK_TEST,
+} block_type;
 
 /**
  * CFG Basic Block
@@ -216,6 +241,9 @@ typedef enum
 */
 typedef struct _basic_block
 {
+    size_t id;
+    block_type type;
+
     instruction* inst_first;
     instruction* inst_last;
 
@@ -272,8 +300,6 @@ typedef struct _cfg
     edge_array edges;
     // entry point
     basic_block* entry;
-    // exit point
-    basic_block* exit;
 } cfg;
 
 /**
@@ -348,6 +374,27 @@ typedef struct _definition
 } definition;
 
 /**
+ * IR CFG Worker
+ *
+ * when a CFG is finalized, worker will contain following information:
+ * 1. the code graph
+ * 2. entry node: specified by graph->entry
+ * 3. implicit exit node: which is the node specified by cur_blk
+ * 4. outbound strategy: indicates how implicit exit node is connected
+ *                       to it successor
+ *
+ * a CFG can have multiple exit node because every "return" statemnt
+ * will behave as an exit node;
+ * but a CFG can only have one implict exit node
+*/
+typedef struct
+{
+    cfg* graph;
+    basic_block* cur_blk;
+    edge_type next_outbound_strategy;
+} cfg_worker;
+
+/**
  * Top Level of Semantics
  *
  * on top level, each method occupies a tree of blocks
@@ -377,7 +424,7 @@ typedef struct
     java_error_stack* error;
 
     // member declarator initialization code
-    cfg code_member_init;
+    cfg* code_member_init;
 } java_ir;
 
 char* t2s(java_token* token);
@@ -434,11 +481,30 @@ void definition_delete(definition* v);
 definition* definition_copy(definition* v);
 bool is_definition_valid(const definition* d);
 
+void edge_array_resize(edge_array* edges, size_t by);
+void node_array_resize(node_array* nodes, size_t by);
+
+cfg* new_cfg_container();
 void init_cfg(cfg* g);
 void release_cfg(cfg* g);
 basic_block* cfg_new_basic_block(cfg* g);
-void cfg_new_edge(cfg* g, basic_block* from, basic_block* to);
-cfg* cfg_connect(cfg* g, cfg* src_graph);
+void cfg_new_edge(cfg* g, basic_block* from, basic_block* to, edge_type type);
+void cfg_detach(cfg* g);
+
+void init_cfg_worker(cfg_worker* worker);
+void release_cfg_worker(cfg_worker* worker, cfg* move_to);
+basic_block* cfg_worker_current_block(cfg_worker* worker);
+basic_block* cfg_worker_grow(cfg_worker* worker);
+basic_block* cfg_worker_jump(cfg_worker* worker, basic_block* to, bool change_cur, bool edge);
+void cfg_worker_grow_with_graph(cfg_worker* dest, cfg_worker* src);
+instruction* cfg_worker_execute(
+    java_ir* ir,
+    cfg_worker* worker,
+    operation irop,
+    reference** lvalue,
+    reference** operand_1,
+    reference** operand_2
+);
 
 reference* new_reference();
 reference* copy_reference(const reference* r);
@@ -450,7 +516,7 @@ bool instruction_insert(basic_block* node, instruction* prev, instruction* inst)
 bool instruction_push_back(basic_block* node, instruction* inst);
 bool instruction_push_front(basic_block* node, instruction* inst);
 
-void walk_expression(java_ir* ir, cfg* g, tree_node* expression);
+void walk_expression(java_ir* ir, cfg* container, tree_node* expression);
 void walk_block(java_ir* ir, cfg* g, tree_node* block, bool use_new_scope);
 
 void init_ir(java_ir* ir, java_expression* expression, java_error_stack* error);

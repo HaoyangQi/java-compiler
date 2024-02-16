@@ -240,7 +240,7 @@ static void ctx_class(java_ir* ir, tree_node* node)
                     if (declaration->type == JNT_EXPRESSION)
                     {
                         // top-level defs do not have order
-                        walk_expression(ir, &ir->code_member_init, declaration);
+                        walk_expression(ir, ir->code_member_init, declaration);
                     }
                     else if (declaration->type == JNT_ARRAY_INIT)
                     {

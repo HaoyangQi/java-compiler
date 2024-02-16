@@ -290,7 +290,7 @@ typedef struct
     /* static map from OPID to IROP */
     operation* ir_map;
     /* #operand needed for each IROP */
-    size_t* irop_operand_count;
+    size_t* opid_operand_count;
 } java_expression;
 
 void init_expression(java_expression* expression);
@@ -299,7 +299,6 @@ void release_expression(java_expression* expression);
 java_operator expr_opid2def(const java_expression* expression, operator_id opid);
 operator_id expr_tid2opid(const java_expression* expression, java_lexeme_type tid);
 operation expr_opid2irop(const java_expression* expression, operator_id opid);
-size_t expr_irop_operand_count(const java_expression* expression, operation irop);
 size_t expr_opid_operand_count(const java_expression* expression, operator_id opid);
 
 /**
