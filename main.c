@@ -66,6 +66,7 @@ int main(int argc, char* argv[])
             debug_ast(&compiler.context);
             debug_ir_on_demand_imports(&compiler.ir);
             debug_ir_global_names(&compiler.ir);
+            debug_ir_literal(&compiler.ir);
             debug_ir_lookup(&compiler.ir);
             debug_print_definition_pool(&compiler.ir);
         }

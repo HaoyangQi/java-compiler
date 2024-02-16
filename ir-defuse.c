@@ -160,7 +160,7 @@ definition* def_li(java_ir* ir, java_token* token)
         else
         {
             // number literal definition
-            v = new_definition(JNT_PRIMARY_COMPLEX);
+            v = new_definition(JLT_LTR_NUMBER);
             v->li_type = JLT_LTR_NUMBER;
             v->next = NULL;
             v->li_number.type = __p;

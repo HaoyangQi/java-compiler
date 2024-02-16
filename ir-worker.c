@@ -29,6 +29,8 @@ void init_cfg_worker(cfg_worker* worker)
 */
 void release_cfg_worker(cfg_worker* worker, cfg* move_to)
 {
+    if (!worker) { return; }
+
     if (move_to)
     {
         memcpy(move_to, worker->graph, sizeof(cfg));
@@ -84,6 +86,14 @@ basic_block* cfg_worker_grow(cfg_worker* worker)
 }
 
 /**
+ * mark next outbound strategy of current block
+*/
+void cfg_worker_next_outbound_strategy(cfg_worker* worker, edge_type type)
+{
+    worker->next_outbound_strategy = type;
+}
+
+/**
  * jump from current to a destination
  *
  * change_cur: if true, current block trancker will be changed
@@ -96,7 +106,8 @@ basic_block* cfg_worker_jump(cfg_worker* worker, basic_block* to, bool change_cu
 {
     if (edge)
     {
-        cfg_new_edge(worker->graph, worker->cur_blk, to, EDGE_JUMP);
+        cfg_new_edge(worker->graph, worker->cur_blk, to, worker->next_outbound_strategy);
+        worker->next_outbound_strategy = EDGE_ANY;
     }
 
     if (change_cur)
@@ -113,33 +124,68 @@ basic_block* cfg_worker_jump(cfg_worker* worker, basic_block* to, bool change_cu
  * just like cfg_worker_grow, it grows the graph from current
  * block, but instead of appending a new block, it appends
  * a new graph
+ *
+ * once merged, src worker will be released
 */
-void cfg_worker_grow_with_graph(cfg_worker* dest, cfg_worker* src)
+void cfg_worker_grow_with_graph(cfg_worker* dest, cfg_worker** src_worker)
 {
+    if (!src_worker) { return; }
+
+    cfg_worker* src = *src_worker;
     cfg* dest_graph = dest->graph;
     cfg* src_graph = src->graph;
 
-    // array resizing
-    node_array_resize(&dest_graph->nodes, src_graph->nodes.num);
-    edge_array_resize(&dest_graph->edges, src_graph->edges.num);
+    // only do heavy work if graph is not empty
+    // now an entry must be determined otherwise it will crash purposefully
+    if (src->graph->nodes.num > 0)
+    {
+        // array resizing
+        node_array_resize(&dest_graph->nodes, src_graph->nodes.num);
+        edge_array_resize(&dest_graph->edges, src_graph->edges.num);
 
-    // merge array
-    memcpy(
-        dest_graph->nodes.arr + dest_graph->nodes.num,
-        src_graph->nodes.arr,
-        src_graph->nodes.num * sizeof(basic_block*)
-    );
-    memcpy(
-        dest_graph->edges.arr + dest_graph->edges.num,
-        src_graph->edges.arr,
-        src_graph->edges.num * sizeof(cfg_edge*)
-    );
+        // merge array
+        memcpy(
+            dest_graph->nodes.arr + dest_graph->nodes.num,
+            src_graph->nodes.arr,
+            src_graph->nodes.num * sizeof(basic_block*)
+        );
+        memcpy(
+            dest_graph->edges.arr + dest_graph->edges.num,
+            src_graph->edges.arr,
+            src_graph->edges.num * sizeof(cfg_edge*)
+        );
 
-    cfg_new_edge(dest_graph, dest->cur_blk, src->graph->entry, dest->next_outbound_strategy);
-    dest->cur_blk = src->cur_blk;
-    dest->next_outbound_strategy = src->next_outbound_strategy;
+        // update node id
+        for (size_t id = dest_graph->nodes.num, i = 0; i < src_graph->nodes.num; id++, i++)
+        {
+            src_graph->nodes.arr[i]->id = id;
+        }
 
+        // update counter
+        dest_graph->nodes.num += src_graph->nodes.num;
+        dest_graph->edges.num += src_graph->edges.num;
+
+        // order matters here
+        if (!dest_graph->entry)
+        {
+            // otherwise it means we have an empty graph, so transfer header info
+            dest_graph->entry = src->graph->entry;
+        }
+        else if (dest->cur_blk)
+        {
+            // connect, if we have to
+            cfg_new_edge(dest_graph, dest->cur_blk, src->graph->entry, dest->next_outbound_strategy);
+        }
+
+        dest->cur_blk = src->cur_blk;
+        dest->next_outbound_strategy = src->next_outbound_strategy;
+    }
+
+    // cleanup
     cfg_detach(src->graph);
+    release_cfg_worker(*src_worker, NULL);
+    free(*src_worker);
+    *src_worker = NULL;
 }
 
 /**
@@ -205,13 +251,12 @@ instruction* cfg_worker_execute(
     {
         case IROP_RET:
             /**
-             * if it is a return statement:
+             * do not add node here
              *
-             * mark the node as an exit node, AND
-             * grow the graph
+             * because some structure like "if" will automatically
+             * add phi node in the end
             */
             block->type = BLOCK_EXIT;
-            cfg_worker_grow(worker);
             break;
         case IROP_TEST:
             /**

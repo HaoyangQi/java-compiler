@@ -74,6 +74,8 @@ static reference* __interpret_operand(java_ir* ir, tree_node* base)
         }
         else if (token->class == JT_IDENTIFIER)
         {
+            ref->type = IR_ASN_REF_DEFINITION;
+
             char* content = t2s(token);
             printf("%s ", content);
             free(content);
@@ -177,23 +179,38 @@ static void __execute_instruction(
  *
  * node: JNT_EXPRESSION
 */
-void walk_expression(java_ir* ir, cfg* container, tree_node* expression)
+cfg_worker* walk_expression(java_ir* ir, tree_node* expression)
 {
-    cfg_worker worker;
-    init_cfg_worker(&worker);
+    cfg_worker* worker = (cfg_worker*)malloc_assert(sizeof(cfg_worker));
+    init_cfg_worker(worker);
 
-    // if start is OP, expression is invalid
+    // if start is OP or end with non-OP, expression is invalid
     if (!expression->first_child || expression->first_child->type == JNT_OPERATOR)
     {
         ir_error(ir, JAVA_E_EXPRESSION_NO_OPERAND);
-        release_cfg_worker(&worker, container);
-        return;
+        return worker;
     }
 
     // stack control
     tree_node* base1;
     tree_node* base2;
     tree_node* top = expression->first_child;
+
+    if (!top->next_sibling)
+    {
+        // minimum case: constant expression (only one operand)
+        reference* constant = __interpret_operand(ir, top);
+        cfg_worker_execute(ir, worker, IROP_NONE, NULL, &constant, NULL);
+        delete_reference(constant);
+
+        return worker;
+    }
+    else if (expression->last_child->type != JNT_OPERATOR)
+    {
+        // if end with non-OP, expression is invalid
+        ir_error(ir, JAVA_E_EXPRESSION_NO_OPERATOR);
+        return worker;
+    }
 
     /**
      * expression traversal
@@ -278,7 +295,7 @@ void walk_expression(java_ir* ir, cfg* container, tree_node* expression)
          * order matters here!
         */
         __execute_instruction(
-            ir, &worker, top,
+            ir, worker, top,
             __interpret_operand(ir, base2),
             __interpret_operand(ir, base1)
         );
@@ -289,8 +306,202 @@ void walk_expression(java_ir* ir, cfg* container, tree_node* expression)
         top = top->next_sibling;
     }
 
+    return worker;
+}
+
+void __execute_statement(java_ir* ir, cfg_worker* worker, tree_node* stmt, bool execute_in_new_block);
+cfg_worker* walk_block(java_ir* ir, tree_node* block, bool use_new_scope);
+
+/**
+ * walk return statement
+ *
+ * return ---+--- Expression
+ *
+ * node: JNT_STATEMENT_RETURN
+*/
+void __execute_statement_return(java_ir* ir, cfg_worker* worker, tree_node* stmt)
+{
+    cfg_worker* w = NULL;
+    reference* ref = NULL;
+
+    // Expression
+    stmt = stmt->first_child;
+
+    if (stmt)
+    {
+        // parse return value
+        w = walk_expression(ir, stmt);
+        cfg_worker_grow_with_graph(worker, &w);
+        printf("after return value current block id: %zd\n", worker->cur_blk->id);
+
+        // prepare reference
+        ref = new_reference();
+        ref->type = IR_ASN_REF_INSTRUCTION;
+        ref->doi = worker->cur_blk->inst_last;
+    }
+
+    // execute
+    cfg_worker_execute(ir, worker, IROP_RET, NULL, &ref, NULL);
+    printf("after RET current block id: %zd\n", worker->cur_blk->id);
+
     // cleanup
-    release_cfg_worker(&worker, container);
+    delete_reference(ref);
+}
+
+/**
+ * walk if statement
+ *
+ * if ---+--- Expression
+ *       |
+ *       +--- Statement
+ *
+ * node: JNT_STATEMENT_IF
+*/
+void __execute_statement_if(java_ir* ir, cfg_worker* worker, tree_node* stmt)
+{
+    cfg_worker* w = NULL;
+    basic_block* test;
+    basic_block* phi;
+
+    // Expression
+    stmt = stmt->first_child;
+
+    // parse condition
+    w = walk_expression(ir, stmt);
+    cfg_worker_grow_with_graph(worker, &w);
+
+    // mark block as a test block
+    cfg_worker_execute(ir, worker, IROP_TEST, NULL, NULL, NULL);
+    cfg_worker_next_outbound_strategy(worker, EDGE_TRUE);
+
+    // mark test node
+    test = cfg_worker_current_block(worker);
+
+    // Statement (If Branch)
+    stmt = stmt->next_sibling;
+
+    // parse true branch
+    if (stmt->type == JNT_STATEMENT_VAR_DECL)
+    {
+        ir_error(ir, JAVA_E_IF_LOCAL_VAR_DECL);
+    }
+    else
+    {
+        __execute_statement(ir, worker, stmt, true);
+    }
+
+    // place a phi node
+    phi = cfg_worker_grow(worker);
+
+    // Statement (Else Branch)
+    stmt = stmt->next_sibling;
+
+    // go back to test node and prepare for false branch
+    cfg_worker_jump(worker, test, true, false);
+    cfg_worker_next_outbound_strategy(worker, EDGE_FALSE);
+
+    if (stmt)
+    {
+        // parse true branch
+        if (stmt->type == JNT_STATEMENT_VAR_DECL)
+        {
+            ir_error(ir, JAVA_E_IF_LOCAL_VAR_DECL);
+        }
+        else
+        {
+            __execute_statement(ir, worker, stmt, true);
+        }
+    }
+
+    // connect else branch
+    cfg_worker_jump(worker, phi, true, true);
+}
+
+/**
+ * TODO: Statemnt AST Walk
+ *
+ * node: JNT_BLOCK
+*/
+void __execute_statement(java_ir* ir, cfg_worker* worker, tree_node* stmt, bool execute_in_new_block)
+{
+    cfg_worker* w;
+
+    if (worker->cur_blk && worker->cur_blk->type == BLOCK_EXIT)
+    {
+        /**
+         * TODO: issue warning here
+         *
+         * because code behind a return will never execute
+         * but... we probably need to issue only one warning
+        */
+    }
+
+    if (execute_in_new_block)
+    {
+        switch (stmt->type)
+        {
+            case JNT_STATEMENT_SWITCH:
+            case JNT_STATEMENT_IF:
+            case JNT_STATEMENT_WHILE:
+            case JNT_STATEMENT_FOR:
+            case JNT_STATEMENT_CATCH:
+            case JNT_BLOCK:
+                /**
+                 * things with a leading expression will
+                 * start from new block by definition
+                */
+                break;
+            default:
+                cfg_worker_grow(worker);
+                break;
+        }
+    }
+
+    switch (stmt->type)
+    {
+        case JNT_STATEMENT_SWITCH:
+            break;
+        case JNT_STATEMENT_DO:
+            break;
+        case JNT_STATEMENT_BREAK:
+            break;
+        case JNT_STATEMENT_CONTINUE:
+            break;
+        case JNT_STATEMENT_RETURN:
+            __execute_statement_return(ir, worker, stmt);
+            break;
+        case JNT_STATEMENT_SYNCHRONIZED:
+            break;
+        case JNT_STATEMENT_THROW:
+            break;
+        case JNT_STATEMENT_TRY:
+            break;
+        case JNT_STATEMENT_IF:
+            __execute_statement_if(ir, worker, stmt);
+            break;
+        case JNT_STATEMENT_WHILE:
+            break;
+        case JNT_STATEMENT_FOR:
+            break;
+        case JNT_STATEMENT_LABEL:
+            break;
+        case JNT_STATEMENT_EXPRESSION:
+            break;
+        case JNT_STATEMENT_VAR_DECL:
+            break;
+        case JNT_STATEMENT_CATCH:
+            break;
+        case JNT_STATEMENT_FINALLY:
+            break;
+        case JNT_SWITCH_LABEL:
+            break;
+        case JNT_BLOCK:
+            w = walk_block(ir, stmt, true);
+            cfg_worker_grow_with_graph(worker, &w);
+            break;
+        default:
+            break;
+    }
 }
 
 /**
@@ -298,16 +509,25 @@ void walk_expression(java_ir* ir, cfg* container, tree_node* expression)
  *
  * node: JNT_BLOCK
 */
-void walk_block(java_ir* ir, cfg* g, tree_node* block, bool use_new_scope)
+cfg_worker* walk_block(java_ir* ir, tree_node* block, bool use_new_scope)
 {
     hash_table* scope = use_new_scope ? lookup_new_scope(ir, LST_NONE) : lookup_top_scope(ir);
+    cfg_worker* worker = (cfg_worker*)malloc_assert(sizeof(cfg_worker));
 
-    /**
-     * TODO:
-    */
+    init_cfg_worker(worker);
+
+    // every child is a statement
+    block = block->first_child;
+    while (block)
+    {
+        __execute_statement(ir, worker, block, false);
+        block = block->next_sibling;
+    }
 
     if (use_new_scope)
     {
         lookup_pop_scope(ir, true);
     }
+
+    return worker;
 }

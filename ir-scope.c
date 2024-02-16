@@ -179,7 +179,7 @@ definition* new_definition(java_node_query type)
         case JNT_METHOD_DECL:
             v->method.modifier = JLT_UNDEFINED;
             __init_type_name(&v->method.return_type);
-            init_cfg(&v->method.code);
+            // no code CFG initialization here as parser will do it
             break;
         default:
             break;

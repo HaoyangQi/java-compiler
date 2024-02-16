@@ -197,6 +197,7 @@ typedef enum
  * IROP_TC      ternary: condition part (a ? TB)
  * IROP_TB,     ternary: branch part (c : d)
  * IROP_LMD     lambda
+ * IROP_NONE    the instruction only stores a operand
  * IROP_JMP     jump
  * IROP_RET     return
  * IROP_TEST    test-and-jump
@@ -264,6 +265,7 @@ typedef enum
 
     /* IR-specific */
 
+    IROP_NONE,
     IROP_JMP,
     IROP_RET,
     IROP_TEST,
