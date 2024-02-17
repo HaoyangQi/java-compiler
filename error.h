@@ -118,6 +118,7 @@ typedef enum
     JAVA_E_METHOD_DIM_AMBIGUOUS,
     JAVA_E_METHOD_DIM_DUPLICATE,
     JAVA_E_IF_LOCAL_VAR_DECL,
+    JAVA_E_REF_UNDEFINED,
 
     /**
      * Ambiguity Error Flags

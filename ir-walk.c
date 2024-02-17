@@ -48,6 +48,7 @@ static reference* __interpret_operand(java_ir* ir, tree_node* base)
 
     tree_node* primary = base->first_child;
     java_token* token;
+    char* content;
 
     /**
      * TODO: other primary types
@@ -62,26 +63,29 @@ static reference* __interpret_operand(java_ir* ir, tree_node* base)
 
         /**
          * TODO: interpret all token types
+         * TODO: this includes sequence of JT_IDENTIFIER
+         *       as field access
         */
         if (token->type == JLT_LTR_NUMBER)
         {
             ref->type = IR_ASN_REF_LITERAL;
             ref->doi = __def;
 
-            char* content = t2s(token);
+            content = t2s(token);
             printf("%llu(%s) ", __def->li_number.imm, content);
             free(content);
         }
         else if (token->class == JT_IDENTIFIER)
         {
             ref->type = IR_ASN_REF_DEFINITION;
-
-            char* content = t2s(token);
+            content = t2s(token);
+            ref->doi = use(ir, content, DU_CTL_LOOKUP_GLOBAL, JAVA_E_REF_UNDEFINED);
             printf("%s ", content);
             free(content);
 
-            // def(__def, move)
-            // definition_delete(__def)
+            /**
+             * TODO: how to handle field access?
+            */
         }
         else
         {
@@ -332,7 +336,6 @@ void __execute_statement_return(java_ir* ir, cfg_worker* worker, tree_node* stmt
         // parse return value
         w = walk_expression(ir, stmt);
         cfg_worker_grow_with_graph(worker, &w);
-        printf("after return value current block id: %zd\n", worker->cur_blk->id);
 
         // prepare reference
         ref = new_reference();
@@ -342,7 +345,6 @@ void __execute_statement_return(java_ir* ir, cfg_worker* worker, tree_node* stmt
 
     // execute
     cfg_worker_execute(ir, worker, IROP_RET, NULL, &ref, NULL);
-    printf("after RET current block id: %zd\n", worker->cur_blk->id);
 
     // cleanup
     delete_reference(ref);
