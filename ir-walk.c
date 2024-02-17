@@ -179,20 +179,15 @@ static void __execute_instruction(
 /**
  * Expression AST Walk
  *
- * do not use initialized container, as the data region will be wiped
- *
  * node: JNT_EXPRESSION
 */
-cfg_worker* walk_expression(java_ir* ir, tree_node* expression)
+void walk_expression(java_ir* ir, tree_node* expression)
 {
-    cfg_worker* worker = (cfg_worker*)malloc_assert(sizeof(cfg_worker));
-    init_cfg_worker(worker);
-
     // if start is OP or end with non-OP, expression is invalid
     if (!expression->first_child || expression->first_child->type == JNT_OPERATOR)
     {
         ir_error(ir, JAVA_E_EXPRESSION_NO_OPERAND);
-        return worker;
+        return;
     }
 
     // stack control
@@ -204,16 +199,16 @@ cfg_worker* walk_expression(java_ir* ir, tree_node* expression)
     {
         // minimum case: constant expression (only one operand)
         reference* constant = __interpret_operand(ir, top);
-        cfg_worker_execute(ir, worker, IROP_NONE, NULL, &constant, NULL);
+        cfg_worker_execute(ir, TSW(ir), IROP_NONE, NULL, &constant, NULL);
         delete_reference(constant);
 
-        return worker;
+        return;
     }
     else if (expression->last_child->type != JNT_OPERATOR)
     {
         // if end with non-OP, expression is invalid
         ir_error(ir, JAVA_E_EXPRESSION_NO_OPERATOR);
-        return worker;
+        return;
     }
 
     /**
@@ -299,7 +294,7 @@ cfg_worker* walk_expression(java_ir* ir, tree_node* expression)
          * order matters here!
         */
         __execute_instruction(
-            ir, worker, top,
+            ir, TSW(ir), top,
             __interpret_operand(ir, base2),
             __interpret_operand(ir, base1)
         );
@@ -309,8 +304,6 @@ cfg_worker* walk_expression(java_ir* ir, tree_node* expression)
         // reduction of current operator completed, move on
         top = top->next_sibling;
     }
-
-    return worker;
 }
 
 /**
@@ -325,7 +318,6 @@ static void __start_statement_in_new_block(cfg_worker* worker, java_node_query s
     switch (stmt_type)
     {
         case JNT_STATEMENT_SWITCH:
-        case JNT_STATEMENT_IF:
         case JNT_STATEMENT_WHILE:
         case JNT_STATEMENT_FOR:
         case JNT_STATEMENT_CATCH:
@@ -384,7 +376,7 @@ void __execute_statement_return(java_ir* ir, tree_node* stmt)
     if (stmt)
     {
         // parse return value
-        cfg_worker_grow_with_graph(TSW(ir), walk_expression(ir, stmt));
+        walk_expression(ir, stmt);
 
         // prepare reference
         ref = new_reference(IR_ASN_REF_INSTRUCTION, TSW(ir)->cur_blk->inst_last);
@@ -401,8 +393,14 @@ void __execute_statement_return(java_ir* ir, tree_node* stmt)
  * walk if statement
  *
  * if ---+--- Expression
- *       |
- *       +--- Statement
+ * |     |
+ * |     +--- Statement
+ * |
+ * else ---if ---+--- Expression
+ *         |     |
+ *         |     +--- Statement
+ *         |
+ *         else--- Statement
  *
  * node: JNT_STATEMENT_IF
 */
@@ -415,7 +413,7 @@ void __execute_statement_if(java_ir* ir, tree_node* stmt)
     stmt = stmt->first_child;
 
     // parse condition
-    cfg_worker_grow_with_graph(TSW(ir), walk_expression(ir, stmt));
+    walk_expression(ir, stmt);
 
     // mark block as a test block
     cfg_worker_execute(ir, TSW(ir), IROP_TEST, NULL, NULL, NULL);
@@ -512,6 +510,7 @@ void __execute_statement(java_ir* ir, tree_node* stmt)
         case JNT_STATEMENT_LABEL:
             break;
         case JNT_STATEMENT_EXPRESSION:
+            walk_expression(ir, stmt->first_child);
             break;
         case JNT_STATEMENT_VAR_DECL:
             break;

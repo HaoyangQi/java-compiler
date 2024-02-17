@@ -248,9 +248,11 @@ static void ctx_class(java_ir* ir, tree_node* node)
                     if (declaration->type == JNT_EXPRESSION)
                     {
                         // parse right side
-                        worker = walk_expression(ir, declaration);
+                        push_scope_worker(ir);
+                        walk_expression(ir, declaration);
 
                         // prepare assignment code
+                        worker = get_scope_worker(ir);
                         lvalue = new_reference(IR_ASN_REF_DEFINITION, desc);
                         operand = new_reference(IR_ASN_REF_INSTRUCTION, worker->cur_blk->inst_last);
 
@@ -262,6 +264,7 @@ static void ctx_class(java_ir* ir, tree_node* node)
                         delete_reference(operand);
 
                         // merge code
+                        worker = pop_scope_worker(ir);
                         cfg_worker_grow_with_graph(&member_init_worker, worker);
                     }
                     else if (declaration->type == JNT_ARRAY_INIT)

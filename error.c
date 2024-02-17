@@ -52,6 +52,8 @@ void init_error_definition(java_error_definition* err_def)
     err_def->descriptor[JAVA_E_LOCAL_VAR_DIM_AMBIGUOUS] = DEFINE_CONTEXT_ERROR;
     err_def->descriptor[JAVA_E_LOCAL_VAR_DIM_DUPLICATE] = DEFINE_CONTEXT_ERROR;
     err_def->descriptor[JAVA_E_LOCAL_VAR_NO_SEMICOLON] = DEFINE_CONTEXT_ERROR;
+    err_def->descriptor[JAVA_E_VAR_NO_DECLARATOR] = DEFINE_SYNTAX_ERROR;
+    err_def->descriptor[JAVA_E_VAR_NO_ARR_ENCLOSE] = DEFINE_SYNTAX_ERROR;
     err_def->descriptor[JAVA_E_PARAM_DUPLICATE] = DEFINE_CONTEXT_ERROR;
     err_def->descriptor[JAVA_E_PARAM_DIM_AMBIGUOUS] = DEFINE_CONTEXT_ERROR;
     err_def->descriptor[JAVA_E_PARAM_DIM_DUPLICATE] = DEFINE_CONTEXT_ERROR;
@@ -103,6 +105,8 @@ void init_error_definition(java_error_definition* err_def)
     err_def->message[JAVA_E_LOCAL_VAR_DIM_AMBIGUOUS] = ERR_MSG_DIM_DEF_DIVERGE;
     err_def->message[JAVA_E_LOCAL_VAR_DIM_DUPLICATE] = ERR_MSG_DIM_DEF_DUPLICATE;
     err_def->message[JAVA_E_LOCAL_VAR_NO_SEMICOLON] = ERR_MSG_NO_SEMICOLON;
+    err_def->message[JAVA_E_VAR_NO_DECLARATOR] = "Expected declarator name after type.";
+    err_def->message[JAVA_E_VAR_NO_ARR_ENCLOSE] = "Expected ']'.";
     err_def->message[JAVA_E_PARAM_DUPLICATE] = "Duplicated parameter name.";
     err_def->message[JAVA_E_PARAM_DIM_AMBIGUOUS] = ERR_MSG_DIM_DEF_DIVERGE;
     err_def->message[JAVA_E_PARAM_DIM_DUPLICATE] = ERR_MSG_DIM_DEF_DUPLICATE;
