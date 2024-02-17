@@ -241,10 +241,15 @@ static void ctx_class(java_ir* ir, tree_node* node)
                 // we only have global to lookup so no need to call use()
                 desc = t2d(table, declaration->data->declarator.id.complex);
 
-                // if has a child, then it is the initializer
+                // reach initializer
                 declaration = declaration->first_child;
+
+                // create variable data chunk ref
+                lvalue = new_reference(IR_ASN_REF_DEFINITION, desc);
+
                 if (declaration)
                 {
+                    // if has a child, then it is the initializer
                     if (declaration->type == JNT_EXPRESSION)
                     {
                         // parse right side
@@ -253,14 +258,12 @@ static void ctx_class(java_ir* ir, tree_node* node)
 
                         // prepare assignment code
                         worker = get_scope_worker(ir);
-                        lvalue = new_reference(IR_ASN_REF_DEFINITION, desc);
                         operand = new_reference(IR_ASN_REF_INSTRUCTION, worker->cur_blk->inst_last);
 
                         // add assignment code
                         cfg_worker_execute(ir, worker, IROP_ASN, &lvalue, &operand, NULL);
 
                         // cleanup
-                        delete_reference(lvalue);
                         delete_reference(operand);
 
                         // merge code
@@ -274,6 +277,17 @@ static void ctx_class(java_ir* ir, tree_node* node)
                         */
                     }
                 }
+                else
+                {
+                    /**
+                     * otherwise we insert a dummy code, indicate that
+                     * the variable is defined here and some initialization required
+                    */
+                    cfg_worker_execute(ir, &member_init_worker, IROP_INIT, &lvalue, NULL, NULL);
+                }
+
+                // cleanup
+                delete_reference(lvalue);
             }
             else if (declaration->next_sibling->type == JNT_METHOD_DECL)
             {

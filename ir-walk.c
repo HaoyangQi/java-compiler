@@ -465,9 +465,82 @@ void __execute_statement_if(java_ir* ir, tree_node* stmt)
 }
 
 /**
- * TODO: Statemnt AST Walk
+ * walk variable declaration statement
  *
- * node: JNT_BLOCK
+ * JNT_STATEMENT_VAR_DECL
+ * |
+ * +--- JNT_LOCAL_VAR_DECL
+ *      |
+ *      +--- JNT_TYPE
+ *      |
+ *      +--- JNT_VAR_DECLARATORS
+ *           |
+ *           +--- JNT_VAR_DECL
+ *           |    |
+ *           |    +--- JNT_EXPRESSION
+ *           |
+ *           +--- JNT_VAR_DECL
+ *           |
+ *           ...
+ *
+ * node: JNT_STATEMENT_VAR_DECL
+*/
+void __execute_statement_variable_declaration(java_ir* ir, tree_node* stmt)
+{
+    // JNT_TYPE
+    stmt = stmt->first_child->first_child;
+
+    // get type definition
+    definition* type = type2def(stmt, JNT_VAR_DECL, JLT_UNDEFINED, false);
+    definition* var;
+    reference* lvalue;
+    reference* operand;
+
+    // register from first JNT_VAR_DECL, every id has same type
+    for (stmt = stmt->next_sibling->first_child; stmt != NULL; stmt = stmt->next_sibling)
+    {
+        // only move the definition for the last variable
+        var = def_var(ir, stmt, &type, stmt->next_sibling ? DU_CTL_DATA_COPY : DU_CTL_DEFAULT, false);
+
+        // only generate code for successful registration
+        if (!var) { continue; }
+
+        // create variable data chunk reference
+        lvalue = new_reference(IR_ASN_REF_DEFINITION, var);
+
+        if (stmt->first_child)
+        {
+            // if there is an initializer, parse it
+            walk_expression(ir, stmt->first_child);
+
+            // assignment code
+            operand = new_reference(IR_ASN_REF_INSTRUCTION, TSW(ir)->cur_blk->inst_last);
+            cfg_worker_execute(ir, TSW(ir), IROP_ASN, &lvalue, &operand, NULL);
+
+            // cleanup
+            delete_reference(operand);
+        }
+        else
+        {
+            /**
+             * otherwise we insert a dummy code, indicate that
+             * the variable is defined here and some initialization required
+            */
+            cfg_worker_execute(ir, TSW(ir), IROP_INIT, &lvalue, NULL, NULL);
+        }
+
+        // cleanup
+        delete_reference(lvalue);
+    }
+
+    // cleanup
+    definition_delete(type);
+}
+
+/**
+ * TODO: Statemnt Parser Dispatch
+ *
+ * node: any statement (including JNT_BLOCK)
 */
 void __execute_statement(java_ir* ir, tree_node* stmt)
 {
@@ -513,6 +586,7 @@ void __execute_statement(java_ir* ir, tree_node* stmt)
             walk_expression(ir, stmt->first_child);
             break;
         case JNT_STATEMENT_VAR_DECL:
+            __execute_statement_variable_declaration(ir, stmt);
             break;
         case JNT_STATEMENT_CATCH:
             break;

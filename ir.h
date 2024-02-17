@@ -496,7 +496,7 @@ bool lookup_register(
     java_error_id err
 );
 
-bool def(
+definition* def(
     java_ir* ir,
     char** name,
     definition** type_def,
@@ -519,7 +519,8 @@ definition* type2def(
     lbit_flag modifier,
     bool is_member
 );
-void def_var(java_ir* ir, tree_node* node, lbit_flag modifier, bool is_member);
+definition* def_var(java_ir* ir, tree_node* node, definition** type, def_use_control duc, bool is_member);
+void def_vars(java_ir* ir, tree_node* node, lbit_flag modifier, bool is_member);
 void def_params(java_ir* ir, tree_node* node);
 void def_method(java_ir* ir, tree_node* node, lbit_flag modifier);
 void def_class(java_ir* ir, tree_node* node);
