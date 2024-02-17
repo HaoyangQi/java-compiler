@@ -330,7 +330,7 @@ static void ctx_class(java_ir* ir, tree_node* node)
     }
 
     // cleanup
-    if (member_init_worker.graph->nodes.num > 0)
+    if (!cfg_empty(member_init_worker.graph))
     {
         // no init, just need a memory chunk here
         ir->code_member_init = new_cfg_container();

@@ -247,6 +247,14 @@ void cfg_new_edge(cfg* g, basic_block* from, basic_block* to, edge_type type)
 }
 
 /**
+ * test if graph is empty
+*/
+bool cfg_empty(const cfg* g)
+{
+    return g->nodes.num == 0;
+}
+
+/**
  * detach CFG data
  *
  * nodes.arr and edges.arr cannot be set to NULL

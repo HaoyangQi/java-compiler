@@ -478,7 +478,7 @@ void push_scope_worker(java_ir* ir);
 cfg_worker* get_scope_worker(java_ir* ir);
 cfg_worker* pop_scope_worker(java_ir* ir);
 
-void push_statement_context(java_ir* ir, java_node_query type);
+statement_context* push_statement_context(java_ir* ir, java_node_query type);
 statement_context* get_statement_context(java_ir* ir, java_node_query type);
 void pop_statement_context(java_ir* ir);
 
@@ -538,6 +538,7 @@ void init_cfg(cfg* g);
 void release_cfg(cfg* g);
 basic_block* cfg_new_basic_block(cfg* g);
 void cfg_new_edge(cfg* g, basic_block* from, basic_block* to, edge_type type);
+bool cfg_empty(const cfg* g);
 void cfg_detach(cfg* g);
 
 void init_cfg_worker(cfg_worker* worker);
@@ -555,6 +556,7 @@ instruction* cfg_worker_execute(
     reference** operand_1,
     reference** operand_2
 );
+bool cfg_worker_current_block_empty(const cfg_worker* worker);
 
 reference* new_reference(reference_type t, void* doi);
 reference* copy_reference(const reference* r);

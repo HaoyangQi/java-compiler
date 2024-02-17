@@ -16,7 +16,9 @@ instruction: OP[12] OP[9] 3(3)
 instruction: OP[13] 7(7) 6(6)
 instruction: OP[30] OP[13] OP[12]
 instruction: OP[29] OP[30] OP[19]
-0(0) instruction: OP[19] 1(1) 2(2)
+0(0) instruction: OP[19] y x
+instruction: OP[2] x
+instruction: OP[19] 1(1) 2(2)
 instruction: OP[12] y x
 instruction: OP[13] 6(6) r2
 instruction: OP[12] y OP[13]
@@ -26,7 +28,9 @@ instruction: OP[31] OP[12] r3
 instruction: OP[9] 9(9) y
 instruction: OP[13] OP[9] tmp
 instruction: OP[31] OP[13] tmp
-tmp2 r3 0(0) ===== ABSTRACT SYNTAX TREE =====
+tmp2 r3 instruction: OP[17] y x
+instruction: OP[1] x
+0(0) ===== ABSTRACT SYNTAX TREE =====
 Compilation Unit
   Package Declaration
     Name
@@ -110,6 +114,19 @@ Compilation Unit
                   Type: JLT_RWD_SHORT
             Method Body
               Block
+                While Statement
+                  Expression
+                    Primary
+                      x
+                    Primary
+                      y
+                    OP[19]: OPID_GREAT -> JLT_SYM_ANGLE_BRACKET_CLOSE ">"
+                  Block
+                    Expression Statement
+                      Expression
+                        Primary
+                          x
+                        OP[2]: OPID_POST_DEC -> JLT_SYM_DECREMENT "--"
                 If Statement
                   Expression
                     Primary
@@ -192,6 +209,19 @@ Compilation Unit
                         Expression
                           Primary
                             r3
+                While Statement
+                  Expression
+                    Primary
+                      x
+                    Primary
+                      y
+                    OP[17]: OPID_LESS -> JLT_SYM_ANGLE_BRACKET_OPEN "<"
+                  Block
+                    Expression Statement
+                      Expression
+                        Primary
+                          x
+                        OP[1]: OPID_POST_INC -> JLT_SYM_INCREMENT "++"
                 Return Statement
                   Expression
                     Primary
@@ -210,103 +240,113 @@ longest chain: 1
 ===== MEMBER INITIALIZATION =====
 Code:
 node[0] (entry point) ANY -> 1
-    [0000022322439410]: (li: 0x1{1}) IROP_GT (li: 0x2{2})
-    [0000022322438C90]: (li: 0x4{4}) IROP_MUL (li: 0x5{5})
-    [0000022322439110]: (li: 0x3{3}) IROP_ADD (inst: 0000022322438C90)
-    [0000022322438590]: (li: 0x6{6}) IROP_SUB (li: 0x7{7})
-    [0000022322439190]: (inst: 0000022322439110) IROP_TB (inst: 0000022322438590)
-    [00000223224387D0]: (inst: 0000022322439410) IROP_TC (inst: 0000022322439190)
-    [0000022322438B50]: (def: 0000022322430940) <- (inst: 00000223224387D0) IROP_ASN (null)
+    [000002CBF4B28850]: (li: 0x1{1}) IROP_GT (li: 0x2{2})
+    [000002CBF4B28890]: (li: 0x4{4}) IROP_MUL (li: 0x5{5})
+    [000002CBF4B288D0]: (li: 0x3{3}) IROP_ADD (inst: 000002CBF4B28890)
+    [000002CBF4B27510]: (li: 0x6{6}) IROP_SUB (li: 0x7{7})
+    [000002CBF4B274D0]: (inst: 000002CBF4B288D0) IROP_TB (inst: 000002CBF4B27510)
+    [000002CBF4B27550]: (inst: 000002CBF4B28850) IROP_TC (inst: 000002CBF4B274D0)
+    [000002CBF4B26F90]: (def: 000002CBF4B20950) <- (inst: 000002CBF4B27550) IROP_ASN (null)
 node[1] ANY
-    [0000022322438F90]: (li: 0x0{0}) IROP_NONE (null)
-    [0000022322438CD0]: (def: 0000022322439D60) <- (inst: 0000022322438F90) IROP_ASN (null)
-    [0000022322439450]: (def: 0000022322439DD0) <- (null) IROP_INIT (null)
+    [000002CBF4B26FD0]: (li: 0x0{0}) IROP_NONE (null)
+    [000002CBF4B27710]: (def: 000002CBF4B29DE0) <- (inst: 000002CBF4B26FD0) IROP_ASN (null)
+    [000002CBF4B27590]: (def: 000002CBF4B29E50) <- (null) IROP_INIT (null)
 ===== GLOBAL NAMES =====
 memory: 464 bytes
 load factor: 40.91%
 longest chain: 3
     MyPackageClass:
-      [0](00000223224308D0): class, Access: No Modifier extends C1 implements C2,C3
+      [0](000002CBF4B208E0): class, Access: No Modifier extends C1 implements C2,C3
     calc:
-      [0](0000022322439E40): def method, Access: private, Return: JLT_RWD_INT
+      [0](000002CBF4B29EC0): def method, Access: private, Return: JLT_RWD_INT
 Code:
-node[0] (entry point) TEST -> 1(TRUE) -> 3(FALSE)
-    [00000223224385D0]: (li: 0x2{2}) IROP_GT (li: 0x1{1})
-    [0000022322438D10]: (null) IROP_TEST (null)
-node[1] EXIT -> 2
-    [0000022322439490]: (def: 000002232243A650) IROP_ADD (def: 000002232243A180)
-    [00000223224394D0]: (def: 000002232243A730) IROP_SUB (li: 0x6{6})
-    [0000022322438B90]: (inst: 00000223224394D0) IROP_ADD (def: 000002232243A180)
-    [0000022322438BD0]: (def: 0000022322439D60) <- (inst: 0000022322438B90) IROP_ASN (null)
-    [0000022322438C50]: (li: 0x3{3}) IROP_NONE (null)
-    [0000022322439050]: (inst: 0000022322438C50) IROP_RET (null)
-node[2] EXIT
-    [0000022322437410]: (li: 0x0{0}) IROP_NONE (null)
-    [0000022322436F50]: (inst: 0000022322437410) IROP_RET (null)
-node[3] TEST -> 4(TRUE) -> 6(FALSE)
-    [0000022322438D50]: (def: 000002232243A730) IROP_LT (def: 000002232243A650)
-    [0000022322438C10]: (null) IROP_TEST (null)
-node[4] EXIT -> 5
-    [0000022322438DD0]: (li: 0x9{9}) IROP_NONE (null)
-    [0000022322438F50]: (def: 000002232243A2D0) <- (inst: 0000022322438DD0) IROP_ASN (null)
-    [0000022322439150]: (def: 000002232243A180) <- (def: 000002232243A180) IROP_ADD (li: 0x2{2})
-    [0000022322439090]: (def: 000002232243A3B0) <- (null) IROP_INIT (null)
-    [00000223224391D0]: (def: 000002232243A180) IROP_MUL (li: 0x9{9})
-    [00000223224390D0]: (def: 000002232243A2D0) IROP_SUB (inst: 00000223224391D0)
-    [0000022322439210]: (def: 000002232243A2D0) <- (inst: 00000223224390D0) IROP_ASN (null)
-    [0000022322437390]: (def: 000002232243A3B0) IROP_NONE (null)
-    [0000022322436F10]: (inst: 0000022322437390) IROP_RET (null)
-node[5] ANY -> 2
+node[0] (entry point) TEST -> 1(FALSE) -> 2(TRUE)
+    [000002CBF4B2B740]: (def: 000002CBF4B2A2E0) IROP_GT (def: 000002CBF4B2A5F0)
+    [000002CBF4B2B340]: (null) IROP_TEST (null)
+node[1] TEST -> 3(TRUE) -> 5(FALSE)
+    [000002CBF4B2BA80]: (li: 0x2{2}) IROP_GT (li: 0x1{1})
+    [000002CBF4B2BC80]: (null) IROP_TEST (null)
+node[2] ANY -> 0
+    [000002CBF4B2BEC0]: (null) IROP_ADEC (def: 000002CBF4B2A2E0)
+node[3] EXIT -> 4
+    [000002CBF4B2B840]: (def: 000002CBF4B2A2E0) IROP_ADD (def: 000002CBF4B2A5F0)
+    [000002CBF4B2BB40]: (def: 000002CBF4B2A190) IROP_SUB (li: 0x6{6})
+    [000002CBF4B2BAC0]: (inst: 000002CBF4B2BB40) IROP_ADD (def: 000002CBF4B2A5F0)
+    [000002CBF4B2C080]: (def: 000002CBF4B29DE0) <- (inst: 000002CBF4B2BAC0) IROP_ASN (null)
+    [000002CBF4B2B380]: (li: 0x3{3}) IROP_NONE (null)
+    [000002CBF4B2B140]: (inst: 000002CBF4B2B380) IROP_RET (null)
+node[4] TEST -> 9(FALSE) -> 10(TRUE)
+    [000002CBF4B2B400]: (def: 000002CBF4B2A2E0) IROP_LT (def: 000002CBF4B2A5F0)
+    [000002CBF4B2B3C0]: (null) IROP_TEST (null)
+node[5] TEST -> 6(TRUE) -> 8(FALSE)
+    [000002CBF4B2BBC0]: (def: 000002CBF4B2A190) IROP_LT (def: 000002CBF4B2A2E0)
+    [000002CBF4B2BD80]: (null) IROP_TEST (null)
+node[6] EXIT -> 7
+    [000002CBF4B2BB80]: (li: 0x9{9}) IROP_NONE (null)
+    [000002CBF4B2B640]: (def: 000002CBF4B2A660) <- (inst: 000002CBF4B2BB80) IROP_ASN (null)
+    [000002CBF4B2BC00]: (def: 000002CBF4B2A5F0) <- (def: 000002CBF4B2A5F0) IROP_ADD (li: 0x2{2})
+    [000002CBF4B2BB00]: (def: 000002CBF4B2A740) <- (null) IROP_INIT (null)
+    [000002CBF4B2B4C0]: (def: 000002CBF4B2A5F0) IROP_MUL (li: 0x9{9})
+    [000002CBF4B2B8C0]: (def: 000002CBF4B2A660) IROP_SUB (inst: 000002CBF4B2B4C0)
+    [000002CBF4B2B180]: (def: 000002CBF4B2A660) <- (inst: 000002CBF4B2B8C0) IROP_ASN (null)
+    [000002CBF4B2BCC0]: (def: 000002CBF4B2A740) IROP_NONE (null)
+    [000002CBF4B2BA40]: (inst: 000002CBF4B2BCC0) IROP_RET (null)
+node[7] ANY -> 4
     (no instructions)
-node[6] EXIT -> 5
-    [0000022322437810]: (def: 0000022322439D60) IROP_NONE (null)
-    [0000022322436D50]: (inst: 0000022322437810) IROP_RET (null)
+node[8] EXIT -> 7
+    [000002CBF4B2BF00]: (def: 000002CBF4B29DE0) IROP_NONE (null)
+    [000002CBF4B2B980]: (inst: 000002CBF4B2BF00) IROP_RET (null)
+node[9] EXIT
+    [000002CBF4B2B580]: (li: 0x0{0}) IROP_NONE (null)
+    [000002CBF4B2BC40]: (inst: 000002CBF4B2B580) IROP_RET (null)
+node[10] ANY -> 4
+    [000002CBF4B2B1C0]: (null) IROP_AINC (def: 000002CBF4B2A2E0)
 
     DecimalFormat:
-      [0](0000022322437C50): import, FROM java.text
+      [0](000002CBF4B27CD0): import, FROM java.text
     basic:
-      [0](0000022322439EB0): def method, Access: public static, Return: JLT_RWD_VOID
+      [0](000002CBF4B29F30): def method, Access: public static, Return: JLT_RWD_VOID
 Code:
 (no code)
 
     InputMismatchException:
-      [0](0000022322437CC0): import, FROM java.util
+      [0](000002CBF4B27D40): import, FROM java.util
     r4:
-      [0](0000022322439DD0): def member var, Access: No Modifier, Type: JLT_RWD_SHORT
+      [0](000002CBF4B29E50): def member var, Access: No Modifier, Type: JLT_RWD_SHORT
     r2:
-      [0](0000022322430940): def member var, Access: No Modifier, Type: JLT_RWD_INT
+      [0](000002CBF4B20950): def member var, Access: No Modifier, Type: JLT_RWD_INT
     r3:
-      [0](0000022322439D60): def member var, Access: No Modifier, Type: JLT_RWD_INT
+      [0](000002CBF4B29DE0): def member var, Access: No Modifier, Type: JLT_RWD_INT
     Scanner:
-      [0](0000022322430860): import, FROM java.util
+      [0](000002CBF4B20870): import, FROM java.util
 ===== LITERALS =====
 memory: 464 bytes
 load factor: 40.91%
 longest chain: 1
     1:
-      [0](000002232243A260): number,1
+      [0](000002CBF4B2A820): number,1
     9:
-      [0](000002232243A340): number,9
+      [0](000002CBF4B2A6D0): number,9
     7:
-      [0](000002232243A110): number,7
+      [0](000002CBF4B2A4A0): number,7
     5:
-      [0](000002232243A1F0): number,5
+      [0](000002CBF4B2A430): number,5
     0:
-      [0](000002232243A0A0): number,0
+      [0](000002CBF4B2A3C0): number,0
     3:
-      [0](000002232243A570): number,3
+      [0](000002CBF4B2A510): number,3
     2:
-      [0](0000022322439FE0): number,2
+      [0](000002CBF4B2A060): number,2
     6:
-      [0](000002232243A5E0): number,6
+      [0](000002CBF4B2A350): number,6
     4:
-      [0](000002232243A500): number,4
+      [0](000002CBF4B2A580): number,4
 ===== LOOKUP STACK =====
 (lookup stack is empty)
 ===== DEFINITION POOL =====
-[0](000002232243A650): def var, Access: No Modifier, Type: JLT_RWD_INT
-[1](000002232243A180): def var, Access: No Modifier, Type: JLT_RWD_INT
-[2](000002232243A730): def var, Access: No Modifier, Type: JLT_RWD_SHORT
-[3](000002232243A2D0): def var, Access: No Modifier, Type: JLT_RWD_INT
-[4](000002232243A3B0): def var, Access: No Modifier, Type: JLT_RWD_INT
+[0](000002CBF4B2A2E0): def var, Access: No Modifier, Type: JLT_RWD_INT
+[1](000002CBF4B2A5F0): def var, Access: No Modifier, Type: JLT_RWD_INT
+[2](000002CBF4B2A190): def var, Access: No Modifier, Type: JLT_RWD_SHORT
+[3](000002CBF4B2A660): def var, Access: No Modifier, Type: JLT_RWD_INT
+[4](000002CBF4B2A740): def var, Access: No Modifier, Type: JLT_RWD_INT
 Press any key to continue . . .

@@ -138,7 +138,7 @@ void cfg_worker_grow_with_graph(cfg_worker* dest, cfg_worker* src)
 
     // only do heavy work if graph is not empty
     // now an entry must be determined otherwise it will crash purposefully
-    if (src->graph->nodes.num > 0)
+    if (!cfg_empty(src->graph))
     {
         // array resizing
         node_array_resize(&dest_graph->nodes, src_graph->nodes.num);
@@ -273,4 +273,14 @@ instruction* cfg_worker_execute(
     }
 
     return inst;
+}
+
+/**
+ * test if current block is empty
+ *
+ * if graph is empty, then it also return true
+*/
+bool cfg_worker_current_block_empty(const cfg_worker* worker)
+{
+    return !(worker->cur_blk && worker->cur_blk->inst_first);
 }
