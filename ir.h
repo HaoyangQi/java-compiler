@@ -15,6 +15,9 @@
 // hash table mapping string->definition wrapper
 #define HT_STR2DEF(t, s) ((definition*)shash_table_find(t, s))
 
+// fast top scope worker getter (no NULL check)
+#define TSW(ir) ((ir)->scope_workers->worker)
+
 /**
  * def/use control bit flags
  *
@@ -395,6 +398,41 @@ typedef struct
 } cfg_worker;
 
 /**
+ * scope worker context
+ *
+*/
+typedef struct __cfg_worker_context
+{
+    cfg_worker* worker;
+    struct __cfg_worker_context* next;
+} cfg_worker_context;
+
+/**
+ * statement context info
+ *
+ * this info is used by statements that allow following:
+ * 1. break: while/do/for/switch
+ * 2. continue: while/do/for
+*/
+typedef struct __statement_context
+{
+    /**
+     * only following value are used:
+     * JNT_STATEMENT_FOR
+     * JNT_STATEMENT_WHILE
+     * JNT_STATEMENT_DO
+     * JNT_STATEMENT_SWITCH
+    */
+    java_node_query type;
+    // the block in statement that "continue" jumps to
+    basic_block* _continue;
+    // the block in statement that "break" jumps to
+    basic_block* _break;
+
+    struct __statement_context* next;
+} statement_context;
+
+/**
  * Top Level of Semantics
  *
  * on top level, each method occupies a tree of blocks
@@ -415,8 +453,10 @@ typedef struct
     definition* local_def_pool;
     // stack top symbol lookup
     scope_frame* scope_stack_top;
-    // toplevel block count
-    size_t num_methods;
+    // scope worker context stack
+    cfg_worker_context* scope_workers;
+    // statement context stack
+    statement_context* statement_contexts;
 
     // architecture info
     architecture* arch;
@@ -433,6 +473,14 @@ char* t2s(java_token* token);
 definition* t2d(hash_table* table, java_token* token);
 primitive t2p(java_ir* ir, java_token* t, uint64_t* n);
 char* name_unit_concat(tree_node* from, tree_node* stop_before);
+
+void push_scope_worker(java_ir* ir);
+cfg_worker* get_scope_worker(java_ir* ir);
+cfg_worker* pop_scope_worker(java_ir* ir);
+
+void push_statement_context(java_ir* ir, java_node_query type);
+statement_context* get_statement_context(java_ir* ir, java_node_query type);
+void pop_statement_context(java_ir* ir);
 
 void lookup_scope_deleter(char* k, definition* v);
 hash_table* lookup_new_scope(java_ir* ir, lookup_scope_type type);
@@ -497,7 +545,7 @@ basic_block* cfg_worker_current_block(cfg_worker* worker);
 basic_block* cfg_worker_grow(cfg_worker* worker);
 void cfg_worker_next_outbound_strategy(cfg_worker* worker, edge_type type);
 basic_block* cfg_worker_jump(cfg_worker* worker, basic_block* to, bool change_cur, bool edge);
-void cfg_worker_grow_with_graph(cfg_worker* dest, cfg_worker** src);
+void cfg_worker_grow_with_graph(cfg_worker* dest, cfg_worker* src);
 instruction* cfg_worker_execute(
     java_ir* ir,
     cfg_worker* worker,

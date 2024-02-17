@@ -125,13 +125,14 @@ basic_block* cfg_worker_jump(cfg_worker* worker, basic_block* to, bool change_cu
  * block, but instead of appending a new block, it appends
  * a new graph
  *
- * once merged, src worker will be released
+ * NOTE:
+ * once merged, src worker will be released AND deleted
+ * so do NOT use stack variable as source worker
 */
-void cfg_worker_grow_with_graph(cfg_worker* dest, cfg_worker** src_worker)
+void cfg_worker_grow_with_graph(cfg_worker* dest, cfg_worker* src)
 {
-    if (!src_worker) { return; }
+    if (!src) { return; }
 
-    cfg_worker* src = *src_worker;
     cfg* dest_graph = dest->graph;
     cfg* src_graph = src->graph;
 
@@ -183,9 +184,8 @@ void cfg_worker_grow_with_graph(cfg_worker* dest, cfg_worker** src_worker)
 
     // cleanup
     cfg_detach(src->graph);
-    release_cfg_worker(*src_worker, NULL);
-    free(*src_worker);
-    *src_worker = NULL;
+    release_cfg_worker(src, NULL);
+    free(src);
 }
 
 /**
