@@ -158,7 +158,7 @@ cfg_worker* pop_scope_worker(java_ir* ir)
  *
  * it will return the context
 */
-void push_statement_context(java_ir* ir, java_node_query type)
+statement_context* push_statement_context(java_ir* ir, java_node_query type)
 {
     statement_context* c = (statement_context*)malloc_assert(sizeof(statement_context));
 
@@ -167,6 +167,8 @@ void push_statement_context(java_ir* ir, java_node_query type)
     c->_continue = NULL;
     c->next = ir->statement_contexts;
     ir->statement_contexts = c;
+
+    return c;
 }
 
 /**

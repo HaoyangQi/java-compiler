@@ -313,12 +313,13 @@ void walk_expression(java_ir* ir, tree_node* expression)
  * NOTE: keep this method up-to-date based on algorithm of
  *       corresponding statement parser
 */
-static void __start_statement_in_new_block(cfg_worker* worker, java_node_query stmt_type)
+static void __start_statement_in_new_block(java_ir* ir, java_node_query stmt_type)
 {
+    cfg_worker* w = get_scope_worker(ir);
+
     switch (stmt_type)
     {
         case JNT_STATEMENT_SWITCH:
-        case JNT_STATEMENT_WHILE:
         case JNT_STATEMENT_FOR:
         case JNT_STATEMENT_CATCH:
         case JNT_BLOCK:
@@ -328,7 +329,11 @@ static void __start_statement_in_new_block(cfg_worker* worker, java_node_query s
             */
             break;
         default:
-            cfg_worker_grow(worker);
+            // only grow when current block is not empty
+            if (!cfg_worker_current_block_empty(w))
+            {
+                cfg_worker_grow(w);
+            }
             break;
     }
 }
@@ -417,7 +422,6 @@ void __execute_statement_if(java_ir* ir, tree_node* stmt)
 
     // mark block as a test block
     cfg_worker_execute(ir, TSW(ir), IROP_TEST, NULL, NULL, NULL);
-    cfg_worker_next_outbound_strategy(TSW(ir), EDGE_TRUE);
 
     // mark test node
     test = cfg_worker_current_block(TSW(ir));
@@ -426,13 +430,14 @@ void __execute_statement_if(java_ir* ir, tree_node* stmt)
     stmt = stmt->next_sibling;
 
     // parse true branch
+    cfg_worker_next_outbound_strategy(TSW(ir), EDGE_TRUE);
     if (stmt->type == JNT_STATEMENT_VAR_DECL)
     {
         ir_error(ir, JAVA_E_IF_LOCAL_VAR_DECL);
     }
     else
     {
-        __start_statement_in_new_block(TSW(ir), stmt->type);
+        __start_statement_in_new_block(ir, stmt->type);
         __execute_statement(ir, stmt);
     }
 
@@ -455,7 +460,7 @@ void __execute_statement_if(java_ir* ir, tree_node* stmt)
         }
         else
         {
-            __start_statement_in_new_block(TSW(ir), stmt->type);
+            __start_statement_in_new_block(ir, stmt->type);
             __execute_statement(ir, stmt);
         }
     }
@@ -538,6 +543,85 @@ void __execute_statement_variable_declaration(java_ir* ir, tree_node* stmt)
 }
 
 /**
+ * walk while statement
+ *
+ * JNT_STATEMENT_WHILE
+ * |
+ * +--- JNT_EXPRESSION
+ * |
+ * +--- statement
+ *
+ * node: JNT_STATEMENT_WHILE
+*/
+void __execute_statement_while(java_ir* ir, tree_node* stmt)
+{
+    statement_context* sc = push_statement_context(ir, stmt->type);
+    basic_block* test;
+
+    /**
+     * since condition block needs to be revisited
+     * during iteration, so it must stay in its own block
+     *
+     * do not use cfg_worker_grow here: we do not know if
+     * current node is empty
+    */
+    __start_statement_in_new_block(ir, stmt->type);
+
+    // mark continue point: which is the start of expression
+    sc->_continue = cfg_worker_current_block(TSW(ir));
+
+    // parse condition
+    stmt = stmt->first_child;
+    walk_expression(ir, stmt);
+
+    // mark test block
+    cfg_worker_execute(ir, TSW(ir), IROP_TEST, NULL, NULL, NULL);
+
+    // mark test block: which is the end of expression
+    test = cfg_worker_current_block(TSW(ir));
+
+    /**
+     * prepare break point first
+     *
+     * WARNING: order matters here!
+     * we must prepare loop break-out node first to finalize
+     * the statement context before we go into the loop
+     * body, which is the recursion, and other statements
+     * within the loop body need this context to work properly
+     *
+     * mark break point: which is the false branch block;
+     * worker will also stop at this empty block for
+     * future parsing
+    */
+    cfg_worker_next_outbound_strategy(TSW(ir), EDGE_FALSE);
+    sc->_break = cfg_worker_grow(TSW(ir));
+
+    // go back to test node to branch into loop body
+    cfg_worker_jump(TSW(ir), test, true, false);
+    cfg_worker_next_outbound_strategy(TSW(ir), EDGE_TRUE);
+
+    // parse loop body
+    stmt = stmt->next_sibling;
+    if (stmt->type == JNT_STATEMENT_VAR_DECL)
+    {
+        ir_error(ir, JAVA_E_IF_LOCAL_VAR_DECL);
+    }
+    else
+    {
+        __start_statement_in_new_block(ir, stmt->type);
+        __execute_statement(ir, stmt);
+    }
+
+    // add edge to loop back to test block
+    cfg_worker_next_outbound_strategy(TSW(ir), EDGE_JUMP);
+    cfg_worker_jump(TSW(ir), test, false, true);
+
+    // cleanup: need to stop at break point for future parsing
+    cfg_worker_jump(TSW(ir), sc->_break, true, false);
+    pop_statement_context(ir);
+}
+
+/**
  * TODO: Statemnt Parser Dispatch
  *
  * node: any statement (including JNT_BLOCK)
@@ -577,6 +661,7 @@ void __execute_statement(java_ir* ir, tree_node* stmt)
             __execute_statement_if(ir, stmt);
             break;
         case JNT_STATEMENT_WHILE:
+            __execute_statement_while(ir, stmt);
             break;
         case JNT_STATEMENT_FOR:
             break;
