@@ -1712,3 +1712,16 @@ void debug_print_definition_pool(java_ir* ir)
 
     debug_print_definitions(ir->local_def_pool);
 }
+
+void debug_print_member_initialization(java_ir* ir)
+{
+    printf("===== MEMBER INITIALIZATION =====\n");
+
+    if (!ir->code_member_init)
+    {
+        printf("(No code)\n");
+        return;
+    }
+
+    debug_print_cfg(ir->code_member_init);
+}

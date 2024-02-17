@@ -160,6 +160,11 @@ static void ctx_class(java_ir* ir, tree_node* node)
     tree_node* declaration = NULL;
     definition* desc = NULL;
     cfg_worker* worker = NULL;
+    reference* lvalue;
+    reference* operand;
+    cfg_worker member_init_worker;
+
+    init_cfg_worker(&member_init_worker);
 
     /**
      * JNT_TOP_LEVEL
@@ -232,7 +237,9 @@ static void ctx_class(java_ir* ir, tree_node* node)
             if (declaration->next_sibling->type == JNT_VAR_DECLARATORS)
             {
                 declaration = declaration->next_sibling->first_child;
-                // desc = t2d(table, declaration->data->declarator.id.complex);
+
+                // we only have global to lookup so no need to call use()
+                desc = t2d(table, declaration->data->declarator.id.complex);
 
                 // if has a child, then it is the initializer
                 declaration = declaration->first_child;
@@ -240,10 +247,26 @@ static void ctx_class(java_ir* ir, tree_node* node)
                 {
                     if (declaration->type == JNT_EXPRESSION)
                     {
-                        // top-level defs do not have order
+                        // parse right side
                         worker = walk_expression(ir, declaration);
-                        release_cfg_worker(worker, ir->code_member_init);
-                        free(worker);
+
+                        // prepare assignment code
+                        lvalue = new_reference();
+                        lvalue->type = IR_ASN_REF_DEFINITION;
+                        lvalue->doi = desc;
+                        operand = new_reference();
+                        operand->type = IR_ASN_REF_INSTRUCTION;
+                        operand->doi = worker->cur_blk->inst_last;
+
+                        // add assignment code
+                        cfg_worker_execute(ir, worker, IROP_ASN, &lvalue, &operand, NULL);
+
+                        // cleanup
+                        delete_reference(lvalue);
+                        delete_reference(operand);
+
+                        // merge code
+                        cfg_worker_grow_with_graph(&member_init_worker, &worker);
                     }
                     else if (declaration->type == JNT_ARRAY_INIT)
                     {
@@ -291,6 +314,18 @@ static void ctx_class(java_ir* ir, tree_node* node)
         }
 
         part = part->next_sibling;
+    }
+
+    // cleanup
+    if (member_init_worker.graph->nodes.num > 0)
+    {
+        // no init, just need a memory chunk here
+        ir->code_member_init = new_cfg_container();
+        release_cfg_worker(&member_init_worker, ir->code_member_init);
+    }
+    else
+    {
+        release_cfg_worker(&member_init_worker, NULL);
     }
 }
 

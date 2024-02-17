@@ -13,6 +13,7 @@ class MyPackageClass extends C1 implements C2, C3 {
     //int r = 4 * (a + 7) - a / 2;
     //int r1 = 1-1-1-1-1-1;
     int r2 = 1>2?3+4*5:6-7;//1+2*3/4;
+    int r3 = 0;
 
     //public static void main(String[] args) {
     //    System.out.println("This is my package!");
@@ -23,19 +24,14 @@ class MyPackageClass extends C1 implements C2, C3 {
         {
             return 3;
         }
-        else if (0)
+        else if (r2 > x)
         {
-            return 9;
+            return y;
         }
         else 
         {
-            return 4;
+            return r3;
         }
-
-        //if (x > y)
-        //{
-        //    return x;
-        //}
 
         return 0;
     }

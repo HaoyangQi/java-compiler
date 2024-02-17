@@ -15,7 +15,7 @@ void init_ir(java_ir* ir, java_expression* expression, java_error_stack* error)
     ir->arch = NULL;
     ir->expression = expression;
     ir->error = error;
-    ir->code_member_init = new_cfg_container();
+    ir->code_member_init = NULL;
 
     init_hash_table(&ir->tbl_on_demand_packages, HASH_TABLE_DEFAULT_BUCKET_SIZE);
     init_hash_table(&ir->tbl_global, HASH_TABLE_DEFAULT_BUCKET_SIZE);
