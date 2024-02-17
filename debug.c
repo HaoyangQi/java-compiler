@@ -1306,6 +1306,9 @@ static void debug_print_irop(operation irop)
         case IROP_NONE:
             printf("IROP_NONE");
             break;
+        case IROP_INIT:
+            printf("IROP_INIT");
+            break;
         case IROP_JMP:
             printf("IROP_JMP");
             break;

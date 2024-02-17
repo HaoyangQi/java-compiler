@@ -10,9 +10,12 @@
  *
  * name will be set to NULL if successful; stay as-is otherwise
  *
+ * it returns the definition reference of the variable after
+ * successful registration; NULL otherwise
+ *
  * node: variable declarator
 */
-bool def(
+definition* def(
     java_ir* ir,
     char** name,
     definition** type_def,
@@ -23,39 +26,27 @@ bool def(
     java_error_id err_dim_dup
 )
 {
+    // test if declarator can be registered
+    if (use(ir, *name, duc, JAVA_E_MAX) != NULL)
+    {
+        ir_error(ir, err_dup);
+        return NULL;
+    }
+
     hash_table* table = lookup_working_scope(ir);
-    char* n = *name;
     bool copy_def = duc & DU_CTL_DATA_COPY;
     definition* tdef = copy_def ? definition_copy(*type_def) : *type_def;
 
-    // test if exists
-    bool success = use(ir, n, duc, JAVA_E_MAX) == NULL;
+    // register
+    shash_table_insert(table, *name, tdef);
 
-    // test if declarator can be registered
-    if (success)
+    // we always move name, so simply detach
+    *name = NULL;
+
+    // only detach if the reference is moved successfully
+    if (!copy_def)
     {
-        // we always move name, so no need to free if successful
-        shash_table_insert(table, n, tdef);
-
-        // we always move name, so simply detach
-        *name = NULL;
-
-        // only detach if the reference is moved successfully
-        if (!copy_def)
-        {
-            *type_def = NULL;
-        }
-    }
-    else
-    {
-        ir_error(ir, err_dup);
-
-        // we do not know if rejected moved data will be reused
-        // but copied data can, and should be deleted on failure 
-        if (copy_def)
-        {
-            definition_delete(tdef);
-        }
+        *type_def = NULL;
     }
 
     /**
@@ -80,7 +71,7 @@ bool def(
         }
     }
 
-    return success;
+    return tdef;
 }
 
 /**
@@ -178,6 +169,7 @@ definition* def_li(java_ir* ir, java_token* token)
  *
  * it returns a definition regarding the type
  * modifier is optional, pass JLT_UNDEFINED
+ * as "no modifier specified"
  *
  * node: JNT_TYPE
 */
@@ -227,46 +219,65 @@ definition* type2def(
 /**
  * register a variable in lookup table
  *
- * node: JNT_TYPE---JNT_VAR_DECLARATORS
+ * returns the definition data reference of the variable registered;
+ * NULL otherwise
+ *
+ * JNT_VAR_DECL
+ * |
+ * +--- JNT_EXPRESSION
+ *
+ * node: JNT_VAR_DECL
 */
-void def_var(java_ir* ir, tree_node* node, lbit_flag modifier, bool is_member)
+definition* def_var(java_ir* ir, tree_node* node, definition** type, def_use_control duc, bool is_member)
+{
+    char* name = t2s(node->data->declarator.id.complex);
+
+    definition* data = def(
+        ir, &name, type,
+        node->data->declarator.dimension,
+        duc | DU_CTL_LOOKUP_GLOBAL,
+        is_member ? JAVA_E_MEMBER_VAR_DUPLICATE : JAVA_E_LOCAL_VAR_DUPLICATE,
+        is_member ? JAVA_E_MEMBER_VAR_DIM_AMBIGUOUS : JAVA_E_LOCAL_VAR_DIM_AMBIGUOUS,
+        is_member ? JAVA_E_MEMBER_VAR_DIM_DUPLICATE : JAVA_E_LOCAL_VAR_DIM_DUPLICATE
+    );
+
+    // if succeeds, name is NULL here so it is safe
+    free(name);
+
+    return data;
+}
+
+/**
+ * register all declarators under one type in lookup table
+ *
+ * NOTE: this method will skip initializers
+ *
+ * JNT_TYPE
+ * |
+ * JNT_VAR_DECLARATORS
+ * |
+ * +--- JNT_VAR_DECL
+ * |    |
+ * |    +--- JNT_EXPRESSION
+ * |
+ * +--- JNT_VAR_DECL
+ * |
+ * +--- ...
+ *
+ * node: JNT_TYPE
+*/
+void def_vars(java_ir* ir, tree_node* node, lbit_flag modifier, bool is_member)
 {
     definition* desc = type2def(node, JNT_VAR_DECL, modifier, is_member);
 
-    /**
-     * type
-     * |
-     * variable declarators
-     * |
-     * +--- declarator 1
-     * |    |
-     * |    +--- expr
-     * |
-     * +--- declarator 2
-     * |    |
-     * |    +--- expr
-     * |
-     * +--- ...
-    */
+    // first JNT_VAR_DECL
     node = node->next_sibling->first_child;
 
     // register, every id has same type
     while (node)
     {
-        char* name = t2s(node->data->declarator.id.complex);
-
-        def(
-            ir, &name, &desc,
-            node->data->declarator.dimension,
-            DU_CTL_DATA_COPY | DU_CTL_LOOKUP_GLOBAL,
-            is_member ? JAVA_E_MEMBER_VAR_DUPLICATE : JAVA_E_LOCAL_VAR_DUPLICATE,
-            is_member ? JAVA_E_MEMBER_VAR_DIM_AMBIGUOUS : JAVA_E_LOCAL_VAR_DIM_AMBIGUOUS,
-            is_member ? JAVA_E_MEMBER_VAR_DIM_DUPLICATE : JAVA_E_LOCAL_VAR_DIM_DUPLICATE
-        );
-
-        // if succeeds, name is NULL here so it is safe
-        free(name);
-
+        // only move the definition for the last variable
+        def_var(ir, node, &desc, node->next_sibling ? DU_CTL_DATA_COPY : DU_CTL_DEFAULT, is_member);
         node = node->next_sibling;
     }
 
@@ -505,7 +516,7 @@ void def_class(java_ir* ir, tree_node* node)
             switch (probe->next_sibling->type)
             {
                 case JNT_VAR_DECLARATORS:
-                    def_var(ir, probe, part->data->top_level_declaration.modifier, true);
+                    def_vars(ir, probe, part->data->top_level_declaration.modifier, true);
                     break;
                 case JNT_METHOD_DECL:
                     def_method(ir, probe, part->data->top_level_declaration.modifier);
