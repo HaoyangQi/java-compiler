@@ -507,7 +507,7 @@ instruction* cfg_worker_execute(
     reference** operand_2
 );
 
-reference* new_reference();
+reference* new_reference(reference_type t, void* doi);
 reference* copy_reference(const reference* r);
 void delete_reference(reference* ref);
 

@@ -30,7 +30,7 @@ static reference* __interpret_operand(java_ir* ir, tree_node* base)
         return NULL;
     }
 
-    reference* ref = new_reference();
+    reference* ref = new_reference(IR_ASN_REF_UNDEFINED, NULL);
 
     // if an operand is refernecing an old OP, it means
     // it referes to that instruction
@@ -338,9 +338,7 @@ void __execute_statement_return(java_ir* ir, cfg_worker* worker, tree_node* stmt
         cfg_worker_grow_with_graph(worker, &w);
 
         // prepare reference
-        ref = new_reference();
-        ref->type = IR_ASN_REF_INSTRUCTION;
-        ref->doi = worker->cur_blk->inst_last;
+        ref = new_reference(IR_ASN_REF_INSTRUCTION, worker->cur_blk->inst_last);
     }
 
     // execute

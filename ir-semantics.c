@@ -251,12 +251,8 @@ static void ctx_class(java_ir* ir, tree_node* node)
                         worker = walk_expression(ir, declaration);
 
                         // prepare assignment code
-                        lvalue = new_reference();
-                        lvalue->type = IR_ASN_REF_DEFINITION;
-                        lvalue->doi = desc;
-                        operand = new_reference();
-                        operand->type = IR_ASN_REF_INSTRUCTION;
-                        operand->doi = worker->cur_blk->inst_last;
+                        lvalue = new_reference(IR_ASN_REF_DEFINITION, desc);
+                        operand = new_reference(IR_ASN_REF_INSTRUCTION, worker->cur_blk->inst_last);
 
                         // add assignment code
                         cfg_worker_execute(ir, worker, IROP_ASN, &lvalue, &operand, NULL);

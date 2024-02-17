@@ -1455,7 +1455,7 @@ static void debug_print_cfg(cfg* g)
         b = g->nodes.arr[i];
 
         // print node header
-        printf("node [%zd](%p)%s", b->id, b, b == g->entry ? " entry point " : " ");
+        printf("node[%zd]%s", b->id, b == g->entry ? " (entry point) " : " ");
         debug_print_cfg_node_type(b->type);
 
         // print node edges

@@ -310,12 +310,12 @@ void delete_instruction(instruction* inst, bool destructive)
 /**
  * new reference
 */
-reference* new_reference()
+reference* new_reference(reference_type t, void* doi)
 {
     reference* ref = (reference*)malloc_assert(sizeof(reference));
 
-    ref->type = IR_ASN_REF_UNDEFINED;
-    ref->doi = NULL;
+    ref->type = t;
+    ref->doi = doi;
     ref->ver = 0;
 
     return ref;
