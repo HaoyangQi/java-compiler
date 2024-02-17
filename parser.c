@@ -198,17 +198,17 @@ static tree_node* parse_binary_ambiguity(
     copy_parser(parser, parser_2);
 
     // parse path 1
-    n1 = (*f1)(parser);
-    n1_valid = parser_1->error->num_err > 0;
+    n1 = (*f1)(parser_1);
+    n1_valid = parser_1->error->num_err == 0;
 
     // parse path 2
     n2 = (*f2)(parser_2);
-    n2_valid = parser_2->error->num_err > 0;
+    n2_valid = parser_2->error->num_err == 0;
 
     // verify terminator and determine final validity status
     n1_valid = n1_valid &&
-        (terminator == JLT_MAX || peek_token_type_is(parser, TOKEN_PEEK_1st, terminator));
-    n2_valid = n1_valid &&
+        (terminator == JLT_MAX || peek_token_type_is(parser_1, TOKEN_PEEK_1st, terminator));
+    n2_valid = n2_valid &&
         (terminator == JLT_MAX || peek_token_type_is(parser_2, TOKEN_PEEK_1st, terminator));
 
     if (n1_valid && n2_valid)
@@ -219,9 +219,12 @@ static tree_node* parse_binary_ambiguity(
         tree_node_add_child(node, n2);
 
         // convergence test
-        if (parser->buffer->cur != parser_2->buffer->cur)
+        if (parser_1->buffer->cur != parser_2->buffer->cur)
         {
-            fprintf(stderr, "TODO error: internal error: ambiguity diverges: termination differs.\n");
+            fprintf(stderr,
+                "TODO error: internal error: ambiguity diverges: termination differs (0x%x 0x%x).\n",
+                *(parser_1->buffer->cur), *(parser_2->buffer->cur)
+            );
         }
 
         /**
@@ -1443,7 +1446,7 @@ static tree_node* parse_local_variable_declaration(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected variable declarator.\n");
+        parser_error(parser, JAVA_E_VAR_NO_DECLARATOR);
     }
 
     return node;
@@ -2928,7 +2931,7 @@ static tree_node* parse_variable_declarator(java_parser* parser)
         }
         else
         {
-            fprintf(stderr, "TODO error: expected ']'\n");
+            parser_error(parser, JAVA_E_VAR_NO_ARR_ENCLOSE);
             return node;
         }
 

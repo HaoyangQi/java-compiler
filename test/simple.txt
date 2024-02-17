@@ -22,9 +22,11 @@ class MyPackageClass extends C1 implements C2, C3 {
     private int calc(int x, int y, short r2) {
         if (2 > 1)
         {
+            x + y;
+            r3 = r2 - 6 + y;
             return 3;
         }
-        else if (r2 > x)
+        else if (r2 < x)
         {
             return y;
         }

@@ -565,7 +565,7 @@ bool instruction_insert(basic_block* node, instruction* prev, instruction* inst)
 bool instruction_push_back(basic_block* node, instruction* inst);
 bool instruction_push_front(basic_block* node, instruction* inst);
 
-cfg_worker* walk_expression(java_ir* ir, tree_node* expression);
+void walk_expression(java_ir* ir, tree_node* expression);
 cfg_worker* walk_block(java_ir* ir, tree_node* block, bool use_new_scope);
 
 void init_ir(java_ir* ir, java_expression* expression, java_error_stack* error);
