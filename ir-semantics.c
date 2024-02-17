@@ -262,7 +262,7 @@ static void ctx_class(java_ir* ir, tree_node* node)
                         delete_reference(operand);
 
                         // merge code
-                        cfg_worker_grow_with_graph(&member_init_worker, &worker);
+                        cfg_worker_grow_with_graph(&member_init_worker, worker);
                     }
                     else if (declaration->type == JNT_ARRAY_INIT)
                     {

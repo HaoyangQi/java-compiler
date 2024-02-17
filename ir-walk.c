@@ -313,7 +313,58 @@ cfg_worker* walk_expression(java_ir* ir, tree_node* expression)
     return worker;
 }
 
-void __execute_statement(java_ir* ir, cfg_worker* worker, tree_node* stmt, bool execute_in_new_block);
+/**
+ * grow worker to guarantee that next statement always
+ * starts in a new block
+ *
+ * NOTE: keep this method up-to-date based on algorithm of
+ *       corresponding statement parser
+*/
+static void __start_statement_in_new_block(cfg_worker* worker, java_node_query stmt_type)
+{
+    switch (stmt_type)
+    {
+        case JNT_STATEMENT_SWITCH:
+        case JNT_STATEMENT_IF:
+        case JNT_STATEMENT_WHILE:
+        case JNT_STATEMENT_FOR:
+        case JNT_STATEMENT_CATCH:
+        case JNT_BLOCK:
+            /**
+             * things with a leading expression will
+             * start from new block by definition
+            */
+            break;
+        default:
+            cfg_worker_grow(worker);
+            break;
+    }
+}
+
+/**
+ * Recursive Statement Walk
+ *
+ * WARNING: big recursion ahead!
+ *
+ * NOTE: to optimize stack usage,
+ * 1. do NOT add parameter unless there is a valid reason to do so
+ *    otherwise, just use linked-list on heap to simulate data passed
+ *    on stack
+ * 2. allocate local variables wisely: always write all local variable
+ *    at the beginning for readability
+ *
+ * scope worker usage
+ * walk_block will start a new scope worker, and all statement will use it
+ * to pass it around, a stack on heap is managed to get current worker
+ * but, do not invoke the getter call, simply use the macro:
+ *
+ * TSW(ir)
+ *
+ * and with this no parameter is required to access current scope worker
+ *
+*/
+
+void __execute_statement(java_ir* ir, tree_node* stmt);
 cfg_worker* walk_block(java_ir* ir, tree_node* block, bool use_new_scope);
 
 /**
@@ -323,9 +374,8 @@ cfg_worker* walk_block(java_ir* ir, tree_node* block, bool use_new_scope);
  *
  * node: JNT_STATEMENT_RETURN
 */
-void __execute_statement_return(java_ir* ir, cfg_worker* worker, tree_node* stmt)
+void __execute_statement_return(java_ir* ir, tree_node* stmt)
 {
-    cfg_worker* w = NULL;
     reference* ref = NULL;
 
     // Expression
@@ -334,15 +384,14 @@ void __execute_statement_return(java_ir* ir, cfg_worker* worker, tree_node* stmt
     if (stmt)
     {
         // parse return value
-        w = walk_expression(ir, stmt);
-        cfg_worker_grow_with_graph(worker, &w);
+        cfg_worker_grow_with_graph(TSW(ir), walk_expression(ir, stmt));
 
         // prepare reference
-        ref = new_reference(IR_ASN_REF_INSTRUCTION, worker->cur_blk->inst_last);
+        ref = new_reference(IR_ASN_REF_INSTRUCTION, TSW(ir)->cur_blk->inst_last);
     }
 
     // execute
-    cfg_worker_execute(ir, worker, IROP_RET, NULL, &ref, NULL);
+    cfg_worker_execute(ir, TSW(ir), IROP_RET, NULL, &ref, NULL);
 
     // cleanup
     delete_reference(ref);
@@ -357,9 +406,8 @@ void __execute_statement_return(java_ir* ir, cfg_worker* worker, tree_node* stmt
  *
  * node: JNT_STATEMENT_IF
 */
-void __execute_statement_if(java_ir* ir, cfg_worker* worker, tree_node* stmt)
+void __execute_statement_if(java_ir* ir, tree_node* stmt)
 {
-    cfg_worker* w = NULL;
     basic_block* test;
     basic_block* phi;
 
@@ -367,15 +415,14 @@ void __execute_statement_if(java_ir* ir, cfg_worker* worker, tree_node* stmt)
     stmt = stmt->first_child;
 
     // parse condition
-    w = walk_expression(ir, stmt);
-    cfg_worker_grow_with_graph(worker, &w);
+    cfg_worker_grow_with_graph(TSW(ir), walk_expression(ir, stmt));
 
     // mark block as a test block
-    cfg_worker_execute(ir, worker, IROP_TEST, NULL, NULL, NULL);
-    cfg_worker_next_outbound_strategy(worker, EDGE_TRUE);
+    cfg_worker_execute(ir, TSW(ir), IROP_TEST, NULL, NULL, NULL);
+    cfg_worker_next_outbound_strategy(TSW(ir), EDGE_TRUE);
 
     // mark test node
-    test = cfg_worker_current_block(worker);
+    test = cfg_worker_current_block(TSW(ir));
 
     // Statement (If Branch)
     stmt = stmt->next_sibling;
@@ -387,18 +434,19 @@ void __execute_statement_if(java_ir* ir, cfg_worker* worker, tree_node* stmt)
     }
     else
     {
-        __execute_statement(ir, worker, stmt, true);
+        __start_statement_in_new_block(TSW(ir), stmt->type);
+        __execute_statement(ir, stmt);
     }
 
     // place a phi node
-    phi = cfg_worker_grow(worker);
+    phi = cfg_worker_grow(TSW(ir));
 
     // Statement (Else Branch)
     stmt = stmt->next_sibling;
 
     // go back to test node and prepare for false branch
-    cfg_worker_jump(worker, test, true, false);
-    cfg_worker_next_outbound_strategy(worker, EDGE_FALSE);
+    cfg_worker_jump(TSW(ir), test, true, false);
+    cfg_worker_next_outbound_strategy(TSW(ir), EDGE_FALSE);
 
     if (stmt)
     {
@@ -409,12 +457,13 @@ void __execute_statement_if(java_ir* ir, cfg_worker* worker, tree_node* stmt)
         }
         else
         {
-            __execute_statement(ir, worker, stmt, true);
+            __start_statement_in_new_block(TSW(ir), stmt->type);
+            __execute_statement(ir, stmt);
         }
     }
 
     // connect else branch
-    cfg_worker_jump(worker, phi, true, true);
+    cfg_worker_jump(TSW(ir), phi, true, true);
 }
 
 /**
@@ -422,11 +471,9 @@ void __execute_statement_if(java_ir* ir, cfg_worker* worker, tree_node* stmt)
  *
  * node: JNT_BLOCK
 */
-void __execute_statement(java_ir* ir, cfg_worker* worker, tree_node* stmt, bool execute_in_new_block)
+void __execute_statement(java_ir* ir, tree_node* stmt)
 {
-    cfg_worker* w;
-
-    if (worker->cur_blk && worker->cur_blk->type == BLOCK_EXIT)
+    if (TSW(ir)->cur_blk && TSW(ir)->cur_blk->type == BLOCK_EXIT)
     {
         /**
          * TODO: issue warning here
@@ -434,27 +481,6 @@ void __execute_statement(java_ir* ir, cfg_worker* worker, tree_node* stmt, bool 
          * because code behind a return will never execute
          * but... we probably need to issue only one warning
         */
-    }
-
-    if (execute_in_new_block)
-    {
-        switch (stmt->type)
-        {
-            case JNT_STATEMENT_SWITCH:
-            case JNT_STATEMENT_IF:
-            case JNT_STATEMENT_WHILE:
-            case JNT_STATEMENT_FOR:
-            case JNT_STATEMENT_CATCH:
-            case JNT_BLOCK:
-                /**
-                 * things with a leading expression will
-                 * start from new block by definition
-                */
-                break;
-            default:
-                cfg_worker_grow(worker);
-                break;
-        }
     }
 
     switch (stmt->type)
@@ -468,7 +494,7 @@ void __execute_statement(java_ir* ir, cfg_worker* worker, tree_node* stmt, bool 
         case JNT_STATEMENT_CONTINUE:
             break;
         case JNT_STATEMENT_RETURN:
-            __execute_statement_return(ir, worker, stmt);
+            __execute_statement_return(ir, stmt);
             break;
         case JNT_STATEMENT_SYNCHRONIZED:
             break;
@@ -477,7 +503,7 @@ void __execute_statement(java_ir* ir, cfg_worker* worker, tree_node* stmt, bool 
         case JNT_STATEMENT_TRY:
             break;
         case JNT_STATEMENT_IF:
-            __execute_statement_if(ir, worker, stmt);
+            __execute_statement_if(ir, stmt);
             break;
         case JNT_STATEMENT_WHILE:
             break;
@@ -496,8 +522,9 @@ void __execute_statement(java_ir* ir, cfg_worker* worker, tree_node* stmt, bool 
         case JNT_SWITCH_LABEL:
             break;
         case JNT_BLOCK:
-            w = walk_block(ir, stmt, true);
-            cfg_worker_grow_with_graph(worker, &w);
+            // still need this because we do not know
+            // who dispatched this
+            cfg_worker_grow_with_graph(TSW(ir), walk_block(ir, stmt, true));
             break;
         default:
             break;
@@ -511,16 +538,39 @@ void __execute_statement(java_ir* ir, cfg_worker* worker, tree_node* stmt, bool 
 */
 cfg_worker* walk_block(java_ir* ir, tree_node* block, bool use_new_scope)
 {
-    hash_table* scope = use_new_scope ? lookup_new_scope(ir, LST_NONE) : lookup_top_scope(ir);
-    cfg_worker* worker = (cfg_worker*)malloc_assert(sizeof(cfg_worker));
+    // prepare scope lookup
+    if (use_new_scope)
+    {
+        lookup_new_scope(ir, LST_NONE);
+    }
+    else
+    {
+        lookup_top_scope(ir);
+    }
 
-    init_cfg_worker(worker);
+    // prepare scope worker
+    push_scope_worker(ir);
 
     // every child is a statement
     block = block->first_child;
     while (block)
     {
-        __execute_statement(ir, worker, block, false);
+        /**
+         * optimization:
+         *
+         * if it is a block statement, just recursively call itself
+         * so walk_block and __execute_statement will not alternate
+         * on call stack
+        */
+        if (block->type == JNT_BLOCK)
+        {
+            cfg_worker_grow_with_graph(TSW(ir), walk_block(ir, block, true));
+        }
+        else
+        {
+            __execute_statement(ir, block);
+        }
+
         block = block->next_sibling;
     }
 
@@ -529,5 +579,5 @@ cfg_worker* walk_block(java_ir* ir, tree_node* block, bool use_new_scope)
         lookup_pop_scope(ir, true);
     }
 
-    return worker;
+    return pop_scope_worker(ir);
 }

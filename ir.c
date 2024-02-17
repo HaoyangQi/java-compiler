@@ -11,11 +11,12 @@ void init_ir(java_ir* ir, java_expression* expression, java_error_stack* error)
 {
     ir->local_def_pool = NULL;
     ir->scope_stack_top = NULL;
-    ir->num_methods = 0;
     ir->arch = NULL;
     ir->expression = expression;
     ir->error = error;
     ir->code_member_init = NULL;
+    ir->scope_workers = NULL;
+    ir->statement_contexts = NULL;
 
     init_hash_table(&ir->tbl_on_demand_packages, HASH_TABLE_DEFAULT_BUCKET_SIZE);
     init_hash_table(&ir->tbl_global, HASH_TABLE_DEFAULT_BUCKET_SIZE);
@@ -108,4 +109,102 @@ char* name_unit_concat(tree_node* from, tree_node* stop_before)
     release_string_list(&sl);
 
     return s;
+}
+
+/**
+ * push a new scope worker
+ *
+*/
+void push_scope_worker(java_ir* ir)
+{
+    cfg_worker_context* c = (cfg_worker_context*)malloc_assert(sizeof(cfg_worker_context));
+    c->worker = (cfg_worker*)malloc_assert(sizeof(cfg_worker));
+
+    init_cfg_worker(c->worker);
+    c->next = ir->scope_workers;
+    ir->scope_workers = c;
+}
+
+/**
+ * get stack-top scope worker
+*/
+cfg_worker* get_scope_worker(java_ir* ir)
+{
+    return ir->scope_workers ? ir->scope_workers->worker : NULL;
+}
+
+/**
+ * pop top scope worker
+ *
+ * it will return the worker
+*/
+cfg_worker* pop_scope_worker(java_ir* ir)
+{
+    cfg_worker* w = NULL;
+    cfg_worker_context* c = ir->scope_workers;
+
+    if (c)
+    {
+        ir->scope_workers = c->next;
+        w = c->worker;
+        free(c);
+    }
+
+    return w;
+}
+
+/**
+ * push a new statement context
+ *
+ * it will return the context
+*/
+void push_statement_context(java_ir* ir, java_node_query type)
+{
+    statement_context* c = (statement_context*)malloc_assert(sizeof(statement_context));
+
+    c->type = type;
+    c->_break = NULL;
+    c->_continue = NULL;
+    c->next = ir->statement_contexts;
+    ir->statement_contexts = c;
+}
+
+/**
+ * get closest stack-top statement context
+ *
+ * a type must be provided due to statement nesting
+ * e.g.
+ *
+ * while(){ switch(){ case: continue; } }
+ *
+ * now the "continue" need to reach "while", but stack top
+ * is "switch"
+*/
+statement_context* get_statement_context(java_ir* ir, java_node_query type)
+{
+    statement_context* probe = ir->statement_contexts;
+
+    while (probe && probe->type != type)
+    {
+        probe = probe->next;
+    }
+
+    return probe;
+}
+
+/**
+ * pop top statement context
+ *
+ * data contained are all references, so only delete stack frame
+*/
+void pop_statement_context(java_ir* ir)
+{
+    statement_context* c = ir->statement_contexts;
+
+    if (c)
+    {
+        ir->statement_contexts = c->next;
+    }
+
+    free(c);
 }
