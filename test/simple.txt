@@ -23,7 +23,12 @@ class MyPackageClass extends C1 implements C2, C3 {
     private int calc(int x, int y, short r2) {
         while (x > y)
         {
+            if (4 == 9) break;
             x--;
+            if (6 >= 2)
+            {
+                continue;
+            }
         }
 
         if (2 > 1)
