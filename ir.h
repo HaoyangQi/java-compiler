@@ -227,14 +227,18 @@ typedef struct
  * Node type
  *
  * special IDs for graph manipulation
- * BLOCK_EXIT: a node that ends with "return"
+ * BLOCK_RETURN: a node that (should) ends with "return"
+ * BLOCK_BREAK: a node that (should) ends with "break"
+ * BLOCK_CONTINUE: a node that (should) ends with "continue"
  * BLOCK_TEST: a node that ends with a logical test
  *             which will trigger 2 outbound branches
 */
 typedef enum
 {
     BLOCK_ANY,
-    BLOCK_EXIT,
+    BLOCK_RETURN,
+    BLOCK_BREAK,
+    BLOCK_CONTINUE,
     BLOCK_TEST,
 } block_type;
 
@@ -263,16 +267,6 @@ typedef struct
     size_t size;
     size_t num;
 } node_array;
-
-/**
- * CFG Node Type
-*/
-typedef enum
-{
-    CFG_BLOCK_ENTRY,
-    CFG_BLOCK_EXIT,
-    CFG_BLOCK_NORMAL,
-} cfg_block_type;
 
 /**
  * CFG Entry Point
@@ -408,6 +402,18 @@ typedef struct __cfg_worker_context
 } cfg_worker_context;
 
 /**
+ * bit mask of statement context type
+ *
+ * 0000 0001: loop
+ * 0000 0010: switch
+*/
+typedef enum
+{
+    SCQ_LOOP = 1,
+    SCQ_SWITCH = 2,
+} statement_context_query;
+
+/**
  * statement context info
  *
  * this info is used by statements that allow following:
@@ -416,14 +422,8 @@ typedef struct __cfg_worker_context
 */
 typedef struct __statement_context
 {
-    /**
-     * only following value are used:
-     * JNT_STATEMENT_FOR
-     * JNT_STATEMENT_WHILE
-     * JNT_STATEMENT_DO
-     * JNT_STATEMENT_SWITCH
-    */
-    java_node_query type;
+    // context type
+    statement_context_query type;
     // the block in statement that "continue" jumps to
     basic_block* _continue;
     // the block in statement that "break" jumps to
@@ -478,8 +478,8 @@ void push_scope_worker(java_ir* ir);
 cfg_worker* get_scope_worker(java_ir* ir);
 cfg_worker* pop_scope_worker(java_ir* ir);
 
-statement_context* push_statement_context(java_ir* ir, java_node_query type);
-statement_context* get_statement_context(java_ir* ir, java_node_query type);
+statement_context* push_statement_context(java_ir* ir, statement_context_query type);
+statement_context* get_statement_context(java_ir* ir, statement_context_query query);
 void pop_statement_context(java_ir* ir);
 
 void lookup_scope_deleter(char* k, definition* v);
@@ -546,6 +546,7 @@ void release_cfg_worker(cfg_worker* worker, cfg* move_to);
 basic_block* cfg_worker_current_block(cfg_worker* worker);
 basic_block* cfg_worker_grow(cfg_worker* worker);
 void cfg_worker_next_outbound_strategy(cfg_worker* worker, edge_type type);
+void cfg_worker_set_current_block_type(cfg_worker* worker, block_type t);
 basic_block* cfg_worker_jump(cfg_worker* worker, basic_block* to, bool change_cur, bool edge);
 void cfg_worker_grow_with_graph(cfg_worker* dest, cfg_worker* src);
 instruction* cfg_worker_execute(

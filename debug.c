@@ -1335,16 +1335,22 @@ static void debug_print_cfg_node_type(block_type type)
     switch (type)
     {
         case BLOCK_ANY:
-            printf("ANY");
+            printf("<ANY>");
             break;
-        case BLOCK_EXIT:
-            printf("EXIT");
+        case BLOCK_RETURN:
+            printf("<RETURN>");
+            break;
+        case BLOCK_BREAK:
+            printf("<BREAK>");
+            break;
+        case BLOCK_CONTINUE:
+            printf("<CONTINUE>");
             break;
         case BLOCK_TEST:
-            printf("TEST");
+            printf("<TEST>");
             break;
         default:
-            printf("(unknown type)");
+            printf("<UNKNOWN NODE TYPE>");
             break;
     }
 }
@@ -1412,7 +1418,7 @@ static void debug_print_reference(reference* r)
     }
 }
 
-static void debug_print_instructions(instruction* inst)
+static void debug_print_instructions(instruction* inst, size_t* cnt)
 {
     if (!inst)
     {
@@ -1436,6 +1442,8 @@ static void debug_print_instructions(instruction* inst)
         debug_print_reference(inst->operand_2);
         printf("\n");
 
+        if (cnt) { (*cnt)++; }
+
         inst = inst->next;
     }
 }
@@ -1445,17 +1453,24 @@ static void debug_print_cfg(cfg* g)
     basic_block* b;
     instruction* inst;
     cfg_edge* edge;
+    size_t instruction_count = 0;
+    size_t node_out_count = 0;
+    size_t node_in_count = 0;
 
-    printf("Code:\n");
+    printf("\n===== CONTROL FLOW GRAPH =====\n");
 
     if (g->nodes.num == 0)
     {
-        printf("(no code)\n");
+        printf("(empty)\n");
+        return;
     }
 
     for (size_t i = 0; i < g->nodes.num; i++)
     {
         b = g->nodes.arr[i];
+
+        node_out_count += b->out.size;
+        node_in_count += b->in.size;
 
         // print node header
         printf("node[%zd]%s", b->id, b == g->entry ? " (entry point) " : " ");
@@ -1478,14 +1493,30 @@ static void debug_print_cfg(cfg* g)
                     printf("(FALSE)");
                     break;
                 case EDGE_JUMP:
+                    printf("(JMP)");
                 default:
                     break;
             }
         }
         printf("\n");
 
-        debug_print_instructions(b->inst_first);
+        debug_print_instructions(b->inst_first, &instruction_count);
     }
+
+    printf(">>>>> SUMMARY <<<<<\n");
+    printf("node count: %zd\n", g->nodes.num);
+    printf("node arr size: %zd\n", g->nodes.size);
+    printf("edge count: %zd\n", g->edges.num);
+    printf("edge arr size: %zd\n", g->edges.size);
+    printf("instruction count: %zd\n", instruction_count);
+    printf("memory size: %zd bytes\n",
+        sizeof(cfg) +
+        sizeof(basic_block*) * g->nodes.size +
+        sizeof(basic_block) * g->nodes.num +
+        sizeof(cfg_edge*) * (g->edges.size + node_in_count + node_out_count) +
+        sizeof(cfg_edge) * g->edges.num +
+        sizeof(instruction) * instruction_count
+    );
 }
 
 static void debug_print_definition(definition* v)
@@ -1573,12 +1604,15 @@ static void debug_print_definition(definition* v)
     }
 }
 
-static void debug_print_definitions(definition* v)
+static void debug_print_definitions(definition* v, size_t* cnt)
 {
     for (size_t j = 0; v != NULL; j++)
     {
         printf("[%zd](%p): ", j, v);
         debug_print_definition(v);
+
+        if (cnt) { (*cnt)++; }
+
         v = v->next;
     }
 }
@@ -1597,7 +1631,7 @@ static void debug_print_scope_frame_table(hash_table* table)
                 printf("    %s:\n      ", (char*)(p->key));
 
                 // print all definitions of this name
-                debug_print_definitions(p->value);
+                debug_print_definitions(p->value, NULL);
 
                 p = p->next;
             }
@@ -1705,6 +1739,8 @@ void debug_ir_lookup(java_ir* ir)
 
 void debug_print_definition_pool(java_ir* ir)
 {
+    size_t cnt = 0;
+
     printf("===== DEFINITION POOL =====\n");
 
     if (!ir->local_def_pool)
@@ -1713,7 +1749,11 @@ void debug_print_definition_pool(java_ir* ir)
         return;
     }
 
-    debug_print_definitions(ir->local_def_pool);
+    debug_print_definitions(ir->local_def_pool, &cnt);
+
+    printf(">>>>> SUMMARY <<<<<\n");
+    printf("definition count: %zd\n", cnt);
+    printf("pool emory size: %zd bytes\n", sizeof(definition) * cnt);
 }
 
 void debug_print_member_initialization(java_ir* ir)

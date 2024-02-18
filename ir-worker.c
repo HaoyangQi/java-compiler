@@ -94,6 +94,14 @@ void cfg_worker_next_outbound_strategy(cfg_worker* worker, edge_type type)
 }
 
 /**
+ * set current block type
+*/
+void cfg_worker_set_current_block_type(cfg_worker* worker, block_type t)
+{
+    worker->cur_blk->type = t;
+}
+
+/**
  * jump from current to a destination
  *
  * change_cur: if true, current block trancker will be changed
@@ -246,26 +254,22 @@ instruction* cfg_worker_execute(
 
     /**
      * special worker state update
+     *
+     * NOTE: do NOT grow node here -- let parser do it
+     * because valid code dtructure will scope them correctly
+     * so that return/break/continue is the last operation in
+     * current block
+     *
+     * and those are not valid can stay as-is so that we can
+     * use this context to issue warning and skip statements
+     * that will never executed
     */
     switch (irop)
     {
         case IROP_RET:
-            /**
-             * do not add node here
-             *
-             * because some structure like "if" will automatically
-             * add phi node in the end
-            */
-            block->type = BLOCK_EXIT;
+            block->type = BLOCK_RETURN;
             break;
         case IROP_TEST:
-            /**
-             * if it is a logical test:
-             *
-             * mark the node as a test node
-             * (parser should handle the graph grow
-             * because ountbound can be many)
-            */
             block->type = BLOCK_TEST;
             break;
         default:

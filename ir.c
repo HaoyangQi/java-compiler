@@ -158,7 +158,7 @@ cfg_worker* pop_scope_worker(java_ir* ir)
  *
  * it will return the context
 */
-statement_context* push_statement_context(java_ir* ir, java_node_query type)
+statement_context* push_statement_context(java_ir* ir, statement_context_query type)
 {
     statement_context* c = (statement_context*)malloc_assert(sizeof(statement_context));
 
@@ -174,7 +174,7 @@ statement_context* push_statement_context(java_ir* ir, java_node_query type)
 /**
  * get closest stack-top statement context
  *
- * a type must be provided due to statement nesting
+ * a query must be provided due to statement nesting
  * e.g.
  *
  * while(){ switch(){ case: continue; } }
@@ -182,16 +182,21 @@ statement_context* push_statement_context(java_ir* ir, java_node_query type)
  * now the "continue" need to reach "while", but stack top
  * is "switch"
 */
-statement_context* get_statement_context(java_ir* ir, java_node_query type)
+statement_context* get_statement_context(java_ir* ir, statement_context_query query)
 {
     statement_context* probe = ir->statement_contexts;
 
-    while (probe && probe->type != type)
+    while (probe)
     {
+        if (probe->type & query)
+        {
+            return probe;
+        }
+
         probe = probe->next;
     }
 
-    return probe;
+    return NULL;
 }
 
 /**

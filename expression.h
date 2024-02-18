@@ -199,7 +199,7 @@ typedef enum
  * IROP_LMD     lambda
  * IROP_NONE    the instruction only stores a operand
  * IROP_INIT    default initialization of a variable
- * IROP_JMP     jump
+ * IROP_JMP     jump (triggers EDGE_JUMP)
  * IROP_RET     return
  * IROP_TEST    test-and-jump
 */

@@ -310,6 +310,10 @@ void walk_expression(java_ir* ir, tree_node* expression)
  * grow worker to guarantee that next statement always
  * starts in a new block
  *
+ * NOTE: use this when:
+ * 1. a parser enforces in new block at the beginning, OR
+ * 2. not sure what the upcoming statement is
+ *
  * NOTE: keep this method up-to-date based on algorithm of
  *       corresponding statement parser
 */
@@ -319,18 +323,15 @@ static void __start_statement_in_new_block(java_ir* ir, java_node_query stmt_typ
 
     switch (stmt_type)
     {
-        case JNT_STATEMENT_SWITCH:
-        case JNT_STATEMENT_FOR:
-        case JNT_STATEMENT_CATCH:
         case JNT_BLOCK:
             /**
-             * things with a leading expression will
-             * start from new block by definition
+             * block merges worker graph
+             * so by definition a block always enforces in new block
             */
             break;
         default:
-            // only grow when current block is not empty
-            if (!cfg_worker_current_block_empty(w))
+            // only grow when current block is not empty or empty graph
+            if (!cfg_worker_current_block_empty(w) || cfg_empty(w->graph))
             {
                 cfg_worker_grow(w);
             }
@@ -365,36 +366,6 @@ void __execute_statement(java_ir* ir, tree_node* stmt);
 cfg_worker* walk_block(java_ir* ir, tree_node* block, bool use_new_scope);
 
 /**
- * walk return statement
- *
- * return ---+--- Expression
- *
- * node: JNT_STATEMENT_RETURN
-*/
-void __execute_statement_return(java_ir* ir, tree_node* stmt)
-{
-    reference* ref = NULL;
-
-    // Expression
-    stmt = stmt->first_child;
-
-    if (stmt)
-    {
-        // parse return value
-        walk_expression(ir, stmt);
-
-        // prepare reference
-        ref = new_reference(IR_ASN_REF_INSTRUCTION, TSW(ir)->cur_blk->inst_last);
-    }
-
-    // execute
-    cfg_worker_execute(ir, TSW(ir), IROP_RET, NULL, &ref, NULL);
-
-    // cleanup
-    delete_reference(ref);
-}
-
-/**
  * walk if statement
  *
  * if ---+--- Expression
@@ -426,25 +397,27 @@ void __execute_statement_if(java_ir* ir, tree_node* stmt)
     // mark test node
     test = cfg_worker_current_block(TSW(ir));
 
-    // Statement (If Branch)
+    // Statement (TRUE Branch)
     stmt = stmt->next_sibling;
 
-    // parse true branch
+    // branch into TRUE branch
     cfg_worker_next_outbound_strategy(TSW(ir), EDGE_TRUE);
+    __start_statement_in_new_block(ir, stmt->type);
+
+    // parse true branch
     if (stmt->type == JNT_STATEMENT_VAR_DECL)
     {
         ir_error(ir, JAVA_E_IF_LOCAL_VAR_DECL);
     }
     else
     {
-        __start_statement_in_new_block(ir, stmt->type);
         __execute_statement(ir, stmt);
     }
 
     // place a phi node
     phi = cfg_worker_grow(TSW(ir));
 
-    // Statement (Else Branch)
+    // Statement (FALSE Branch, optional)
     stmt = stmt->next_sibling;
 
     // go back to test node and prepare for false branch
@@ -453,6 +426,8 @@ void __execute_statement_if(java_ir* ir, tree_node* stmt)
 
     if (stmt)
     {
+        __start_statement_in_new_block(ir, stmt->type);
+
         // parse true branch
         if (stmt->type == JNT_STATEMENT_VAR_DECL)
         {
@@ -460,7 +435,6 @@ void __execute_statement_if(java_ir* ir, tree_node* stmt)
         }
         else
         {
-            __start_statement_in_new_block(ir, stmt->type);
             __execute_statement(ir, stmt);
         }
     }
@@ -555,7 +529,7 @@ void __execute_statement_variable_declaration(java_ir* ir, tree_node* stmt)
 */
 void __execute_statement_while(java_ir* ir, tree_node* stmt)
 {
-    statement_context* sc = push_statement_context(ir, stmt->type);
+    statement_context* sc = push_statement_context(ir, SCQ_LOOP);
     basic_block* test;
 
     /**
@@ -565,7 +539,7 @@ void __execute_statement_while(java_ir* ir, tree_node* stmt)
      * do not use cfg_worker_grow here: we do not know if
      * current node is empty
     */
-    __start_statement_in_new_block(ir, stmt->type);
+    __start_statement_in_new_block(ir, JNT_STATEMENT_WHILE);
 
     // mark continue point: which is the start of expression
     sc->_continue = cfg_worker_current_block(TSW(ir));
@@ -596,19 +570,21 @@ void __execute_statement_while(java_ir* ir, tree_node* stmt)
     cfg_worker_next_outbound_strategy(TSW(ir), EDGE_FALSE);
     sc->_break = cfg_worker_grow(TSW(ir));
 
-    // go back to test node to branch into loop body
+    // Statement (loop body)
+    stmt = stmt->next_sibling;
+
+    // go back to test node and branch into loop body
     cfg_worker_jump(TSW(ir), test, true, false);
     cfg_worker_next_outbound_strategy(TSW(ir), EDGE_TRUE);
+    __start_statement_in_new_block(ir, stmt->type);
 
     // parse loop body
-    stmt = stmt->next_sibling;
     if (stmt->type == JNT_STATEMENT_VAR_DECL)
     {
-        ir_error(ir, JAVA_E_IF_LOCAL_VAR_DECL);
+        ir_error(ir, JAVA_E_WHILE_LOCAL_VAR_DECL);
     }
     else
     {
-        __start_statement_in_new_block(ir, stmt->type);
         __execute_statement(ir, stmt);
     }
 
@@ -622,20 +598,177 @@ void __execute_statement_while(java_ir* ir, tree_node* stmt)
 }
 
 /**
+ * walk return statement
+ *
+ * return ---+--- Expression
+ *
+ * node: JNT_STATEMENT_RETURN
+*/
+void __execute_statement_return(java_ir* ir, tree_node* stmt)
+{
+    reference* ref = NULL;
+
+    // Expression
+    stmt = stmt->first_child;
+
+    if (stmt)
+    {
+        // parse return value
+        walk_expression(ir, stmt);
+
+        // prepare reference
+        ref = new_reference(IR_ASN_REF_INSTRUCTION, TSW(ir)->cur_blk->inst_last);
+    }
+
+    // execute
+    cfg_worker_execute(ir, TSW(ir), IROP_RET, NULL, &ref, NULL);
+
+    // cleanup
+    delete_reference(ref);
+
+    /**
+     * here we do NOT grow
+     *
+     * because: a valid code structure will make sure this statement
+     * is the last one in current scope
+     *
+     * otherwise those statements are not valid anyway
+    */
+}
+
+/**
+ * walk break statement
+ *
+ * node->data->id.complex->class = JT_IDENTIFIER will contain the optional ID
+ *
+ * node: JNT_STATEMENT_BREAK
+*/
+void __execute_statement_break(java_ir* ir, tree_node* stmt)
+{
+    // break is bounded by switch and loop
+    statement_context* sc = get_statement_context(ir, SCQ_LOOP | SCQ_SWITCH);
+
+    // the statement must be bounded
+    if (!sc)
+    {
+        // early return to avoid grow
+        ir_error(ir, JAVA_E_BREAK_UNBOUND);
+        return;
+    }
+
+    if (stmt->data->id.complex->class == JT_IDENTIFIER)
+    {
+        /**
+         * TODO: branch to label (additional lookup)
+         *
+         * early return on failure
+        */
+    }
+    else
+    {
+        // execute
+        cfg_worker_execute(ir, TSW(ir), IROP_JMP, NULL, NULL, NULL);
+
+        /**
+         * here sc->_break must be valid
+         * so no check here
+        */
+        cfg_worker_next_outbound_strategy(TSW(ir), EDGE_JUMP);
+        cfg_worker_jump(TSW(ir), sc->_break, false, true);
+    }
+
+    // mark node (since IROP_JMP cannot distinguish break/continue)
+    cfg_worker_set_current_block_type(TSW(ir), BLOCK_BREAK);
+
+    /**
+     * here we do NOT grow
+     *
+     * because: a valid code structure will make sure this statement
+     * is the last one in current scope
+     *
+     * otherwise those statements are not valid anyway
+    */
+}
+
+/**
+ * walk continue statement
+ *
+ * node->data->id.complex->class = JT_IDENTIFIER will contain the optional ID
+ *
+ * node: JNT_STATEMENT_BREAK
+*/
+void __execute_statement_continue(java_ir* ir, tree_node* stmt)
+{
+    // break is bounded by loop
+    statement_context* sc = get_statement_context(ir, SCQ_LOOP);
+
+    // the statement must be bounded
+    if (!sc)
+    {
+        // early return to avoid grow
+        ir_error(ir, JAVA_E_CONTINUE_UNBOUND);
+        return;
+    }
+
+    if (stmt->data->id.complex->class == JT_IDENTIFIER)
+    {
+        /**
+         * TODO: branch to label (additional lookup)
+         *
+         * early return on failure
+        */
+    }
+    else
+    {
+        // execute
+        cfg_worker_execute(ir, TSW(ir), IROP_JMP, NULL, NULL, NULL);
+
+        /**
+         * here sc->_continue must be valid
+         * so no check here
+        */
+        cfg_worker_next_outbound_strategy(TSW(ir), EDGE_JUMP);
+        cfg_worker_jump(TSW(ir), sc->_continue, false, true);
+    }
+
+    // mark node (since IROP_JMP cannot distinguish break/continue)
+    cfg_worker_set_current_block_type(TSW(ir), BLOCK_CONTINUE);
+
+    /**
+     * here we do NOT grow
+     *
+     * because: a valid code structure will make sure this statement
+     * is the last one in current scope
+     *
+     * otherwise those statements are not valid anyway
+    */
+}
+
+/**
  * TODO: Statemnt Parser Dispatch
  *
  * node: any statement (including JNT_BLOCK)
 */
 void __execute_statement(java_ir* ir, tree_node* stmt)
 {
-    if (TSW(ir)->cur_blk && TSW(ir)->cur_blk->type == BLOCK_EXIT)
+    if (TSW(ir)->cur_blk)
     {
-        /**
-         * TODO: issue warning here
-         *
-         * because code behind a return will never execute
-         * but... we probably need to issue only one warning
-        */
+        switch (TSW(ir)->cur_blk->type)
+        {
+            case BLOCK_RETURN:
+            case BLOCK_BREAK:
+            case BLOCK_CONTINUE:
+                /**
+                 * TODO: issue warning here
+                 *
+                 * because code behind a return will never execute
+                 * but... we probably need to issue only one warning
+                */
+                fprintf(stderr, "TODO ir error: warning: statement will never execute.\n");
+                break;
+            default:
+                break;
+        }
     }
 
     switch (stmt->type)
@@ -645,8 +778,10 @@ void __execute_statement(java_ir* ir, tree_node* stmt)
         case JNT_STATEMENT_DO:
             break;
         case JNT_STATEMENT_BREAK:
+            __execute_statement_break(ir, stmt);
             break;
         case JNT_STATEMENT_CONTINUE:
+            __execute_statement_continue(ir, stmt);
             break;
         case JNT_STATEMENT_RETURN:
             __execute_statement_return(ir, stmt);

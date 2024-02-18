@@ -61,7 +61,10 @@ void init_error_definition(java_error_definition* err_def)
     err_def->descriptor[JAVA_E_METHOD_DIM_AMBIGUOUS] = DEFINE_CONTEXT_ERROR;
     err_def->descriptor[JAVA_E_METHOD_DIM_DUPLICATE] = DEFINE_CONTEXT_ERROR;
     err_def->descriptor[JAVA_E_IF_LOCAL_VAR_DECL] = DEFINE_SYNTAX_ERROR;
+    err_def->descriptor[JAVA_E_WHILE_LOCAL_VAR_DECL] = DEFINE_SYNTAX_ERROR;
     err_def->descriptor[JAVA_E_REF_UNDEFINED] = DEFINE_CONTEXT_ERROR;
+    err_def->descriptor[JAVA_E_BREAK_UNBOUND] = DEFINE_CONTEXT_ERROR;
+    err_def->descriptor[JAVA_E_CONTINUE_UNBOUND] = DEFINE_CONTEXT_ERROR;
 
     err_def->descriptor[JAVA_E_AMBIGUITY_START] = DEFINE_RESERVED_ERROR;
     err_def->descriptor[JAVA_E_AMBIGUITY_PATH_1] = DEFINE_RESERVED_ERROR;
@@ -113,8 +116,11 @@ void init_error_definition(java_error_definition* err_def)
     err_def->message[JAVA_E_METHOD_DUPLICATE] = "Duplicated method name.";
     err_def->message[JAVA_E_METHOD_DIM_AMBIGUOUS] = ERR_MSG_DIM_DEF_DIVERGE;
     err_def->message[JAVA_E_METHOD_DIM_DUPLICATE] = ERR_MSG_DIM_DEF_DUPLICATE;
-    err_def->message[JAVA_E_IF_LOCAL_VAR_DECL] = "Local variable definition not allowed in shoft 'if'.";
+    err_def->message[JAVA_E_IF_LOCAL_VAR_DECL] = "Local variable definition not allowed in short 'if'.";
+    err_def->message[JAVA_E_WHILE_LOCAL_VAR_DECL] = "Local variable definition not allowed in short 'while'.";
     err_def->message[JAVA_E_REF_UNDEFINED] = "Undefined reference.";
+    err_def->message[JAVA_E_BREAK_UNBOUND] = "Unbounded statement: 'break' needs to be bounded by a loop or 'switch'.";
+    err_def->message[JAVA_E_CONTINUE_UNBOUND] = "Unbounded statement: 'continue' needs to be bounded by a loop.";
 
     err_def->message[JAVA_E_AMBIGUITY_START] = NULL;
     err_def->message[JAVA_E_AMBIGUITY_PATH_1] = NULL;
