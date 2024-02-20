@@ -4,6 +4,68 @@
 #include "token.h"
 #include "node.h"
 #include "expression.h"
+#include "number.h"
+
+typedef struct
+{
+    char* content;
+    java_number_type type;
+} debug_number_data;
+
+static const debug_number_data test_numbers[] = {
+    { "0x123456789abcdef", JT_NUM_HEX },
+    { "0X123456789ABCDEF", JT_NUM_HEX },
+    { "0x123456789ABCDEF1234567890", JT_NUM_HEX },
+
+    { "01234567", JT_NUM_OCT },
+    { "01234567", JT_NUM_OCT },
+    { "01234567111111122222223333333", JT_NUM_OCT },
+
+    { "0b000101010101", JT_NUM_BIN },
+    { "0B111000001010", JT_NUM_BIN },
+
+    { "123456789", JT_NUM_DEC },
+    { "123456789l", JT_NUM_DEC },
+    { "9999999999999999999", JT_NUM_DEC }, // largest integer for fast conversion
+    { "10000000000000000000", JT_NUM_DEC }, // larger integer requires big integer library
+    { "100000000000000000000", JT_NUM_DEC }, // integer that overflows u64
+
+    { ".0", JT_NUM_FP_DOUBLE },
+    { ".0000", JT_NUM_FP_DOUBLE },
+    { ".1234567890", JT_NUM_FP_DOUBLE },
+    { ".1234567890e10", JT_NUM_FP_DOUBLE },
+    { ".1234567890e-10", JT_NUM_FP_DOUBLE },
+
+    { "0.0", JT_NUM_FP_DOUBLE },
+    { "0.0000", JT_NUM_FP_DOUBLE },
+    { "0.1234567890", JT_NUM_FP_DOUBLE },
+    { "0.1234567890e10", JT_NUM_FP_DOUBLE },
+    { "0.1234567890e-10", JT_NUM_FP_DOUBLE },
+
+    { "987654321.0", JT_NUM_FP_DOUBLE },
+    { "987654321.0000", JT_NUM_FP_DOUBLE },
+    { "987654321.1234567890", JT_NUM_FP_DOUBLE },
+    { "987654321.1234567890e10", JT_NUM_FP_DOUBLE },
+    { "987654321.1234567890e-10", JT_NUM_FP_DOUBLE },
+
+    { ".0", JT_NUM_FP_FLOAT },
+    { ".0000", JT_NUM_FP_FLOAT },
+    { ".1234567890", JT_NUM_FP_FLOAT },
+    { ".1234567890e10", JT_NUM_FP_FLOAT },
+    { ".1234567890e-10", JT_NUM_FP_FLOAT },
+
+    { "0.0", JT_NUM_FP_FLOAT },
+    { "0.0000", JT_NUM_FP_FLOAT },
+    { "0.1234567890", JT_NUM_FP_FLOAT },
+    { "0.1234567890e10", JT_NUM_FP_FLOAT },
+    { "0.1234567890e-10", JT_NUM_FP_FLOAT },
+
+    { "987654321.0", JT_NUM_FP_FLOAT },
+    { "987654321.0000", JT_NUM_FP_FLOAT },
+    { "987654321.1234567890", JT_NUM_FP_FLOAT },
+    { "987654321.1234567890e10", JT_NUM_FP_FLOAT },
+    { "987654321.1234567890e-10", JT_NUM_FP_FLOAT },
+};
 
 static void debug_print_memory(byte* mem, long size, long line_break)
 {
@@ -1753,7 +1815,7 @@ void debug_print_definition_pool(java_ir* ir)
 
     printf(">>>>> SUMMARY <<<<<\n");
     printf("definition count: %zd\n", cnt);
-    printf("pool emory size: %zd bytes\n", sizeof(definition) * cnt);
+    printf("pool memory size: %zd bytes\n", sizeof(definition) * cnt);
 }
 
 void debug_print_member_initialization(java_ir* ir)
@@ -1767,4 +1829,119 @@ void debug_print_member_initialization(java_ir* ir)
     }
 
     debug_print_cfg(ir->code_member_init);
+}
+
+void debug_number_library()
+{
+    printf("===== NUMBER LIBRARY TEST =====\n");
+    printf("max int64: %lld\n", 0x7FFFFFFFFFFFFFFF);
+    printf("max uint64: %llu\n", 0xFFFFFFFFFFFFFFFF);
+
+    size_t len = ARRAY_SIZE(test_numbers);
+    number_truncation_status nts;
+    uint64_t n;
+    uint32_t n32;
+    char* c;
+    java_number_type t;
+    double fp_double;
+    float fp_single;
+    size_t flag;
+    bool pr_bar;
+
+    for (size_t i = 0; i < len; i++)
+    {
+        c = test_numbers[i].content;
+        t = test_numbers[i].type;
+        nts = s2b(c, t, &n);
+        pr_bar = false;
+
+        debug_print_number_type(t);
+        printf(" \"%s\"\n", c);
+
+        printf("    raw: 0x%llX\n", n);
+        printf("    overflow: ");
+        for (size_t j = 0; j < 12; j++)
+        {
+            flag = 1 << j;
+
+            if (nts & flag)
+            {
+                if (pr_bar) { printf(" | "); }
+                else { pr_bar = true; }
+
+                switch (flag)
+                {
+                    case NTS_OVERFLOW_U8:
+                        printf("u8");
+                        break;
+                    case NTS_OVERFLOW_U16:
+                        printf("u16");
+                        break;
+                    case NTS_OVERFLOW_U32:
+                        printf("u32");
+                        break;
+                    case NTS_OVERFLOW_U64:
+                        printf("u64");
+                        break;
+                    case NTS_OVERFLOW_FP32_EXP:
+                        printf("exp32");
+                        break;
+                    case NTS_OVERFLOW_FP32_MAN:
+                        printf("man32");
+                        break;
+                    case NTS_OVERFLOW_FP64_EXP:
+                        printf("exp64");
+                        break;
+                    case NTS_OVERFLOW_FP64_MAN:
+                        printf("man64");
+                        break;
+                    case NTS_OVERFLOW_INT8:
+                        printf("i8");
+                        break;
+                    case NTS_OVERFLOW_INT16:
+                        printf("i16");
+                        break;
+                    case NTS_OVERFLOW_INT32:
+                        printf("i32");
+                        break;
+                    case NTS_OVERFLOW_INT64:
+                        printf("i64");
+                        break;
+                    default:
+                        printf("(UNKNOWN: %04llx)", flag);
+                        break;
+                }
+            }
+        }
+        printf("\n");
+
+        printf("    formatted: ");
+        switch (t)
+        {
+            case JT_NUM_DEC:
+            case JT_NUM_HEX:
+            case JT_NUM_OCT:
+            case JT_NUM_BIN:
+                printf("%llu", n);
+                break;
+            case JT_NUM_FP_DOUBLE:
+                memcpy(&fp_double, &n, 8);
+                printf("%10.20f", fp_double);
+                break;
+            case JT_NUM_FP_FLOAT:
+                n32 = (uint32_t)n;
+                memcpy(&fp_single, &n32, 4);
+                printf("%10.20f", fp_single);
+                // test simple value
+                // printf("%10.20f(%10.20f)", fp_single, (float)987654321.1234567890e-10);
+                break;
+            default:
+                printf("(UNKNOWN FORMAT)");
+                break;
+        }
+
+        printf("\n\n");
+    }
+
+    printf("\n");
 }

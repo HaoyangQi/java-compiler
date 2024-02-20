@@ -12,6 +12,7 @@
 #include "compiler.h"
 #include "ir.h"
 
+void debug_number_library();
 void debug_report(compiler* compiler);
 void debug_print_reserved_words();
 void debug_file_buffer(file_buffer* reader);
