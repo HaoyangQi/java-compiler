@@ -11,6 +11,7 @@
 #include "architecture.h"
 
 #include "string-list.h"
+#include "number.h"
 
 // hash table mapping string->definition wrapper
 #define HT_STR2DEF(t, s) ((definition*)shash_table_find(t, s))
@@ -307,7 +308,6 @@ typedef struct _cfg
 typedef struct _definition
 {
     java_node_query type;
-    java_lexeme_type li_type;
     struct _definition* next;
 
     union
@@ -367,6 +367,16 @@ typedef struct _definition
             // literal value
             uint64_t imm;
         } li_number;
+
+        struct
+        {
+            // 16-bit character binary stream
+            char* stream;
+            // number of bytes of stream
+            size_t length;
+            // if stream contains 16-bit wide character
+            bool wide_char;
+        } li_string;
     };
 } definition;
 
@@ -471,7 +481,7 @@ typedef struct
 
 char* t2s(java_token* token);
 definition* t2d(hash_table* table, java_token* token);
-primitive t2p(java_ir* ir, java_token* t, uint64_t* n);
+primitive t2p(java_ir* ir, java_token* t, binary_data* data);
 char* name_unit_concat(tree_node* from, tree_node* stop_before);
 
 void push_scope_worker(java_ir* ir);

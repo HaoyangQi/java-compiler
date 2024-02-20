@@ -65,6 +65,22 @@ static const debug_number_data test_numbers[] = {
     { "987654321.1234567890", JT_NUM_FP_FLOAT },
     { "987654321.1234567890e10", JT_NUM_FP_FLOAT },
     { "987654321.1234567890e-10", JT_NUM_FP_FLOAT },
+
+    // the following are not numbers, but are expected to be handeled
+    { "", JT_NUM_MAX },
+    { "0", JT_NUM_MAX },
+    { "01", JT_NUM_MAX },
+    { "hello, world!", JT_NUM_MAX },
+    { "'char'", JT_NUM_MAX },
+    { "\"string\"", JT_NUM_MAX },
+    { "\\b\\s\\t\\n\\f\\r\\\"\\'\\\\", JT_NUM_MAX },
+    { "a\\ba\\sa\\ta\\na\\fa\\ra\\\"a\\'a\\\\a", JT_NUM_MAX },
+    { "\\uc0feabcd", JT_NUM_MAX },
+    { "\\uuuuuuc0feabcd", JT_NUM_MAX },
+    { "\\377", JT_NUM_MAX },
+    { "\\78", JT_NUM_MAX },
+    { "\\777", JT_NUM_MAX },
+    { "\\1234567", JT_NUM_MAX },
 };
 
 static void debug_print_memory(byte* mem, long size, long line_break)
@@ -1839,7 +1855,7 @@ void debug_number_library()
 
     size_t len = ARRAY_SIZE(test_numbers);
     number_truncation_status nts;
-    uint64_t n;
+    binary_data bin;
     uint32_t n32;
     char* c;
     java_number_type t;
@@ -1847,18 +1863,72 @@ void debug_number_library()
     float fp_single;
     size_t flag;
     bool pr_bar;
+    char hex_tbl_print[8];
+    char hex_tbl_cur;
 
     for (size_t i = 0; i < len; i++)
     {
         c = test_numbers[i].content;
         t = test_numbers[i].type;
-        nts = s2b(c, t, &n);
+        nts = s2b(c, t, &bin);
         pr_bar = false;
+
+        // string stream is special
+        if (t == JT_NUM_MAX)
+        {
+            printf("stream\n", c);
+            printf("    bytes: %zd\n", bin.len);
+            printf("    has wide char: %d\n", bin.wide_char);
+
+            printf("            HEX             |  CHAR  \n");
+            printf("----------------------------+--------\n");
+            for (size_t i = 0, j = 0; i < bin.len; i++)
+            {
+                flag = i % 8;
+                hex_tbl_cur = isgraph(bin.stream[i]) ? bin.stream[i] : '.';
+
+                if (i != 0 && (i == bin.len - 1 || flag == 0))
+                {
+                    if (i == bin.len - 1)
+                    {
+                        hex_tbl_print[flag] = hex_tbl_cur;
+                        i++;
+                    }
+
+                    for (size_t k = j; k < j + 8; k++)
+                    {
+                        if (k >= i)
+                        {
+                            if (k - j == 4) { printf("      "); }
+                            else { printf("   "); }
+                        }
+                        else if (k - j == 4) { printf("    %02X", (unsigned char)bin.stream[k]); }
+                        else if (k - j > 0) { printf(" %02X", (unsigned char)bin.stream[k]); }
+                        else { printf("%02X", (unsigned char)bin.stream[k]); }
+                    }
+
+                    printf("   ");
+
+                    for (size_t k = j; k < i; k++)
+                    {
+                        printf("%c", hex_tbl_print[k - j]);
+                    }
+
+                    printf("\n");
+                    j = i;
+                }
+
+                hex_tbl_print[flag] = hex_tbl_cur;
+            }
+
+            printf("\n");
+            continue;
+        }
 
         debug_print_number_type(t);
         printf(" \"%s\"\n", c);
 
-        printf("    raw: 0x%llX\n", n);
+        printf("    raw: 0x%llX\n", bin.number);
         printf("    overflow: ");
         for (size_t j = 0; j < 12; j++)
         {
@@ -1922,14 +1992,14 @@ void debug_number_library()
             case JT_NUM_HEX:
             case JT_NUM_OCT:
             case JT_NUM_BIN:
-                printf("%llu", n);
+                printf("%llu", bin.number);
                 break;
             case JT_NUM_FP_DOUBLE:
-                memcpy(&fp_double, &n, 8);
+                memcpy(&fp_double, &bin.number, 8);
                 printf("%10.20f", fp_double);
                 break;
             case JT_NUM_FP_FLOAT:
-                n32 = (uint32_t)n;
+                n32 = (uint32_t)bin.number;
                 memcpy(&fp_single, &n32, 4);
                 printf("%10.20f", fp_single);
                 // test simple value
