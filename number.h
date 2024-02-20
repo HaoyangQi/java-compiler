@@ -8,10 +8,6 @@
 /**
  * number truncation result flag (bit mask)
  *
- * interger overflow flags includes each other,
- * so the value is carefully selected
- *
- * e.g. if a number overflows u8, then it also overflows int8
 */
 typedef enum
 {
