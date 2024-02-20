@@ -877,7 +877,7 @@ number_truncation_status s2b(const char* content, java_number_type type, uint64_
         }
 
         // mantissa precision loss check
-        if ((int64_t)(bin_man->len) - 1 > (int64_t)fp_man_len)
+        if (bin_man->len > fp_man_len)
         {
             nts |= fp_single_precision ? NTS_OVERFLOW_FP32_MAN : NTS_OVERFLOW_FP64_MAN;
         }
