@@ -71,7 +71,9 @@ static void edge_array_init(edge_array* edges)
 */
 void edge_array_resize(edge_array* edges, size_t by)
 {
-    if (edges->num + by <= edges->size)
+    size_t old_size = edges->size;
+
+    if (edges->num + by <= old_size)
     {
         return;
     }
@@ -82,7 +84,10 @@ void edge_array_resize(edge_array* edges, size_t by)
         edges->size *= EDGE_ARRAY_SIZE_INCREMENT_FACTOR;
     }
 
-    edges->arr = (cfg_edge**)realloc_assert(edges->arr, sizeof(cfg_edge*) * (edges->size));
+    if (edges->size > old_size)
+    {
+        edges->arr = (cfg_edge**)realloc_assert(edges->arr, sizeof(cfg_edge*) * (edges->size));
+    }
 }
 
 /**
@@ -115,7 +120,9 @@ static void node_array_init(node_array* nodes)
 */
 void node_array_resize(node_array* nodes, size_t by)
 {
-    if (nodes->num + by <= nodes->size)
+    size_t old_size = nodes->size;
+
+    if (nodes->num + by <= old_size)
     {
         return;
     }
@@ -126,7 +133,10 @@ void node_array_resize(node_array* nodes, size_t by)
         nodes->size *= NODE_ARRAY_SIZE_INCREMENT_FACTOR;
     }
 
-    nodes->arr = (basic_block**)realloc_assert(nodes->arr, sizeof(basic_block*) * (nodes->size));
+    if (nodes->size > old_size)
+    {
+        nodes->arr = (basic_block**)realloc_assert(nodes->arr, sizeof(basic_block*) * (nodes->size));
+    }
 }
 
 /**

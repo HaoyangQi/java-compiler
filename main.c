@@ -39,6 +39,9 @@ static char* test_paths[] = {
 
 int main(int argc, char* argv[])
 {
+    // library tests
+    debug_number_library();
+
     architecture arch;
     compiler compiler;
     int num_source_files = ARRAY_SIZE(test_paths);
