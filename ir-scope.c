@@ -158,7 +158,6 @@ definition* new_definition(java_node_query type)
     definition* v = (definition*)malloc_assert(sizeof(definition));
 
     v->type = type;
-    v->li_type = JLT_MAX;
     v->next = NULL;
 
     switch (type)
@@ -181,6 +180,18 @@ definition* new_definition(java_node_query type)
             __init_type_name(&v->method.return_type);
             // no code CFG initialization here as parser will do it
             break;
+        case JLT_LTR_NUMBER:
+        case JLT_RWD_BOOLEAN:
+        case JLT_LTR_CHARACTER:
+            v->li_number.type = IRPV_MAX;
+            v->li_number.imm = 0;
+            break;
+        case JLT_LTR_STRING:
+            v->li_string.stream = NULL;
+            v->li_string.length = 0;
+            v->li_string.wide_char = false;
+            break;
+        case JLT_RWD_NULL:
         default:
             break;
     }
@@ -211,6 +222,13 @@ static definition* __definition_delete_single(definition* v)
             free(v->method.return_type.reference);
             release_cfg(&v->method.code);
             break;
+        case JLT_LTR_STRING:
+            free(v->li_string.stream);
+            break;
+        case JLT_LTR_NUMBER:
+        case JLT_RWD_BOOLEAN:
+        case JLT_LTR_CHARACTER:
+        case JLT_RWD_NULL:
         default:
             // no-op
             break;

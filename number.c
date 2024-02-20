@@ -26,6 +26,27 @@ typedef struct
     size_t size;
 } number;
 
+uint64_t __hex_char_to_half_byte(char c)
+{
+    if (isdigit(c))
+    {
+        return __number_c2d(c) & 0xF;
+    }
+    else if (c >= 'a' & c <= 'z')
+    {
+        return ((uint64_t)(c - 'a') + 10) & 0xF;
+    }
+    else if (c >= 'A' & c <= 'Z')
+    {
+        return ((uint64_t)(c - 'A') + 10) & 0xF;
+    }
+    else
+    {
+        // let's hope we will not go this far
+        return 0;
+    }
+}
+
 /**
  * move number to interval
  *
@@ -185,6 +206,35 @@ static void number_append_char(number* n, char c)
     }
 
     n->len++;
+}
+
+static void number_append_char16(number* n, char hi, char lo)
+{
+    size_t old_size = n->size;
+
+    // yes this is dumb, but let's keep it this way
+    while (n->len + 2 > n->size)
+    {
+        n->size *= 2;
+    }
+
+    if (n->size > old_size)
+    {
+        n->s = (char*)realloc_assert(n->s, sizeof(char) * n->size);
+    }
+
+    if (number_zero(n))
+    {
+        n->s[0] = hi;
+        n->s[1] = lo;
+    }
+    else
+    {
+        n->s[n->len] = hi;
+        n->s[n->len + 1] = lo;
+    }
+
+    n->len += 2;
 }
 
 static void number_append_digit(number* n, unsigned int d)
@@ -465,12 +515,9 @@ static void number_pow10(number* integer, number* fraction, const number* exp, b
     }
 }
 
-static number_truncation_status binary_overflow_check(uint64_t* data)
+static number_truncation_status binary_overflow_check(uint64_t n)
 {
-    if (!data) { return NTS_SUCCESS; }
-
     number_truncation_status nts = NTS_SUCCESS;
-    uint64_t n = *data;
 
     for (uint64_t i = 0; n != 0 && i < 64; n >>= 1, i++)
     {
@@ -517,13 +564,12 @@ static number_truncation_status binary_overflow_check(uint64_t* data)
  * that can be contained by 64-bit integer
  *
 */
-static number_truncation_status pow2_base_s2b(const char* content, size_t bin_base, uint64_t* data)
+static number_truncation_status pow2_base_s2b(const char* content, size_t bin_base, binary_data* data)
 {
     size_t len = strlen(content);
     number_truncation_status nts = NTS_SUCCESS;
     size_t total_bits = 0;
     uint64_t n = 0;
-    uint64_t digit;
     char c;
     size_t i = 0;
 
@@ -575,23 +621,10 @@ static number_truncation_status pow2_base_s2b(const char* content, size_t bin_ba
             break;
         }
 
-        if (isdigit(c))
-        {
-            digit = __number_c2d(c);
-        }
-        else if (c >= 'a' & c <= 'z')
-        {
-            digit = (uint64_t)(c - 'a') + 10;
-        }
-        else if (c >= 'A' & c <= 'Z')
-        {
-            digit = (uint64_t)(c - 'A') + 10;
-        }
-
-        n = (n << bin_base) | digit;
+        n = (n << bin_base) | __hex_char_to_half_byte(c);
     }
 
-    if (data) { *data = n; }
+    data->number = n;
 
     return nts;
 }
@@ -612,7 +645,7 @@ static number_truncation_status pow2_base_s2b(const char* content, size_t bin_ba
  *
  * therefore this methods coverts as far as LONG type decimals
 */
-static bool __quick_dec_s2b(const char* content, uint64_t* data)
+static bool __quick_dec_s2b(const char* content, binary_data* data)
 {
     size_t len = strlen(content);
     uint64_t n = 0;
@@ -629,9 +662,171 @@ static bool __quick_dec_s2b(const char* content, uint64_t* data)
         n = n * 10 + __number_c2d(content[i]);
     }
 
-    if (data) { *data = n; }
+    data->number = n;
 
     return true;
+}
+
+/**
+ * String Literal Encode Utility
+ *
+ * This covers character and string literals
+ * It encodes the string in fixed-width 16-bit character
+ *
+ * pc: points to te first character of the string
+ *
+*/
+static number_truncation_status __string_encode(const char* content, binary_data* data)
+{
+    number n;
+    char* pc = (char*)content;
+    bool es = false;
+    uint16_t wc;
+
+    // wide char requires 16 bits each
+    init_number(&n, 2);
+    data->wide_char = false;
+
+    while (*pc)
+    {
+        if (es)
+        {
+            // escape-sequence encoder
+            switch (*pc)
+            {
+                case 'b':
+                    number_append_char16(&n, 0x00, 0x08);
+                    pc++;
+                    break;
+                case 's':
+                    number_append_char16(&n, 0x00, 0x20);
+                    pc++;
+                    break;
+                case 't':
+                    number_append_char16(&n, 0x00, 0x09);
+                    pc++;
+                    break;
+                case 'n':
+                    number_append_char16(&n, 0x00, 0x0A);
+                    pc++;
+                    break;
+                case 'f':
+                    number_append_char16(&n, 0x00, 0x0C);
+                    pc++;
+                    break;
+                case 'r':
+                    number_append_char16(&n, 0x00, 0x0D);
+                    pc++;
+                    break;
+                case '"':
+                    number_append_char16(&n, 0x00, 0x22);
+                    pc++;
+                    break;
+                case '\'':
+                    number_append_char16(&n, 0x00, 0x27);
+                    pc++;
+                    break;
+                case '\\':
+                    number_append_char16(&n, 0x00, 0x5C);
+                    pc++;
+                    break;
+                case 'u':
+                    wc = 0;
+                    // skip header "\uuu..."
+                    while (*pc && *pc == 'u') { pc++; }
+                    // 4 hexadecimal maximum
+                    for (size_t i = 0; i < 4 && *pc && isxdigit(*pc); i++, pc++)
+                    {
+                        wc = (wc << 4) | __hex_char_to_half_byte(*pc);
+                        data->wide_char = i > 1;
+                    }
+                    // now encode it
+                    number_append_char16(&n, (wc & 0xFF00) >> 8, wc & 0x00FF);
+                    break;
+                case '\r':
+                case '\n':
+                    // line break escape has no-op
+                    break;
+                default:
+                    if (isdigit(*pc))
+                    {
+                        wc = 0;
+
+                        /**
+                         * octal unicode value
+                         *
+                         * octal form is a compatibility for ASCII characters only
+                         * so the value has ASCII encode range: [0x00, 0xFF]
+                         *
+                         * maximum 3 octal digits are allowed, otherwise it will not
+                         * be included in this escape sequence
+                        */
+                        for (size_t i = 0; i < 3 && *pc && *pc >= '0' && *pc <= '7'; i++, pc++)
+                        {
+                            wc = (wc << 3) | __hex_char_to_half_byte(*pc);
+
+                            /**
+                             * before we consume this one, we need to test
+                             * if exceeds the range, if so, we cancel it
+                             * and break so pc will not increament
+                            */
+                            if (wc >> 8) // wc > 255
+                            {
+                                wc >>= 3;
+                                break;
+                            }
+                        }
+
+                        // now encode it
+                        number_append_char16(&n, 0x00, wc);
+                    }
+                    // we assume input is valid, so no error process here
+                    break;
+            }
+
+            // escape sequence ends
+            es = false;
+        }
+        else
+        {
+            switch (*pc)
+            {
+                case '\\':
+                    // start escape sequence
+                    es = true;
+                    break;
+                case '\r':
+                case '\n':
+                case '\'':
+                case '"':
+                    // line break and enclosure symbols are no-op
+                    break;
+                default:
+                    // directly translation
+                    number_append_char16(&n, 0x00, *pc);
+                    break;
+            }
+
+            pc++;
+        }
+    }
+
+    data->stream = n.s;
+    data->len = n.len;
+
+    // string stream only needs to detect 'char' type length overflow
+    return n.len > 2 ? NTS_OVERFLOW_U16 : NTS_SUCCESS;
+}
+
+/**
+ * initialize binary data
+*/
+void init_binary_data(binary_data* data)
+{
+    data->number = 0;
+    data->stream = NULL;
+    data->len = 0;
+    data->wide_char = false;
 }
 
 /**
@@ -666,7 +861,7 @@ static bool __quick_dec_s2b(const char* content, uint64_t* data)
  *    truncated, will become mantissa
  *    and the exponent would be the exponent in final form
 */
-number_truncation_status s2b(const char* content, java_number_type type, uint64_t* data)
+number_truncation_status s2b(const char* content, java_number_type type, binary_data* data)
 {
     size_t len_content = strlen(content);
     number_truncation_status nts = NTS_SUCCESS;
@@ -690,21 +885,24 @@ number_truncation_status s2b(const char* content, java_number_type type, uint64_
     {
         case JT_NUM_HEX:
             nts = pow2_base_s2b(content, 4, data);
-            return nts | binary_overflow_check(data);
+            return nts | binary_overflow_check(data->number);
         case JT_NUM_OCT:
             nts = pow2_base_s2b(content, 3, data);
-            return nts | binary_overflow_check(data);
+            return nts | binary_overflow_check(data->number);
         case JT_NUM_BIN:
             nts = pow2_base_s2b(content, 1, data);
-            return nts | binary_overflow_check(data);
+            return nts | binary_overflow_check(data->number);
         case JT_NUM_DEC:
             // a fast pathway for small integers
             if (__quick_dec_s2b(content, data))
             {
                 // if quick conversion works, we are done
-                return binary_overflow_check(data);
+                return binary_overflow_check(data->number);
             }
             break;
+        case JT_NUM_MAX:
+            // if no number type provided, we convert it into a 16-bit-char string stream
+            return __string_encode(content, data);
         default:
             // big DEC and all FP are painful...
             break;
@@ -969,11 +1167,11 @@ number_truncation_status s2b(const char* content, java_number_type type, uint64_
         if (bin[0].len > 64) { nts |= NTS_OVERFLOW_U64 | NTS_OVERFLOW_INT64; }
 
         n = number_bin_truncate(&bin[0], false);
-        nts |= binary_overflow_check(&n);
+        nts |= binary_overflow_check(n);
     }
 
     // pass data
-    if (data) { *data = n; }
+    data->number = n;
 
     // cleanup
     release_number(&part[0]);

@@ -130,35 +130,63 @@ definition* use(java_ir* ir, const char* name, def_use_control duc, java_error_i
 definition* def_li(java_ir* ir, java_token* token)
 {
     definition* v = NULL;
-    char* content = NULL;
-    hash_pair* pair = NULL;
+    char* content;
+    hash_pair* pair;
+    binary_data bin;
 
-    if (token->type == JLT_LTR_NUMBER)
+    // lookup
+    content = t2s(token);
+    pair = shash_table_get(&ir->tbl_literal, content);
+
+    // if key exists, we use; otherwise create
+    if (pair)
     {
-        // get the literal
-        uint64_t __n;
-        primitive __p = t2p(ir, token, &__n);
+        free(content);
+        return pair->value;
+    }
 
-        // lookup
-        content = t2s(token);
-        pair = shash_table_get(&ir->tbl_literal, content);
-
-        // if key exists, we use; otherwise create
-        if (pair)
-        {
-            v = pair->value;
-        }
-        else
-        {
-            // number literal definition
+    // otherwise we register
+    switch (token->type)
+    {
+        case JLT_LTR_NUMBER:
             v = new_definition(JLT_LTR_NUMBER);
-            v->li_type = JLT_LTR_NUMBER;
-            v->next = NULL;
-            v->li_number.type = __p;
-            v->li_number.imm = __n;
+            v->li_number.type = t2p(ir, token, &bin);
+            v->li_number.imm = bin.number;
+            break;
+        case JLT_LTR_CHARACTER:
+            v = new_definition(JLT_LTR_CHARACTER);
+            v->li_number.type = t2p(ir, token, &bin);
+            v->li_number.imm = bin.number;
+            break;
+        case JLT_RWD_TRUE:
+        case JLT_RWD_FALSE:
+            v = new_definition(JLT_RWD_BOOLEAN);
+            v->li_number.type = t2p(ir, token, &bin);
+            v->li_number.imm = bin.number;
+            break;
+        case JLT_RWD_NULL:
+            // NULL has no aux data
+            v = new_definition(JLT_RWD_NULL);
+            break;
+        case JLT_LTR_STRING:
+            v = new_definition(JLT_LTR_STRING);
+            t2p(ir, token, &bin);
+            v->li_string.stream = bin.stream;
+            v->li_string.length = bin.len;
+            v->li_string.wide_char = bin.wide_char;
+            break;
+        default:
+            break;
+    }
 
-            shash_table_insert(&ir->tbl_literal, content, v);
-        }
+    // register: content cannot be freed if successful
+    if (v)
+    {
+        shash_table_insert(&ir->tbl_literal, content, v);
+    }
+    else
+    {
+        free(content);
     }
 
     return v;

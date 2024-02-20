@@ -26,6 +26,27 @@ typedef enum
     NTS_OVERFLOW_INT64 = 0x0800,
 } number_truncation_status;
 
-number_truncation_status s2b(const char* content, java_number_type type, uint64_t* data);
+/**
+ * binary data information
+ *
+ * 1 major data: number AND stream
+ *
+ * s2b uses "stream" for character and string literals,
+ * and uses "number" for number literals
+ *
+ * "stream" also contain aux info: byte count and a flag
+ * indicates whether the stream contains wide character
+*/
+typedef struct
+{
+    uint64_t number;
+
+    char* stream;
+    size_t len;
+    bool wide_char;
+} binary_data;
+
+void init_binary_data(binary_data* data);
+number_truncation_status s2b(const char* content, java_number_type type, binary_data* data);
 
 #endif
