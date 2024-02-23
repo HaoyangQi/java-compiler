@@ -39,7 +39,6 @@ static reference* __interpret_operand(java_ir* ir, tree_node* base)
         /**
          * TODO: should we include JNT_EXPRESSION here for ( Expression ) ?
         */
-        printf("OP[%d] ", base->data->operator.id);
         ref->type = IR_ASN_REF_INSTRUCTION;
         ref->doi = base->data->operator.instruction;
 
@@ -70,17 +69,12 @@ static reference* __interpret_operand(java_ir* ir, tree_node* base)
         {
             ref->type = IR_ASN_REF_LITERAL;
             ref->doi = __def;
-
-            content = t2s(token);
-            printf("%llu(%s) ", __def->li_number.imm, content);
-            free(content);
         }
         else if (token->class == JT_IDENTIFIER)
         {
             ref->type = IR_ASN_REF_DEFINITION;
             content = t2s(token);
             ref->doi = use(ir, content, DU_CTL_LOOKUP_GLOBAL, JAVA_E_REF_UNDEFINED);
-            printf("%s ", content);
             free(content);
 
             /**
@@ -105,12 +99,14 @@ static reference* __interpret_operand(java_ir* ir, tree_node* base)
  *
  * lvalue <- operand_1 op operand_2
  *
+ * it returns if the code requires logical precedence expansion
+ *
  * NOTE: lvalue reference must be copied from an operand!
  * because the version number will be different
  *
  * op: JNT_OPERATOR
 */
-static void __execute_instruction(
+static bool __execute_instruction(
     java_ir* ir,
     cfg_worker* worker,
     tree_node* op,
@@ -121,6 +117,7 @@ static void __execute_instruction(
     operator_id id = op->data->operator.id;
     reference* lvalue = NULL;
     bool validate_lvalue = false;
+    bool needs_logical_expansion = false;
 
     /**
      * reduce composite assignment operators
@@ -151,6 +148,12 @@ static void __execute_instruction(
             lvalue = copy_reference(operand_1);
             validate_lvalue = true;
             break;
+        case OPID_LOGIC_AND:
+        case OPID_LOGIC_OR:
+        case OPID_TERNARY_1:
+        case OPID_TERNARY_2:
+            needs_logical_expansion = true;
+            break;
         default:
             break;
     }
@@ -174,10 +177,49 @@ static void __execute_instruction(
     delete_reference(lvalue);
     delete_reference(operand_1);
     delete_reference(operand_2);
+
+    return needs_logical_expansion;
+}
+
+/**
+ * grow worker to guarantee that next statement always
+ * starts in a new block
+ *
+ * NOTE: use this when:
+ * 1. a parser enforces in new block at the beginning, OR
+ * 2. not sure what the upcoming statement is
+ *
+ * NOTE: keep this method up-to-date based on algorithm of
+ *       corresponding statement parser
+*/
+static void __start_statement_in_new_block(java_ir* ir, java_node_query stmt_type)
+{
+    cfg_worker* w = get_scope_worker(ir);
+
+    switch (stmt_type)
+    {
+        case JNT_BLOCK:
+            /**
+             * block merges worker graph
+             * so by definition a block always enforces in new block
+            */
+            break;
+        default:
+            // only grow when current block is not empty or empty graph
+            if (!cfg_worker_current_block_empty(w) || cfg_empty(w->graph))
+            {
+                cfg_worker_grow(w);
+            }
+            break;
+    }
 }
 
 /**
  * Expression AST Walk
+ *
+ * This method generate a single block of code without any logical expansion
+ *
+ * It returns the flag that if the code needs logical precedence expansion
  *
  * node: JNT_EXPRESSION
 */
@@ -194,12 +236,14 @@ void walk_expression(java_ir* ir, tree_node* expression)
     tree_node* base1;
     tree_node* base2;
     tree_node* top = expression->first_child;
+    instruction* first = TSW(ir)->cur_blk ? TSW(ir)->cur_blk->inst_last : NULL;
+    bool needs_logical_expansion = false;
 
     if (!top->next_sibling)
     {
         // minimum case: constant expression (only one operand)
         reference* constant = __interpret_operand(ir, top);
-        cfg_worker_execute(ir, TSW(ir), IROP_NONE, NULL, &constant, NULL);
+        cfg_worker_execute(ir, TSW(ir), IROP_STORE, NULL, &constant, NULL);
         delete_reference(constant);
 
         return;
@@ -286,56 +330,38 @@ void walk_expression(java_ir* ir, tree_node* expression)
         */
         top->prev_sibling = base2 ? base2->prev_sibling : base1->prev_sibling;
 
-        printf("instruction: OP[%d] ", top->data->operator.id);
-
         /**
          * Code Generation
          *
          * order matters here!
+         * 1. operand order
+         * 2. flag OR order: __execute_instruction needs to stay at
+         * left to make sure it always executes, otherwise the
+         * short circuit might block it
         */
-        __execute_instruction(
+        needs_logical_expansion = __execute_instruction(
             ir, TSW(ir), top,
             __interpret_operand(ir, base2),
             __interpret_operand(ir, base1)
-        );
-
-        printf("\n");
+        ) || needs_logical_expansion;
 
         // reduction of current operator completed, move on
         top = top->next_sibling;
     }
-}
 
-/**
- * grow worker to guarantee that next statement always
- * starts in a new block
- *
- * NOTE: use this when:
- * 1. a parser enforces in new block at the beginning, OR
- * 2. not sure what the upcoming statement is
- *
- * NOTE: keep this method up-to-date based on algorithm of
- *       corresponding statement parser
-*/
-static void __start_statement_in_new_block(java_ir* ir, java_node_query stmt_type)
-{
-    cfg_worker* w = get_scope_worker(ir);
-
-    switch (stmt_type)
+    // logical precedence
+    if (needs_logical_expansion)
     {
-        case JNT_BLOCK:
-            /**
-             * block merges worker graph
-             * so by definition a block always enforces in new block
-            */
-            break;
-        default:
-            // only grow when current block is not empty or empty graph
-            if (!cfg_worker_current_block_empty(w) || cfg_empty(w->graph))
-            {
-                cfg_worker_grow(w);
-            }
-            break;
+        /**
+         * if the block needs logical precedence expansion,
+         * start expression code in new block
+        */
+        if (first)
+        {
+            cfg_worker_current_block_split(ir, TSW(ir), first, EDGE_ANY, false);
+        }
+
+        cfg_worker_expand_logical_precedence(ir, TSW(ir));
     }
 }
 

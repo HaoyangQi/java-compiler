@@ -122,10 +122,6 @@ definition* use(java_ir* ir, const char* name, def_use_control duc, java_error_i
  *
  * if token is not literal, funtion is no-op and NULL is returned
  *
- * TODO: other literals
- * for string literals, we probably need string->definition map
- * and definition reference back to the key string,
- * because we need definition object in instruction
 */
 definition* def_li(java_ir* ir, java_token* token)
 {

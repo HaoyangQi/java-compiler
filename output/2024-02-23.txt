@@ -1,0 +1,423 @@
+===== COMPILER RUNTIME REPORT =====
+Language version: 1
+Reserved word:
+    count: 50
+    memory: 4424 bytes
+    load factor: 14.16%
+    longest chain: 1
+Expression static data size: 1072 bytes
+Error static data size: 538 bytes
+===== END OF REPORT =====
+
+File 1: ./test/simple.txt
+===== ABSTRACT SYNTAX TREE =====
+Compilation Unit
+  Package Declaration
+    Name
+      Unit: mypack
+  Import Declaration (On-demand: false)
+    Name
+      Unit: java
+      Unit: text
+      Unit: DecimalFormat
+  Import Declaration (On-demand: false)
+    Name
+      Unit: java
+      Unit: util
+      Unit: InputMismatchException
+  Import Declaration (On-demand: false)
+    Name
+      Unit: java
+      Unit: util
+      Unit: Scanner
+  Import Declaration (On-demand: true)
+    Name
+      Unit: somepackage
+  Top Level: No Modifier
+    Class Declaration: MyPackageClass
+      Class Extends
+        Class Type
+          Unit: C1
+      Class Implements
+        Interface Type List
+          Interface Type
+            Unit: C2
+          Interface Type
+            Unit: C3
+      Class Body
+        Class Body Declaration: No Modifier
+          Type: JLT_RWD_INT
+          Variable Declarators
+            Variable Declarator: r2
+              Expression
+                Primary
+                  1
+                Primary
+                  2
+                OP[19]: OPID_GREAT -> JLT_SYM_ANGLE_BRACKET_CLOSE ">"
+                Primary
+                  3
+                Primary
+                  4
+                Primary
+                  5
+                OP[9]: OPID_MUL -> JLT_SYM_ASTERISK "*"
+                OP[12]: OPID_ADD -> JLT_SYM_PLUS "+"
+                Primary
+                  6
+                Primary
+                  7
+                OP[13]: OPID_SUB -> JLT_SYM_MINUS "-"
+                OP[30]: OPID_TERNARY_2 -> JLT_SYM_COLON ":"
+                OP[29]: OPID_TERNARY_1 -> JLT_SYM_QUESTION "?"
+        Class Body Declaration: No Modifier
+          Type: JLT_RWD_INT
+          Variable Declarators
+            Variable Declarator: r3
+              Expression
+                Primary
+                  0
+        Class Body Declaration: No Modifier
+          Type: JLT_RWD_SHORT
+          Variable Declarators
+            Variable Declarator: r4
+        Class Body Declaration: No Modifier
+          Type: JLT_RWD_VOID
+          Method Declaration
+            Method Header: logic
+            Method Body
+              Block
+                Expression Statement
+                  Expression
+                    Primary
+                      1
+                    Primary
+                      2
+                    OP[28]: OPID_LOGIC_OR -> JLT_SYM_LOGIC_OR "||"
+                    Primary
+                      3
+                    Primary
+                      4
+                    OP[12]: OPID_ADD -> JLT_SYM_PLUS "+"
+                    OP[28]: OPID_LOGIC_OR -> JLT_SYM_LOGIC_OR "||"
+        Class Body Declaration: private
+          Type: JLT_RWD_INT
+          Method Declaration
+            Method Header: calc
+              Formal Parameter List
+                Formal Parameter: x
+                  Type: JLT_RWD_INT
+                Formal Parameter: y
+                  Type: JLT_RWD_INT
+                Formal Parameter: r2
+                  Type: JLT_RWD_SHORT
+            Method Body
+              Block
+                While Statement
+                  Expression
+                    Primary
+                      x
+                    Primary
+                      y
+                    OP[19]: OPID_GREAT -> JLT_SYM_ANGLE_BRACKET_CLOSE ">"
+                  Block
+                    If Statement
+                      Expression
+                        Primary
+                          4
+                        Primary
+                          9
+                        OP[22]: OPID_EQ -> JLT_SYM_RELATIONAL_EQUAL "=="
+                      Break Statement: (null)
+                    Expression Statement
+                      Expression
+                        Primary
+                          x
+                        OP[2]: OPID_POST_DEC -> JLT_SYM_DECREMENT "--"
+                    If Statement
+                      Expression
+                        Primary
+                          6
+                        Primary
+                          2
+                        OP[20]: OPID_GREAT_EQ -> JLT_SYM_GREATER_EQUAL ">="
+                      Block
+                        Continue Statement: (null)
+                If Statement
+                  Expression
+                    Primary
+                      2
+                    Primary
+                      1
+                    OP[19]: OPID_GREAT -> JLT_SYM_ANGLE_BRACKET_CLOSE ">"
+                  Block
+                    Expression Statement
+                      Expression
+                        Primary
+                          x
+                        Primary
+                          y
+                        OP[12]: OPID_ADD -> JLT_SYM_PLUS "+"
+                    Expression Statement
+                      Expression
+                        Primary
+                          r3
+                        Primary
+                          r2
+                        Primary
+                          6
+                        OP[13]: OPID_SUB -> JLT_SYM_MINUS "-"
+                        Primary
+                          y
+                        OP[12]: OPID_ADD -> JLT_SYM_PLUS "+"
+                        OP[31]: OPID_ASN -> JLT_SYM_EQUAL "="
+                    Return Statement
+                      Expression
+                        Primary
+                          3
+                  If Statement
+                    Expression
+                      Primary
+                        r2
+                      Primary
+                        x
+                      OP[17]: OPID_LESS -> JLT_SYM_ANGLE_BRACKET_OPEN "<"
+                    Block
+                      Variable Declaration
+                        Local Variable Declaration
+                          Type: JLT_RWD_INT
+                          Variable Declarators
+                            Variable Declarator: tmp
+                              Expression
+                                Primary
+                                  9
+                      Expression Statement
+                        Expression
+                          Primary
+                            y
+                          Primary
+                            2
+                          OP[32]: OPID_ADD_ASN -> JLT_SYM_ADD_ASSIGNMENT "+="
+                      Variable Declaration
+                        Local Variable Declaration
+                          Type: JLT_RWD_INT
+                          Variable Declarators
+                            Variable Declarator: tmp2
+                      Expression Statement
+                        Expression
+                          Primary
+                            tmp
+                          Primary
+                            tmp
+                          Primary
+                            y
+                          Primary
+                            9
+                          OP[9]: OPID_MUL -> JLT_SYM_ASTERISK "*"
+                          OP[13]: OPID_SUB -> JLT_SYM_MINUS "-"
+                          OP[31]: OPID_ASN -> JLT_SYM_EQUAL "="
+                      Return Statement
+                        Expression
+                          Primary
+                            tmp2
+                    Block
+                      Return Statement
+                        Expression
+                          Primary
+                            r3
+                While Statement
+                  Expression
+                    Primary
+                      x
+                    Primary
+                      y
+                    OP[17]: OPID_LESS -> JLT_SYM_ANGLE_BRACKET_OPEN "<"
+                  Block
+                    Expression Statement
+                      Expression
+                        Primary
+                          x
+                        OP[1]: OPID_POST_INC -> JLT_SYM_INCREMENT "++"
+                Return Statement
+                  Expression
+                    Primary
+                      0
+        Class Body Declaration: public static
+          Type: JLT_RWD_VOID
+          Method Declaration
+            Method Header: basic
+            Method Body
+              Block
+===== ON-DEMAND IMPORT PACKAGES =====
+memory: 120 bytes
+load factor: 9.09%
+longest chain: 1
+    somepackage
+===== MEMBER INITIALIZATION =====
+
+===== CONTROL FLOW GRAPH =====
+node[0] (entry point) <ANY> -> 1
+    [00000194226EA870][0]: (li: 0x1{1}) IROP_GT (li: 0x2{2})
+    [00000194226EB530][0]: (li: 0x4{4}) IROP_MUL (li: 0x5{5})
+    [00000194226EA7F0][0]: (li: 0x3{3}) IROP_ADD (inst: 00000194226EB530)
+    [00000194226EB370][0]: (li: 0x6{6}) IROP_SUB (li: 0x7{7})
+    [00000194226EB4F0][0]: (inst: 00000194226EA7F0) IROP_TB (inst: 00000194226EB370)
+    [00000194226EB030][0]: (inst: 00000194226EA870) IROP_TC (inst: 00000194226EB4F0)
+    [00000194226EA8B0][0]: (def: 00000194226EB6F0) <- (inst: 00000194226EB030) IROP_ASN (null)
+node[1] <ANY>
+    [00000194226EB5B0][1]: (li: 0x0{0}) IROP_STORE (null)
+    [00000194226EB2B0][1]: (def: 00000194226EB760) <- (inst: 00000194226EB5B0) IROP_ASN (null)
+    [00000194226EADB0][1]: (def: 00000194226EB7D0) <- (null) IROP_INIT (null)
+>>>>> SUMMARY <<<<<
+node count: 2
+node arr size: 2
+edge count: 1
+edge arr size: 2
+instruction count: 10
+memory size: 864 bytes
+===== GLOBAL NAMES =====
+memory: 496 bytes
+load factor: 45.45%
+longest chain: 3
+    MyPackageClass:
+      [0](00000194226E0920): class, Access: No Modifier extends C1 implements C2,C3
+    calc:
+      [0](00000194226EB8B0): def method, Access: private, Return: JLT_RWD_INT
+
+===== CONTROL FLOW GRAPH =====
+node[0] (entry point) <TEST> -> 1(FALSE) -> 2(TRUE)
+    [00000194226EAC70][0]: (def: 00000194226EC870) IROP_GT (def: 00000194226EC9C0)
+    [00000194226EB0F0][0]: (null) IROP_TEST (null)
+node[1] <TEST> -> 7(TRUE) -> 9(FALSE)
+    [00000194226EAA70][1]: (li: 0x2{2}) IROP_GT (li: 0x1{1})
+    [00000194226EB230][1]: (null) IROP_TEST (null)
+node[2] <TEST> -> 3(TRUE) -> 4(FALSE)
+    [00000194226EAB70][2]: (li: 0x4{4}) IROP_EQ (li: 0x9{9})
+    [00000194226EB170][2]: (null) IROP_TEST (null)
+node[3] <BREAK> -> 1(JMP) -> 4
+    [00000194226EABB0][3]: (null) IROP_JMP (null)
+node[4] <TEST> -> 5(TRUE) -> 6(FALSE)
+    [00000194226EA830][4]: (null) IROP_ADEC (def: 00000194226EC870)
+    [00000194226EABF0][4]: (li: 0x6{6}) IROP_GE (li: 0x2{2})
+    [00000194226EB430][4]: (null) IROP_TEST (null)
+node[5] <CONTINUE> -> 0(JMP) -> 6
+    [00000194226EA9B0][5]: (null) IROP_JMP (null)
+node[6] <ANY> -> 0(JMP)
+    (no instructions)
+node[7] <RETURN> -> 8
+    [00000194226EB2F0][7]: (def: 00000194226EC870) IROP_ADD (def: 00000194226EC9C0)
+    [00000194226EACB0][7]: (def: 00000194226ECC60) IROP_SUB (li: 0x6{6})
+    [00000194226EB3B0][7]: (inst: 00000194226EACB0) IROP_ADD (def: 00000194226EC9C0)
+    [00000194226EB570][7]: (def: 00000194226EB760) <- (inst: 00000194226EB3B0) IROP_ASN (null)
+    [00000194226EA770][7]: (li: 0x3{3}) IROP_STORE (null)
+    [00000194226EA7B0][7]: (inst: 00000194226EA770) IROP_RET (null)
+node[8] <TEST> -> 13(FALSE) -> 14(TRUE)
+    [00000194226EF810][8]: (def: 00000194226EC870) IROP_LT (def: 00000194226EC9C0)
+    [00000194226EF350][8]: (null) IROP_TEST (null)
+node[9] <TEST> -> 10(TRUE) -> 12(FALSE)
+    [00000194226EB270][9]: (def: 00000194226ECC60) IROP_LT (def: 00000194226EC870)
+    [00000194226EA9F0][9]: (null) IROP_TEST (null)
+node[10] <RETURN> -> 11
+    [00000194226EF610][10]: (li: 0x9{9}) IROP_STORE (null)
+    [00000194226EFC10][10]: (def: 00000194226EC6B0) <- (inst: 00000194226EF610) IROP_ASN (null)
+    [00000194226EFCD0][10]: (def: 00000194226EC9C0) <- (def: 00000194226EC9C0) IROP_ADD (li: 0x2{2})
+    [00000194226EFB90][10]: (def: 00000194226ECB10) <- (null) IROP_INIT (null)
+    [00000194226EF3D0][10]: (def: 00000194226EC9C0) IROP_MUL (li: 0x9{9})
+    [00000194226EFFD0][10]: (def: 00000194226EC6B0) IROP_SUB (inst: 00000194226EF3D0)
+    [00000194226EF410][10]: (def: 00000194226EC6B0) <- (inst: 00000194226EFFD0) IROP_ASN (null)
+    [00000194226EF8D0][10]: (def: 00000194226ECB10) IROP_STORE (null)
+    [00000194226EF210][10]: (inst: 00000194226EF8D0) IROP_RET (null)
+node[11] <ANY> -> 8
+    (no instructions)
+node[12] <RETURN> -> 11
+    [00000194226EF450][12]: (def: 00000194226EB760) IROP_STORE (null)
+    [00000194226EFC90][12]: (inst: 00000194226EF450) IROP_RET (null)
+node[13] <RETURN>
+    [00000194226EF890][13]: (li: 0x0{0}) IROP_STORE (null)
+    [00000194226EF750][13]: (inst: 00000194226EF890) IROP_RET (null)
+node[14] <ANY> -> 8(JMP)
+    [00000194226EF7D0][14]: (null) IROP_AINC (def: 00000194226EC870)
+>>>>> SUMMARY <<<<<
+node count: 15
+node arr size: 16
+edge count: 22
+edge arr size: 32
+instruction count: 35
+memory size: 4608 bytes
+
+    DecimalFormat:
+      [0](00000194226E85D0): import, FROM java.text
+    basic:
+      [0](00000194226EC5F0): def method, Access: public static, Return: JLT_RWD_VOID
+
+===== CONTROL FLOW GRAPH =====
+(empty)
+
+    InputMismatchException:
+      [0](00000194226E8640): import, FROM java.util
+    r4:
+      [0](00000194226EB7D0): def member var, Access: No Modifier, Type: JLT_RWD_SHORT
+    r2:
+      [0](00000194226EB6F0): def member var, Access: No Modifier, Type: JLT_RWD_INT
+    logic:
+      [0](00000194226EB840): def method, Access: No Modifier, Return: JLT_RWD_VOID
+
+===== CONTROL FLOW GRAPH =====
+node[0] (entry point) <TEST> -> 2(FALSE) -> 1(TRUE)
+    [00000194226EAFB0][0]: (li: 0x1{1}) IROP_STORE (null)
+    [00000194226EB1B0][0]: (null) IROP_TEST (null)
+node[1] <TEST> -> 4(FALSE) -> 3(TRUE)
+    [00000194226EAE30][1]: (inst: 00000194226EAFB0) IROP_PHI (inst: 00000194226EA970)
+    [00000194226EB3F0][1]: (null) IROP_TEST (null)
+node[2] <ANY> -> 1
+    [00000194226EA970][2]: (li: 0x2{2}) IROP_STORE (null)
+node[3] <ANY>
+    [00000194226EA730][3]: (inst: 00000194226EAE30) IROP_PHI (inst: 00000194226EA930)
+node[4] <ANY> -> 3
+    [00000194226EA930][4]: (li: 0x3{3}) IROP_ADD (li: 0x4{4})
+>>>>> SUMMARY <<<<<
+node count: 5
+node arr size: 8
+edge count: 6
+edge arr size: 8
+instruction count: 7
+memory size: 1248 bytes
+
+    r3:
+      [0](00000194226EB760): def member var, Access: No Modifier, Type: JLT_RWD_INT
+    Scanner:
+      [0](00000194226E08B0): import, FROM java.util
+===== LITERALS =====
+memory: 464 bytes
+load factor: 40.91%
+longest chain: 1
+    1:
+      [0](00000194226ECCD0): number,1
+    9:
+      [0](00000194226ECAA0): number,9
+    7:
+      [0](00000194226ECDB0): number,7
+    5:
+      [0](00000194226ECD40): number,5
+    0:
+      [0](00000194226EC800): number,0
+    3:
+      [0](00000194226EC790): number,3
+    2:
+      [0](00000194226EC720): number,2
+    6:
+      [0](00000194226EC8E0): number,6
+    4:
+      [0](00000194226ECA30): number,4
+===== LOOKUP STACK =====
+(lookup stack is empty)
+===== DEFINITION POOL =====
+[0](00000194226EC870): def var, Access: No Modifier, Type: JLT_RWD_INT
+[1](00000194226EC9C0): def var, Access: No Modifier, Type: JLT_RWD_INT
+[2](00000194226ECC60): def var, Access: No Modifier, Type: JLT_RWD_SHORT
+[3](00000194226EC6B0): def var, Access: No Modifier, Type: JLT_RWD_INT
+[4](00000194226ECB10): def var, Access: No Modifier, Type: JLT_RWD_INT
+>>>>> SUMMARY <<<<<
+definition count: 5
+pool memory size: 520 bytes
+Press any key to continue . . .
