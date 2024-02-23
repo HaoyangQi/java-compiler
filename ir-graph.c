@@ -385,6 +385,7 @@ bool instruction_insert(basic_block* node, instruction* prev, instruction* inst)
     }
 
     inst->prev = prev;
+    inst->node = node;
 
     if (prev)
     {
@@ -414,9 +415,62 @@ bool instruction_push_back(basic_block* node, instruction* inst)
 }
 
 /**
+ * pop instruction at the end
+*/
+instruction* instruction_pop_back(basic_block* node)
+{
+    instruction* inst = node->inst_last;
+
+    if (inst)
+    {
+        node->inst_last = inst->prev;
+        inst->prev = NULL;
+        inst->next = NULL;
+
+        if (node->inst_last)
+        {
+            node->inst_last->next = NULL;
+        }
+        else
+        {
+            node->inst_first = NULL;
+        }
+    }
+
+    return inst;
+}
+
+/**
  * push instruction at the beginning
 */
 bool instruction_push_front(basic_block* node, instruction* inst)
 {
     return instruction_insert(node, NULL, inst);
+}
+
+/**
+ * find the very first instrcution that belongs to current instruction
+*/
+instruction* instruction_locate_enclosure_start(instruction* inst)
+{
+    while (inst)
+    {
+        // order matters here
+        if (inst->operand_1 && inst->operand_1->type == IR_ASN_REF_INSTRUCTION)
+        {
+            // operand 1 code covers operand 2
+            inst = inst->operand_1->doi;
+        }
+        else if (inst->operand_2 && inst->operand_2->type == IR_ASN_REF_INSTRUCTION)
+        {
+            inst = inst->operand_2->doi;
+        }
+        else
+        {
+            // if neither requires enclosure, then this is the one
+            break;
+        }
+    }
+
+    return inst;
 }

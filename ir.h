@@ -177,14 +177,14 @@ typedef struct _instruction
     reference* lvalue;
     reference* operand_1;
     reference* operand_2;
+    // reference to the node this instruction belongs to
+    struct _basic_block* node;
 
     // previous instruction
     struct _instruction* prev;
     // next instruction
     struct _instruction* next;
 } instruction;
-
-struct _basic_block;
 
 /**
  * block edge type
@@ -399,6 +399,8 @@ typedef struct
     cfg* graph;
     basic_block* cur_blk;
     edge_type next_outbound_strategy;
+    bool execute_inverse;
+    bool grow_insert;
 } cfg_worker;
 
 /**
@@ -556,8 +558,10 @@ void release_cfg_worker(cfg_worker* worker, cfg* move_to);
 basic_block* cfg_worker_current_block(cfg_worker* worker);
 basic_block* cfg_worker_grow(cfg_worker* worker);
 void cfg_worker_next_outbound_strategy(cfg_worker* worker, edge_type type);
+void cfg_worker_execution_strategy(cfg_worker* worker, bool inverse);
+void cfg_worker_next_grow_strategy(cfg_worker* worker, bool insert);
 void cfg_worker_set_current_block_type(cfg_worker* worker, block_type t);
-basic_block* cfg_worker_jump(cfg_worker* worker, basic_block* to, bool change_cur, bool edge);
+void cfg_worker_jump(cfg_worker* worker, basic_block* to, bool change_cur, bool edge);
 void cfg_worker_grow_with_graph(cfg_worker* dest, cfg_worker* src);
 instruction* cfg_worker_execute(
     java_ir* ir,
@@ -568,6 +572,14 @@ instruction* cfg_worker_execute(
     reference** operand_2
 );
 bool cfg_worker_current_block_empty(const cfg_worker* worker);
+basic_block* cfg_worker_current_block_split(
+    java_ir* ir,
+    cfg_worker* worker,
+    instruction* at,
+    edge_type to_remainder,
+    bool split_before
+);
+void cfg_worker_expand_logical_precedence(java_ir* ir, cfg_worker* worker);
 
 reference* new_reference(reference_type t, void* doi);
 reference* copy_reference(const reference* r);
@@ -577,7 +589,9 @@ instruction* new_instruction();
 void delete_instruction(instruction* inst, bool destructive);
 bool instruction_insert(basic_block* node, instruction* prev, instruction* inst);
 bool instruction_push_back(basic_block* node, instruction* inst);
+instruction* instruction_pop_back(basic_block* node);
 bool instruction_push_front(basic_block* node, instruction* inst);
+instruction* instruction_locate_enclosure_start(instruction* inst);
 
 void walk_expression(java_ir* ir, tree_node* expression);
 cfg_worker* walk_block(java_ir* ir, tree_node* block, bool use_new_scope);

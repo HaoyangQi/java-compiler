@@ -1381,8 +1381,8 @@ static void debug_print_irop(operation irop)
         case IROP_LMD:
             printf("IROP_LMD");
             break;
-        case IROP_NONE:
-            printf("IROP_NONE");
+        case IROP_STORE:
+            printf("IROP_STORE");
             break;
         case IROP_INIT:
             printf("IROP_INIT");
@@ -1398,6 +1398,9 @@ static void debug_print_irop(operation irop)
             break;
         case IROP_PHI:
             printf("IROP_PHI");
+            break;
+        case IROP_NOOP:
+            printf("IROP_NOOP");
             break;
         case IROP_MAX:
             printf("(Invalid: IROP_MAX)");
@@ -1505,7 +1508,7 @@ static void debug_print_instructions(instruction* inst, size_t* cnt)
 
     while (inst)
     {
-        printf("    [%p]: ", inst);
+        printf("    [%p][%zd]: ", inst, inst->node->id);
 
         if (inst->lvalue)
         {
