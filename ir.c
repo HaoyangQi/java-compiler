@@ -165,6 +165,7 @@ statement_context* push_statement_context(java_ir* ir, statement_context_query t
     c->type = type;
     c->_break = NULL;
     c->_continue = NULL;
+    c->_test = NULL;
     c->next = ir->statement_contexts;
     ir->statement_contexts = c;
 

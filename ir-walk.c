@@ -525,22 +525,9 @@ void __execute_statement_if(java_ir* ir, tree_node* stmt)
     // Statement (TRUE Branch)
     stmt = stmt->next_sibling;
 
-    /**
-     * branch into TRUE branch
-     * always make body stay independent
-     *
-     * otherwise code generation will not know which
-     * code to execute if 'if' and 'else' clause both
-     * do not have a block
-     *
-     * as a compromise, when it is a Block statement,
-     * this one is left empty and will out to the
-     * start of the Block code
-     *
-     * same idea goes to 'else' clause
-    */
+    // branch into TRUE branch
     cfg_worker_next_outbound_strategy(TSW(ir), EDGE_TRUE);
-    cfg_worker_grow(TSW(ir));
+    __start_statement_in_new_block(ir, stmt->type);
 
     // parse true branch
     if (stmt->type == JNT_STATEMENT_VAR_DECL)
@@ -564,12 +551,7 @@ void __execute_statement_if(java_ir* ir, tree_node* stmt)
 
     if (stmt)
     {
-        /**
-         * always make else clause stay independent
-         *
-         * same reason above
-        */
-        cfg_worker_grow(TSW(ir));
+        __start_statement_in_new_block(ir, stmt->type);
 
         // parse true branch
         if (stmt->type == JNT_STATEMENT_VAR_DECL)
@@ -630,6 +612,7 @@ void __execute_statement_while(java_ir* ir, tree_node* stmt)
     // parse condition
     stmt = stmt->first_child;
     walk_expression(ir, stmt);
+    sc->_test = cfg_worker_current_block(TSW(ir));
 
     // mark test block
     cfg_worker_execute(ir, TSW(ir), IROP_TEST, NULL, NULL, NULL);
@@ -654,32 +637,31 @@ void __execute_statement_while(java_ir* ir, tree_node* stmt)
     stmt = stmt->next_sibling;
 
     // go back to test node and branch into loop body
-    cfg_worker_jump(TSW(ir), sc->_continue, true, false);
+    cfg_worker_jump(TSW(ir), sc->_test, true, false);
     cfg_worker_next_outbound_strategy(TSW(ir), EDGE_TRUE);
 
-    /**
-     * always make body stay independent
-     *
-     * otherwise the condition block loops back to itself
-     * and we will never know what to execute
-     *
-     * as a compromise, when body is a Block statement,
-     * this one is left empty and will point to the
-     * start of the Block code
-    */
-    cfg_worker_grow(TSW(ir));
-
-    // parse loop body
-    if (stmt->type == JNT_STATEMENT_VAR_DECL)
+    // while body can be empty
+    if (stmt)
     {
-        ir_error(ir, JAVA_E_WHILE_LOCAL_VAR_DECL);
+        __start_statement_in_new_block(ir, stmt->type);
+
+        // parse loop body
+        if (stmt->type == JNT_STATEMENT_VAR_DECL)
+        {
+            ir_error(ir, JAVA_E_WHILE_LOCAL_VAR_DECL);
+        }
+        else
+        {
+            __execute_statement(ir, stmt);
+        }
     }
     else
     {
-        __execute_statement(ir, stmt);
+        // leave body empty
+        cfg_worker_grow(TSW(ir));
     }
 
-    // add edge to loop back to test block
+    // add edge to loop back to continue block
     cfg_worker_next_outbound_strategy(TSW(ir), EDGE_JUMP);
     cfg_worker_jump(TSW(ir), sc->_continue, false, true);
 
@@ -792,7 +774,6 @@ void __execute_statement_for(java_ir* ir, tree_node* stmt)
 {
     statement_context* sc = push_statement_context(ir, SCQ_LOOP);
     basic_block* test_expr_start; // loop-back node (NOT continue point!)
-    basic_block* test_expr_end; // test node
 
     // we need a scope for inits
     lookup_new_scope(ir, LST_FOR);
@@ -826,18 +807,16 @@ void __execute_statement_for(java_ir* ir, tree_node* stmt)
     if (stmt->type == JNT_EXPRESSION)
     {
         walk_expression(ir, stmt);
-        cfg_worker_execute(ir, TSW(ir), IROP_TEST, NULL, NULL, NULL);
         stmt = stmt->next_sibling;
     }
-    else
-    {
-        // still mark the block
-        TSW(ir)->cur_blk->type = BLOCK_TEST;
-    }
+
+    // mark, also makes sure that this node is not empty
+    // so that body can stays isolated
+    cfg_worker_execute(ir, TSW(ir), IROP_TEST, NULL, NULL, NULL);
 
     // must get this after condition because 
     // expression may be expanded
-    test_expr_end = cfg_worker_current_block(TSW(ir));
+    sc->_test = cfg_worker_current_block(TSW(ir));
 
     /**
      * continue block: which is for update
@@ -861,29 +840,23 @@ void __execute_statement_for(java_ir* ir, tree_node* stmt)
     }
 
     // go back to test node and branch into loop body
-    cfg_worker_jump(TSW(ir), test_expr_end, true, false);
+    cfg_worker_jump(TSW(ir), sc->_test, true, false);
     cfg_worker_next_outbound_strategy(TSW(ir), EDGE_TRUE);
 
-    /**
-     * always make body stay independent
-     *
-     * otherwise the condition block loops back to itself
-     * and we will never know what to execute
-     *
-     * as a compromise, when body is a Block statement,
-     * this one is left empty and will point to the
-     * start of the Block code
-    */
-    cfg_worker_grow(TSW(ir));
+    // body can be empty in for loop
+    if (stmt)
+    {
+        __start_statement_in_new_block(ir, stmt->type);
 
-    // parse loop body
-    if (stmt->type == JNT_STATEMENT_VAR_DECL)
-    {
-        ir_error(ir, JAVA_E_WHILE_LOCAL_VAR_DECL);
-    }
-    else
-    {
-        __execute_statement(ir, stmt);
+        // parse loop body
+        if (stmt->type == JNT_STATEMENT_VAR_DECL)
+        {
+            ir_error(ir, JAVA_E_WHILE_LOCAL_VAR_DECL);
+        }
+        else
+        {
+            __execute_statement(ir, stmt);
+        }
     }
 
     // add edge from body to update

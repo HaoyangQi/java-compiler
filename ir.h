@@ -431,6 +431,11 @@ typedef enum
  * this info is used by statements that allow following:
  * 1. break: while/do/for/switch
  * 2. continue: while/do/for
+ *
+ * test: an internal context that always points to the
+ * tail block of condition expression, since expression
+ * may be expanded, so the start block of expression is
+ * not necessarily the end block of it
 */
 typedef struct __statement_context
 {
@@ -440,6 +445,8 @@ typedef struct __statement_context
     basic_block* _continue;
     // the block in statement that "break" jumps to
     basic_block* _break;
+    // the tail block of condition expression
+    basic_block* _test;
 
     struct __statement_context* next;
 } statement_context;
