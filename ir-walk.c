@@ -664,7 +664,6 @@ void __execute_statement_do(java_ir* ir, tree_node* stmt)
      *
      * HACK: do not attach to graph, so body can grow properly
     */
-    // cfg_worker_next_outbound_strategy(TSW(ir), EDGE_FALSE);
     sc->_break = cfg_new_basic_block(TSW(ir)->graph);
 
     // Statement (loop body)
