@@ -556,7 +556,6 @@ void __execute_statement_variable_declaration(java_ir* ir, tree_node* stmt)
 void __execute_statement_while(java_ir* ir, tree_node* stmt)
 {
     statement_context* sc = push_statement_context(ir, SCQ_LOOP);
-    basic_block* test;
 
     /**
      * since condition block needs to be revisited
@@ -576,9 +575,6 @@ void __execute_statement_while(java_ir* ir, tree_node* stmt)
 
     // mark test block
     cfg_worker_execute(ir, TSW(ir), IROP_TEST, NULL, NULL, NULL);
-
-    // mark test block: which is the end of expression
-    test = cfg_worker_current_block(TSW(ir));
 
     /**
      * prepare break point first
@@ -600,7 +596,7 @@ void __execute_statement_while(java_ir* ir, tree_node* stmt)
     stmt = stmt->next_sibling;
 
     // go back to test node and branch into loop body
-    cfg_worker_jump(TSW(ir), test, true, false);
+    cfg_worker_jump(TSW(ir), sc->_continue, true, false);
     cfg_worker_next_outbound_strategy(TSW(ir), EDGE_TRUE);
     __start_statement_in_new_block(ir, stmt->type);
 
@@ -616,10 +612,91 @@ void __execute_statement_while(java_ir* ir, tree_node* stmt)
 
     // add edge to loop back to test block
     cfg_worker_next_outbound_strategy(TSW(ir), EDGE_JUMP);
-    cfg_worker_jump(TSW(ir), test, false, true);
+    cfg_worker_jump(TSW(ir), sc->_continue, false, true);
 
     // cleanup: need to stop at break point for future parsing
     cfg_worker_jump(TSW(ir), sc->_break, true, false);
+    pop_statement_context(ir);
+}
+
+/**
+ * walk do-while statement
+ *
+ * JNT_STATEMENT_DO
+ * |
+ * +--- statement
+ * |
+ * +--- JNT_EXPRESSION
+ *
+ * node: JNT_STATEMENT_DO
+*/
+void __execute_statement_do(java_ir* ir, tree_node* stmt)
+{
+    statement_context* sc = push_statement_context(ir, SCQ_LOOP);
+    basic_block* body;
+
+    /**
+     * do not use cfg_worker_grow here: we do not know if
+     * current node is empty
+     *
+     * NOTE: do NOT use body type stmt->first_child->type
+     * to determine whether we need a new node. In fact:
+     * we need new node no matter what; because otherwise
+     * it is impossible for us to know which one is the
+     * entry node of the statement if it is a Block. As
+     * a compromise, we always start from new node, leaving
+     * it empty when the body statement is Block statement
+    */
+    __start_statement_in_new_block(ir, JNT_STATEMENT_DO);
+
+    // first block is body
+    body = cfg_worker_current_block(TSW(ir));
+
+    /**
+     * mark continue point: which is the start of expression
+     *
+     * HACK: do not attach to graph, so body can grow properly
+    */
+    sc->_continue = cfg_new_basic_block(TSW(ir)->graph);
+
+    /**
+     * break node
+     *
+     * HACK: do not attach to graph, so body can grow properly
+    */
+    sc->_break = cfg_new_basic_block(TSW(ir)->graph);
+
+    // Statement (loop body)
+    stmt = stmt->first_child;
+    cfg_worker_jump(TSW(ir), body, true, false);
+
+    // parse loop body
+    if (stmt->type == JNT_STATEMENT_VAR_DECL)
+    {
+        ir_error(ir, JAVA_E_WHILE_LOCAL_VAR_DECL);
+    }
+    else
+    {
+        __execute_statement(ir, stmt);
+    }
+
+    // connect end of statement to continue
+    cfg_worker_next_outbound_strategy(TSW(ir), EDGE_ANY);
+    cfg_worker_jump(TSW(ir), sc->_continue, true, true);
+
+    // loop edge
+    cfg_worker_next_outbound_strategy(TSW(ir), EDGE_TRUE);
+    cfg_worker_jump(TSW(ir), body, false, true);
+
+    // parse condition
+    walk_expression(ir, stmt->next_sibling);
+    cfg_worker_execute(ir, TSW(ir), IROP_TEST, NULL, NULL, NULL);
+
+    // connect end of expression to break point
+    cfg_worker_next_outbound_strategy(TSW(ir), EDGE_FALSE);
+    cfg_worker_jump(TSW(ir), sc->_break, false, true);
+
+    // cleanup
     pop_statement_context(ir);
 }
 
@@ -802,6 +879,7 @@ void __execute_statement(java_ir* ir, tree_node* stmt)
         case JNT_STATEMENT_SWITCH:
             break;
         case JNT_STATEMENT_DO:
+            __execute_statement_do(ir, stmt);
             break;
         case JNT_STATEMENT_BREAK:
             __execute_statement_break(ir, stmt);
