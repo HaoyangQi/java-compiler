@@ -5,6 +5,8 @@
 */
 static char* ERR_MSG_NO_SEMICOLON = "Expected ';'.";
 static char* ERR_MSG_NO_RIGHT_BRACE = "Expected '}'.";
+static char* ERR_MSG_NO_RIGHT_PARENTHESIS = "Expected ')'.";
+static char* ERR_MSG_NO_RIGHT_BRACKET = "Expected ']'.";
 static char* ERR_MSG_DIM_DEF_DIVERGE = "Dimension definition mismatched.";
 static char* ERR_MSG_DIM_DEF_DUPLICATE = "Duplicated dimension definition.";
 
@@ -60,6 +62,7 @@ void init_error_definition(java_error_definition* err_def)
     err_def->descriptor[JAVA_E_LOCAL_VAR_NO_SEMICOLON] = DEFINE_CONTEXT_ERROR;
     err_def->descriptor[JAVA_E_VAR_NO_DECLARATOR] = DEFINE_SYNTAX_ERROR;
     err_def->descriptor[JAVA_E_VAR_NO_ARR_ENCLOSE] = DEFINE_SYNTAX_ERROR;
+    err_def->descriptor[JAVA_E_VAR_NO_INITIALIZER] = DEFINE_SYNTAX_ERROR;
     err_def->descriptor[JAVA_E_PARAM_DUPLICATE] = DEFINE_CONTEXT_ERROR;
     err_def->descriptor[JAVA_E_PARAM_DIM_AMBIGUOUS] = DEFINE_CONTEXT_ERROR;
     err_def->descriptor[JAVA_E_PARAM_DIM_DUPLICATE] = DEFINE_CONTEXT_ERROR;
@@ -71,6 +74,9 @@ void init_error_definition(java_error_definition* err_def)
     err_def->descriptor[JAVA_E_REF_UNDEFINED] = DEFINE_CONTEXT_ERROR;
     err_def->descriptor[JAVA_E_BREAK_UNBOUND] = DEFINE_CONTEXT_ERROR;
     err_def->descriptor[JAVA_E_CONTINUE_UNBOUND] = DEFINE_CONTEXT_ERROR;
+    err_def->descriptor[JAVA_E_EXPRESSION_LIST_INCOMPLETE] = DEFINE_SYNTAX_ERROR;
+    err_def->descriptor[JAVA_E_EXPRESSION_PARENTHESIS] = DEFINE_SYNTAX_ERROR;
+    err_def->descriptor[JAVA_E_TYPE_NO_ARR_ENCLOSE] = DEFINE_SYNTAX_ERROR;
 
     err_def->descriptor[JAVA_E_AMBIGUITY_START] = DEFINE_RESERVED_ERROR;
     err_def->descriptor[JAVA_E_AMBIGUITY_PATH_1] = DEFINE_RESERVED_ERROR;
@@ -121,7 +127,8 @@ void init_error_definition(java_error_definition* err_def)
     err_def->message[JAVA_E_LOCAL_VAR_DIM_DUPLICATE] = ERR_MSG_DIM_DEF_DUPLICATE;
     err_def->message[JAVA_E_LOCAL_VAR_NO_SEMICOLON] = ERR_MSG_NO_SEMICOLON;
     err_def->message[JAVA_E_VAR_NO_DECLARATOR] = "Expected declarator name after type.";
-    err_def->message[JAVA_E_VAR_NO_ARR_ENCLOSE] = "Expected ']'.";
+    err_def->message[JAVA_E_VAR_NO_ARR_ENCLOSE] = ERR_MSG_NO_RIGHT_BRACKET;
+    err_def->message[JAVA_E_VAR_NO_INITIALIZER] = "Expected variable initializer.";
     err_def->message[JAVA_E_PARAM_DUPLICATE] = "Duplicated parameter name.";
     err_def->message[JAVA_E_PARAM_DIM_AMBIGUOUS] = ERR_MSG_DIM_DEF_DIVERGE;
     err_def->message[JAVA_E_PARAM_DIM_DUPLICATE] = ERR_MSG_DIM_DEF_DUPLICATE;
@@ -133,6 +140,9 @@ void init_error_definition(java_error_definition* err_def)
     err_def->message[JAVA_E_REF_UNDEFINED] = "Undefined reference.";
     err_def->message[JAVA_E_BREAK_UNBOUND] = "Unbounded statement: 'break' needs to be bounded by a loop or 'switch'.";
     err_def->message[JAVA_E_CONTINUE_UNBOUND] = "Unbounded statement: 'continue' needs to be bounded by a loop.";
+    err_def->message[JAVA_E_EXPRESSION_LIST_INCOMPLETE] = "Expected 'expression' in expression list.";
+    err_def->message[JAVA_E_EXPRESSION_PARENTHESIS] = ERR_MSG_NO_RIGHT_PARENTHESIS;
+    err_def->message[JAVA_E_TYPE_NO_ARR_ENCLOSE] = ERR_MSG_NO_RIGHT_BRACKET;
 
     err_def->message[JAVA_E_AMBIGUITY_START] = NULL;
     err_def->message[JAVA_E_AMBIGUITY_PATH_1] = NULL;

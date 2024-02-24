@@ -2101,7 +2101,7 @@ static tree_node* parse_for_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected '(' in while statement.\n");
+        fprintf(stderr, "TODO error: expected '(' in for statement.\n");
         return node;
     }
 
@@ -2152,7 +2152,7 @@ static tree_node* parse_for_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected ')' in while statement.\n");
+        fprintf(stderr, "TODO error: expected ')' in for statement.\n");
         return node;
     }
 
@@ -2337,23 +2337,22 @@ static tree_node* parse_expression_list(java_parser* parser)
     tree_node* node = ast_node_expression_list();
 
     // Expression
-    tree_node_add_child(node, parse_statement(parser));
+    tree_node_add_child(node, parse_expression(parser));
 
-    // {, Statement}
+    // {, Expression}
     while (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_COMMA))
     {
         // ,
         consume_token(parser, NULL);
 
-        // statement that can only start with expression, so trigger
-        // here is expression instead of statement
+        // Expression
         if (parser_trigger_expression(parser, TOKEN_PEEK_1st))
         {
-            tree_node_add_child(node, parse_statement(parser));
+            tree_node_add_child(node, parse_expression(parser));
         }
         else
         {
-            fprintf(stderr, "TODO error: expected expression/declaration in for initialization.\n");
+            parser_error(parser, JAVA_E_EXPRESSION_LIST_INCOMPLETE);
             break;
         }
     }
@@ -2513,7 +2512,7 @@ static tree_node* parse_type(java_parser* parser)
         }
         else
         {
-            fprintf(stderr, "TODO error: expected ']'\n");
+            parser_error(parser, JAVA_E_TYPE_NO_ARR_ENCLOSE);
             break;
         }
 
@@ -2956,7 +2955,7 @@ static tree_node* parse_variable_declarator(java_parser* parser)
         }
         else
         {
-            fprintf(stderr, "TODO error: expected initializer\n");
+            parser_error(parser, JAVA_E_VAR_NO_INITIALIZER);
         }
     }
 
@@ -3427,7 +3426,7 @@ static tree_node* parse_primary(java_parser* parser)
                 }
                 else
                 {
-                    fprintf(stderr, "TODO error: expected ')'\n");
+                    parser_error(parser, JAVA_E_EXPRESSION_PARENTHESIS);
                 }
                 break;
             case JLT_SYM_DOT:
