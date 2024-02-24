@@ -1145,6 +1145,17 @@ cfg_worker* walk_block(java_ir* ir, tree_node* block, bool use_new_scope)
         block = block->next_sibling;
     }
 
+    /**
+     * make sure block is never empty
+     *
+     * this condition is required by statement with branches:
+     * if, while, for, do
+    */
+    if (cfg_empty(TSW(ir)->graph))
+    {
+        cfg_worker_grow(TSW(ir));
+    }
+
     if (use_new_scope)
     {
         lookup_pop_scope(ir, true);
