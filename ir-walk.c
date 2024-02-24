@@ -219,8 +219,6 @@ static void __start_statement_in_new_block(java_ir* ir, java_node_query stmt_typ
  *
  * This method generate a single block of code without any logical expansion
  *
- * It returns the flag that if the code needs logical precedence expansion
- *
  * node: JNT_EXPRESSION
 */
 void walk_expression(java_ir* ir, tree_node* expression)
@@ -366,6 +364,107 @@ void walk_expression(java_ir* ir, tree_node* expression)
 }
 
 /**
+ * walk expression list statement
+ *
+ * JNT_EXPRESSION_LIST
+ * |
+ * +--- JNT_EXPRESSION
+ * |
+ * +--- JNT_EXPRESSION
+ * |
+ * +--- ...
+ *
+ * node: JNT_EXPRESSION_LIST
+*/
+void __execute_expression_list(java_ir* ir, tree_node* stmt)
+{
+    stmt = stmt->first_child;
+
+    while (stmt)
+    {
+        /**
+         * since iniit code runs only once, so
+         * it stays out side of loop body, thus
+         * it can stay in current block instead
+         * of a new one
+        */
+        walk_expression(ir, stmt);
+        stmt = stmt->next_sibling;
+    }
+}
+
+/**
+ * walk variable declaration statement
+ *
+ * JNT_LOCAL_VAR_DECL
+ * |
+ * +--- JNT_TYPE
+ * |
+ * +--- JNT_VAR_DECLARATORS
+ *      |
+ *      +--- JNT_VAR_DECL
+ *      |    |
+ *      |    +--- JNT_EXPRESSION
+ *      |
+ *      +--- JNT_VAR_DECL
+ *      |
+ *      ...
+ *
+ * node: JNT_LOCAL_VAR_DECL
+*/
+void __execute_variable_declaration(java_ir* ir, tree_node* stmt)
+{
+    // JNT_TYPE
+    stmt = stmt->first_child;
+
+    // get type definition
+    definition* type = type2def(stmt, JNT_VAR_DECL, JLT_UNDEFINED, false);
+    definition* var;
+    reference* lvalue;
+    reference* operand;
+
+    // register from first JNT_VAR_DECL, every id has same type
+    for (stmt = stmt->next_sibling->first_child; stmt != NULL; stmt = stmt->next_sibling)
+    {
+        // only move the definition for the last variable
+        var = def_var(ir, stmt, &type, stmt->next_sibling ? DU_CTL_DATA_COPY : DU_CTL_DEFAULT, false);
+
+        // only generate code for successful registration
+        if (!var) { continue; }
+
+        // create variable data chunk reference
+        lvalue = new_reference(IR_ASN_REF_DEFINITION, var);
+
+        if (stmt->first_child)
+        {
+            // if there is an initializer, parse it
+            walk_expression(ir, stmt->first_child);
+
+            // assignment code
+            operand = new_reference(IR_ASN_REF_INSTRUCTION, TSW(ir)->cur_blk->inst_last);
+            cfg_worker_execute(ir, TSW(ir), IROP_ASN, &lvalue, &operand, NULL);
+
+            // cleanup
+            delete_reference(operand);
+        }
+        else
+        {
+            /**
+             * otherwise we insert a dummy code, indicate that
+             * the variable is defined here and some initialization required
+            */
+            cfg_worker_execute(ir, TSW(ir), IROP_INIT, &lvalue, NULL, NULL);
+        }
+
+        // cleanup
+        delete_reference(lvalue);
+    }
+
+    // cleanup
+    definition_delete(type);
+}
+
+/**
  * Recursive Statement Walk
  *
  * WARNING: big recursion ahead!
@@ -475,71 +574,12 @@ void __execute_statement_if(java_ir* ir, tree_node* stmt)
  * JNT_STATEMENT_VAR_DECL
  * |
  * +--- JNT_LOCAL_VAR_DECL
- *      |
- *      +--- JNT_TYPE
- *      |
- *      +--- JNT_VAR_DECLARATORS
- *           |
- *           +--- JNT_VAR_DECL
- *           |    |
- *           |    +--- JNT_EXPRESSION
- *           |
- *           +--- JNT_VAR_DECL
- *           |
- *           ...
  *
  * node: JNT_STATEMENT_VAR_DECL
 */
 void __execute_statement_variable_declaration(java_ir* ir, tree_node* stmt)
 {
-    // JNT_TYPE
-    stmt = stmt->first_child->first_child;
-
-    // get type definition
-    definition* type = type2def(stmt, JNT_VAR_DECL, JLT_UNDEFINED, false);
-    definition* var;
-    reference* lvalue;
-    reference* operand;
-
-    // register from first JNT_VAR_DECL, every id has same type
-    for (stmt = stmt->next_sibling->first_child; stmt != NULL; stmt = stmt->next_sibling)
-    {
-        // only move the definition for the last variable
-        var = def_var(ir, stmt, &type, stmt->next_sibling ? DU_CTL_DATA_COPY : DU_CTL_DEFAULT, false);
-
-        // only generate code for successful registration
-        if (!var) { continue; }
-
-        // create variable data chunk reference
-        lvalue = new_reference(IR_ASN_REF_DEFINITION, var);
-
-        if (stmt->first_child)
-        {
-            // if there is an initializer, parse it
-            walk_expression(ir, stmt->first_child);
-
-            // assignment code
-            operand = new_reference(IR_ASN_REF_INSTRUCTION, TSW(ir)->cur_blk->inst_last);
-            cfg_worker_execute(ir, TSW(ir), IROP_ASN, &lvalue, &operand, NULL);
-
-            // cleanup
-            delete_reference(operand);
-        }
-        else
-        {
-            /**
-             * otherwise we insert a dummy code, indicate that
-             * the variable is defined here and some initialization required
-            */
-            cfg_worker_execute(ir, TSW(ir), IROP_INIT, &lvalue, NULL, NULL);
-        }
-
-        // cleanup
-        delete_reference(lvalue);
-    }
-
-    // cleanup
-    definition_delete(type);
+    __execute_variable_declaration(ir, stmt->first_child);
 }
 
 /**
@@ -572,6 +612,7 @@ void __execute_statement_while(java_ir* ir, tree_node* stmt)
     // parse condition
     stmt = stmt->first_child;
     walk_expression(ir, stmt);
+    sc->_test = cfg_worker_current_block(TSW(ir));
 
     // mark test block
     cfg_worker_execute(ir, TSW(ir), IROP_TEST, NULL, NULL, NULL);
@@ -596,21 +637,31 @@ void __execute_statement_while(java_ir* ir, tree_node* stmt)
     stmt = stmt->next_sibling;
 
     // go back to test node and branch into loop body
-    cfg_worker_jump(TSW(ir), sc->_continue, true, false);
+    cfg_worker_jump(TSW(ir), sc->_test, true, false);
     cfg_worker_next_outbound_strategy(TSW(ir), EDGE_TRUE);
-    __start_statement_in_new_block(ir, stmt->type);
 
-    // parse loop body
-    if (stmt->type == JNT_STATEMENT_VAR_DECL)
+    // while body can be empty
+    if (stmt)
     {
-        ir_error(ir, JAVA_E_WHILE_LOCAL_VAR_DECL);
+        __start_statement_in_new_block(ir, stmt->type);
+
+        // parse loop body
+        if (stmt->type == JNT_STATEMENT_VAR_DECL)
+        {
+            ir_error(ir, JAVA_E_WHILE_LOCAL_VAR_DECL);
+        }
+        else
+        {
+            __execute_statement(ir, stmt);
+        }
     }
     else
     {
-        __execute_statement(ir, stmt);
+        // leave body empty
+        cfg_worker_grow(TSW(ir));
     }
 
-    // add edge to loop back to test block
+    // add edge to loop back to continue block
     cfg_worker_next_outbound_strategy(TSW(ir), EDGE_JUMP);
     cfg_worker_jump(TSW(ir), sc->_continue, false, true);
 
@@ -692,12 +743,134 @@ void __execute_statement_do(java_ir* ir, tree_node* stmt)
     walk_expression(ir, stmt->next_sibling);
     cfg_worker_execute(ir, TSW(ir), IROP_TEST, NULL, NULL, NULL);
 
-    // connect end of expression to break point
+    // connect end of expression to break point then stop there
     cfg_worker_next_outbound_strategy(TSW(ir), EDGE_FALSE);
-    cfg_worker_jump(TSW(ir), sc->_break, false, true);
+    cfg_worker_jump(TSW(ir), sc->_break, true, true);
 
     // cleanup
     pop_statement_context(ir);
+}
+
+/**
+ * walk for statement
+ *
+ * JNT_STATEMENT_FOR
+ * |
+ * +--- [JNT_FOR_INIT]
+ * |    |
+ * |    +--- JNT_LOCAL_VAR_DECL|JNT_EXPRESSION_LIST
+ * |
+ * +--- [JNT_EXPRESSION]
+ * |
+ * +--- [JNT_FOR_UPDATE]
+ * |    |
+ * |    +--- JNT_EXPRESSION_LIST
+ * |
+ * +--- statement (body)
+ *
+ * node: JNT_STATEMENT_FOR
+*/
+void __execute_statement_for(java_ir* ir, tree_node* stmt)
+{
+    statement_context* sc = push_statement_context(ir, SCQ_LOOP);
+    basic_block* test_expr_start; // loop-back node (NOT continue point!)
+
+    // we need a scope for inits
+    lookup_new_scope(ir, LST_FOR);
+
+    // not sure what it is yet
+    stmt = stmt->first_child;
+
+    // for init
+    if (stmt->type == JNT_FOR_INIT)
+    {
+        switch (stmt->first_child->type)
+        {
+            case JNT_EXPRESSION_LIST:
+                __execute_expression_list(ir, stmt->first_child);
+                break;
+            case JNT_LOCAL_VAR_DECL:
+                __execute_variable_declaration(ir, stmt->first_child);
+                break;
+            default:
+                break;
+        }
+
+        stmt = stmt->next_sibling;
+    }
+
+    // enforce new block, which is condition block
+    __start_statement_in_new_block(ir, JNT_STATEMENT_FOR);
+    test_expr_start = cfg_worker_current_block(TSW(ir));
+
+    // for condition
+    if (stmt->type == JNT_EXPRESSION)
+    {
+        walk_expression(ir, stmt);
+        stmt = stmt->next_sibling;
+    }
+
+    // mark, also makes sure that this node is not empty
+    // so that body can stays isolated
+    cfg_worker_execute(ir, TSW(ir), IROP_TEST, NULL, NULL, NULL);
+
+    // must get this after condition because 
+    // expression may be expanded
+    sc->_test = cfg_worker_current_block(TSW(ir));
+
+    /**
+     * continue block: which is for update
+     *
+     * this is continue point, and where we loop back
+     *
+     * HACK: do not attach to graph, so body can grow properly
+    */
+    sc->_continue = cfg_new_basic_block(TSW(ir)->graph);
+
+    // break block
+    cfg_worker_next_outbound_strategy(TSW(ir), EDGE_FALSE);
+    sc->_break = cfg_worker_grow(TSW(ir));
+
+    // for update
+    cfg_worker_jump(TSW(ir), sc->_continue, true, false);
+    if (stmt->type == JNT_FOR_UPDATE)
+    {
+        __execute_expression_list(ir, stmt->first_child);
+        stmt = stmt->next_sibling;
+    }
+
+    // go back to test node and branch into loop body
+    cfg_worker_jump(TSW(ir), sc->_test, true, false);
+    cfg_worker_next_outbound_strategy(TSW(ir), EDGE_TRUE);
+
+    // body can be empty in for loop
+    if (stmt)
+    {
+        __start_statement_in_new_block(ir, stmt->type);
+
+        // parse loop body
+        if (stmt->type == JNT_STATEMENT_VAR_DECL)
+        {
+            ir_error(ir, JAVA_E_WHILE_LOCAL_VAR_DECL);
+        }
+        else
+        {
+            __execute_statement(ir, stmt);
+        }
+    }
+
+    // add edge from body to update
+    cfg_worker_jump(TSW(ir), sc->_continue, true, true);
+
+    // loop back: which is NOT back to TEST node
+    // but back to the start of the test expression
+    cfg_worker_next_outbound_strategy(TSW(ir), EDGE_JUMP);
+    cfg_worker_jump(TSW(ir), test_expr_start, false, true);
+
+    // cleanup
+    cfg_worker_jump(TSW(ir), sc->_break, true, false);
+    pop_statement_context(ir);
+    lookup_pop_scope(ir, true);
 }
 
 /**
@@ -903,6 +1076,7 @@ void __execute_statement(java_ir* ir, tree_node* stmt)
             __execute_statement_while(ir, stmt);
             break;
         case JNT_STATEMENT_FOR:
+            __execute_statement_for(ir, stmt);
             break;
         case JNT_STATEMENT_LABEL:
             break;
@@ -969,6 +1143,17 @@ cfg_worker* walk_block(java_ir* ir, tree_node* block, bool use_new_scope)
         }
 
         block = block->next_sibling;
+    }
+
+    /**
+     * make sure block is never empty
+     *
+     * this condition is required by statement with branches:
+     * if, while, for, do
+    */
+    if (cfg_empty(TSW(ir)->graph))
+    {
+        cfg_worker_grow(TSW(ir));
     }
 
     if (use_new_scope)
