@@ -378,17 +378,17 @@ longest chain: 1
 
 ===== CONTROL FLOW GRAPH =====
 node[0] (entry point) <ANY> -> 1
-    [00000183C335EB50][0]: (li: 0x1{1}) IROP_GT (li: 0x2{2})
-    [00000183C335E290][0]: (li: 0x4{4}) IROP_MUL (li: 0x5{5})
-    [00000183C335E610][0]: (li: 0x3{3}) IROP_ADD (inst: 00000183C335E290)
-    [00000183C335DED0][0]: (li: 0x6{6}) IROP_SUB (li: 0x7{7})
-    [00000183C335E750][0]: (inst: 00000183C335E610) IROP_TB (inst: 00000183C335DED0)
-    [00000183C335E390][0]: (inst: 00000183C335EB50) IROP_TC (inst: 00000183C335E750)
-    [00000183C335E150][0]: (def: 00000183C335ED50) <- (inst: 00000183C335E390) IROP_ASN (null)
+    [0000016E8703E350][0]: (li: 0x1{1}) IROP_GT (li: 0x2{2})
+    [0000016E8703DF10][0]: (li: 0x4{4}) IROP_MUL (li: 0x5{5})
+    [0000016E8703E0D0][0]: (li: 0x3{3}) IROP_ADD (inst: 0000016E8703DF10)
+    [0000016E8703E450][0]: (li: 0x6{6}) IROP_SUB (li: 0x7{7})
+    [0000016E8703E590][0]: (inst: 0000016E8703E0D0) IROP_TB (inst: 0000016E8703E450)
+    [0000016E8703E850][0]: (inst: 0000016E8703E350) IROP_TC (inst: 0000016E8703E590)
+    [0000016E8703E890][0]: (def: 0000016E8703ED50) <- (inst: 0000016E8703E850) IROP_ASN (null)
 node[1] <ANY>
-    [00000183C335E5D0][1]: (li: 0x0{0}) IROP_STORE (null)
-    [00000183C335DE50][1]: (def: 00000183C335EDC0) <- (inst: 00000183C335E5D0) IROP_ASN (null)
-    [00000183C335E590][1]: (def: 00000183C335EE30) <- (null) IROP_INIT (null)
+    [0000016E8703E010][1]: (li: 0x0{0}) IROP_STORE (null)
+    [0000016E8703E110][1]: (def: 0000016E8703EDC0) <- (inst: 0000016E8703E010) IROP_ASN (null)
+    [0000016E8703E950][1]: (def: 0000016E8703EE30) <- (null) IROP_INIT (null)
 >>>>> SUMMARY <<<<<
 node count: 2
 node arr size: 2
@@ -401,113 +401,101 @@ memory: 560 bytes
 load factor: 54.55%
 longest chain: 3
     MyPackageClass:
-      [0](00000183C3350940): class, Access: No Modifier extends C1 implements C2,C3
+      [0](0000016E87030940): class, Access: No Modifier extends C1 implements C2,C3
     calc:
-      [0](00000183C335EF10): def method, Access: private, Return: JLT_RWD_INT
+      [0](0000016E8703EF10): def method, Access: private, Return: JLT_RWD_INT
 
 ===== CONTROL FLOW GRAPH =====
 node[0] (entry point) <TEST> -> 1(FALSE) -> 2(TRUE)
-    [00000183C335EAD0][0]: (def: 00000183C335F790) IROP_GT (def: 00000183C335F250)
-    [00000183C335DF90][0]: (null) IROP_TEST (null)
-node[1] <TEST> -> 9(TRUE) -> 12(FALSE)
-    [00000183C335E8D0][1]: (li: 0x2{2}) IROP_GT (li: 0x1{1})
-    [00000183C335E350][1]: (null) IROP_TEST (null)
-node[2] <ANY> -> 3
+    [0000016E8703E6D0][0]: (def: 0000016E8703F640) IROP_GT (def: 0000016E8703F800)
+    [0000016E8703EA90][0]: (null) IROP_TEST (null)
+node[1] <TEST> -> 7(TRUE) -> 9(FALSE)
+    [0000016E8703E990][1]: (li: 0x2{2}) IROP_GT (li: 0x1{1})
+    [0000016E8703E190][1]: (null) IROP_TEST (null)
+node[2] <TEST> -> 3(TRUE) -> 4(FALSE)
+    [0000016E8703EA10][2]: (li: 0x4{4}) IROP_EQ (li: 0x9{9})
+    [0000016E8703E4D0][2]: (null) IROP_TEST (null)
+node[3] <BREAK> -> 1(JMP) -> 4
+    [0000016E8703E310][3]: (null) IROP_JMP (null)
+node[4] <TEST> -> 5(TRUE) -> 6(FALSE)
+    [0000016E8703E8D0][4]: (null) IROP_ADEC (def: 0000016E8703F640)
+    [0000016E8703EB10][4]: (li: 0x6{6}) IROP_GE (li: 0x2{2})
+    [0000016E8703E690][4]: (null) IROP_TEST (null)
+node[5] <CONTINUE> -> 0(JMP) -> 6
+    [0000016E8703E210][5]: (null) IROP_JMP (null)
+node[6] <ANY> -> 0(JMP)
     (no instructions)
-node[3] <TEST> -> 4(TRUE) -> 5(FALSE)
-    [00000183C335E810][3]: (li: 0x4{4}) IROP_EQ (li: 0x9{9})
-    [00000183C335E110][3]: (null) IROP_TEST (null)
-node[4] <BREAK> -> 1(JMP) -> 5
-    [00000183C335E890][4]: (null) IROP_JMP (null)
-node[5] <TEST> -> 6(TRUE) -> 8(FALSE)
-    [00000183C335E7D0][5]: (null) IROP_ADEC (def: 00000183C335F790)
-    [00000183C335E1D0][5]: (li: 0x6{6}) IROP_GE (li: 0x2{2})
-    [00000183C335E2D0][5]: (null) IROP_TEST (null)
-node[6] <ANY> -> 7
-    (no instructions)
-node[7] <CONTINUE> -> 0(JMP) -> 8
-    [00000183C335EB10][7]: (null) IROP_JMP (null)
-node[8] <ANY> -> 0(JMP)
-    (no instructions)
-node[9] <ANY> -> 10
-    (no instructions)
+node[7] <RETURN> -> 8
+    [0000016E8703E3D0][7]: (def: 0000016E8703F640) IROP_ADD (def: 0000016E8703F800)
+    [0000016E8703E410][7]: (def: 0000016E8703F2C0) IROP_SUB (li: 0x6{6})
+    [0000016E8703E490][7]: (inst: 0000016E8703E410) IROP_ADD (def: 0000016E8703F800)
+    [0000016E8703E750][7]: (def: 0000016E8703EDC0) <- (inst: 0000016E8703E490) IROP_ASN (null)
+    [0000016E8703E510][7]: (li: 0x3{3}) IROP_STORE (null)
+    [0000016E8703E910][7]: (inst: 0000016E8703E510) IROP_RET (null)
+node[8] <TEST> -> 13(FALSE) -> 14(TRUE)
+    [0000016E870426B0][8]: (def: 0000016E8703F640) IROP_LT (def: 0000016E8703F800)
+    [0000016E87042930][8]: (null) IROP_TEST (null)
+node[9] <TEST> -> 10(TRUE) -> 12(FALSE)
+    [0000016E8703EB50][9]: (def: 0000016E8703F2C0) IROP_LT (def: 0000016E8703F640)
+    [0000016E8703E9D0][9]: (null) IROP_TEST (null)
 node[10] <RETURN> -> 11
-    [00000183C335E190][10]: (def: 00000183C335F790) IROP_ADD (def: 00000183C335F250)
-    [00000183C335E650][10]: (def: 00000183C335F4F0) IROP_SUB (li: 0x6{6})
-    [00000183C335E010][10]: (inst: 00000183C335E650) IROP_ADD (def: 00000183C335F250)
-    [00000183C335E950][10]: (def: 00000183C335EDC0) <- (inst: 00000183C335E010) IROP_ASN (null)
-    [00000183C335E990][10]: (li: 0x3{3}) IROP_STORE (null)
-    [00000183C335EC50][10]: (inst: 00000183C335E990) IROP_RET (null)
-node[11] <TEST> -> 18(FALSE) -> 19(TRUE)
-    [00000183C3362F40][11]: (def: 00000183C335F790) IROP_LT (def: 00000183C335F250)
-    [00000183C3362E40][11]: (null) IROP_TEST (null)
-node[12] <TEST> -> 13(TRUE) -> 16(FALSE)
-    [00000183C335E910][12]: (def: 00000183C335F4F0) IROP_LT (def: 00000183C335F790)
-    [00000183C335E450][12]: (null) IROP_TEST (null)
-node[13] <ANY> -> 14
+    [0000016E8703EBD0][10]: (li: 0x9{9}) IROP_STORE (null)
+    [0000016E8703E390][10]: (def: 0000016E8703F720) <- (inst: 0000016E8703EBD0) IROP_ASN (null)
+    [0000016E87043130][10]: (def: 0000016E8703F800) <- (def: 0000016E8703F800) IROP_ADD (li: 0x2{2})
+    [0000016E87042530][10]: (def: 0000016E8703F170) <- (null) IROP_INIT (null)
+    [0000016E870428F0][10]: (def: 0000016E8703F800) IROP_MUL (li: 0x9{9})
+    [0000016E87043230][10]: (def: 0000016E8703F720) IROP_SUB (inst: 0000016E870428F0)
+    [0000016E87042870][10]: (def: 0000016E8703F720) <- (inst: 0000016E87043230) IROP_ASN (null)
+    [0000016E87042D70][10]: (def: 0000016E8703F170) IROP_STORE (null)
+    [0000016E87042A30][10]: (inst: 0000016E87042D70) IROP_RET (null)
+node[11] <ANY> -> 8
     (no instructions)
-node[14] <RETURN> -> 15
-    [00000183C335DDD0][14]: (li: 0x9{9}) IROP_STORE (null)
-    [00000183C335E050][14]: (def: 00000183C335F560) <- (inst: 00000183C335DDD0) IROP_ASN (null)
-    [00000183C3362C40][14]: (def: 00000183C335F250) <- (def: 00000183C335F250) IROP_ADD (li: 0x2{2})
-    [00000183C3362580][14]: (def: 00000183C335F5D0) <- (null) IROP_INIT (null)
-    [00000183C33626C0][14]: (def: 00000183C335F250) IROP_MUL (li: 0x9{9})
-    [00000183C3363300][14]: (def: 00000183C335F560) IROP_SUB (inst: 00000183C33626C0)
-    [00000183C3362740][14]: (def: 00000183C335F560) <- (inst: 00000183C3363300) IROP_ASN (null)
-    [00000183C3362B40][14]: (def: 00000183C335F5D0) IROP_STORE (null)
-    [00000183C3362780][14]: (inst: 00000183C3362B40) IROP_RET (null)
-node[15] <ANY> -> 11
-    (no instructions)
-node[16] <ANY> -> 17
-    (no instructions)
-node[17] <RETURN> -> 15
-    [00000183C3362700][17]: (def: 00000183C335EDC0) IROP_STORE (null)
-    [00000183C3362E00][17]: (inst: 00000183C3362700) IROP_RET (null)
-node[18] <RETURN>
-    [00000183C3363080][18]: (li: 0x0{0}) IROP_STORE (null)
-    [00000183C33627C0][18]: (inst: 00000183C3363080) IROP_RET (null)
-node[19] <ANY> -> 20
-    (no instructions)
-node[20] <ANY> -> 11(JMP)
-    [00000183C3362E80][20]: (null) IROP_AINC (def: 00000183C335F790)
+node[12] <RETURN> -> 11
+    [0000016E870427B0][12]: (def: 0000016E8703EDC0) IROP_STORE (null)
+    [0000016E87042770][12]: (inst: 0000016E870427B0) IROP_RET (null)
+node[13] <RETURN>
+    [0000016E870423F0][13]: (li: 0x0{0}) IROP_STORE (null)
+    [0000016E87042B70][13]: (inst: 0000016E870423F0) IROP_RET (null)
+node[14] <ANY> -> 8(JMP)
+    [0000016E87042DF0][14]: (null) IROP_AINC (def: 0000016E8703F640)
 >>>>> SUMMARY <<<<<
-node count: 21
-node arr size: 32
-edge count: 28
+node count: 15
+node arr size: 16
+edge count: 22
 edge arr size: 32
 instruction count: 35
-memory size: 5552 bytes
+memory size: 4608 bytes
 
     DecimalFormat:
-      [0](00000183C33587F0): import, FROM java.text
+      [0](0000016E870387F0): import, FROM java.text
     basic:
-      [0](00000183C335F330): def method, Access: public static, Return: JLT_RWD_VOID
+      [0](0000016E8703F100): def method, Access: public static, Return: JLT_RWD_VOID
 
 ===== CONTROL FLOW GRAPH =====
 (empty)
 
     InputMismatchException:
-      [0](00000183C3358860): import, FROM java.util
+      [0](0000016E87038860): import, FROM java.util
     r4:
-      [0](00000183C335EE30): def member var, Access: No Modifier, Type: JLT_RWD_SHORT
+      [0](0000016E8703EE30): def member var, Access: No Modifier, Type: JLT_RWD_SHORT
     r2:
-      [0](00000183C335ED50): def member var, Access: No Modifier, Type: JLT_RWD_INT
+      [0](0000016E8703ED50): def member var, Access: No Modifier, Type: JLT_RWD_INT
     logic:
-      [0](00000183C335EEA0): def method, Access: No Modifier, Return: JLT_RWD_VOID
+      [0](0000016E8703EEA0): def method, Access: No Modifier, Return: JLT_RWD_VOID
 
 ===== CONTROL FLOW GRAPH =====
 node[0] (entry point) <TEST> -> 2(FALSE) -> 1(TRUE)
-    [00000183C335DF10][0]: (li: 0x1{1}) IROP_STORE (null)
-    [00000183C335E510][0]: (null) IROP_TEST (null)
+    [0000016E8703E150][0]: (li: 0x1{1}) IROP_STORE (null)
+    [0000016E8703E2D0][0]: (null) IROP_TEST (null)
 node[1] <TEST> -> 4(FALSE) -> 3(TRUE)
-    [00000183C335EA50][1]: (inst: 00000183C335DF10) IROP_PHI (inst: 00000183C335EB90)
-    [00000183C335DF50][1]: (null) IROP_TEST (null)
+    [0000016E8703EC10][1]: (inst: 0000016E8703E150) IROP_PHI (inst: 0000016E8703E550)
+    [0000016E8703EC50][1]: (null) IROP_TEST (null)
 node[2] <ANY> -> 1
-    [00000183C335EB90][2]: (li: 0x2{2}) IROP_STORE (null)
+    [0000016E8703E550][2]: (li: 0x2{2}) IROP_STORE (null)
 node[3] <ANY>
-    [00000183C335EA90][3]: (inst: 00000183C335EA50) IROP_PHI (inst: 00000183C335E490)
+    [0000016E8703E610][3]: (inst: 0000016E8703EC10) IROP_PHI (inst: 0000016E8703DED0)
 node[4] <ANY> -> 3
-    [00000183C335E490][4]: (li: 0x3{3}) IROP_ADD (li: 0x4{4})
+    [0000016E8703DED0][4]: (li: 0x3{3}) IROP_ADD (li: 0x4{4})
 >>>>> SUMMARY <<<<<
 node count: 5
 node arr size: 8
@@ -517,136 +505,130 @@ instruction count: 7
 memory size: 1248 bytes
 
     r3:
-      [0](00000183C335EDC0): def member var, Access: No Modifier, Type: JLT_RWD_INT
+      [0](0000016E8703EDC0): def member var, Access: No Modifier, Type: JLT_RWD_INT
     loop_do_while:
-      [0](00000183C335F040): def method, Access: No Modifier, Return: JLT_RWD_VOID
+      [0](0000016E8703F040): def method, Access: No Modifier, Return: JLT_RWD_VOID
 
 ===== CONTROL FLOW GRAPH =====
 node[0] (entry point) <ANY> -> 1
-    [00000183C3362D40][0]: (def: 00000183C335F6B0) <- (null) IROP_INIT (null)
-    [00000183C3362A00][0]: (def: 00000183C3364190) <- (null) IROP_INIT (null)
+    [0000016E87042430][0]: (def: 0000016E8703F250) <- (null) IROP_INIT (null)
+    [0000016E870427F0][0]: (def: 0000016E87044A90) <- (null) IROP_INIT (null)
 node[1] <ANY> -> 4
     (no instructions)
 node[2] <TEST> -> 1(TRUE) -> 3(FALSE)
-    [00000183C3362540][2]: (def: 00000183C335F6B0) IROP_GT (def: 00000183C3364190)
-    [00000183C3362600][2]: (null) IROP_TEST (null)
+    [0000016E87042EB0][2]: (def: 0000016E8703F250) IROP_GT (def: 0000016E87044A90)
+    [0000016E870428B0][2]: (null) IROP_TEST (null)
 node[3] <ANY>
     (no instructions)
 node[4] <TEST> -> 5(TRUE) -> 6(FALSE)
-    [00000183C33625C0][4]: (li: 0x4{4}) IROP_EQ (li: 0x9{9})
-    [00000183C3362BC0][4]: (null) IROP_TEST (null)
+    [0000016E87042470][4]: (li: 0x4{4}) IROP_EQ (li: 0x9{9})
+    [0000016E87042570][4]: (null) IROP_TEST (null)
 node[5] <BREAK> -> 3(JMP) -> 6
-    [00000183C33628C0][5]: (null) IROP_JMP (null)
-node[6] <TEST> -> 7(TRUE) -> 9(FALSE)
-    [00000183C3363040][6]: (null) IROP_ADEC (def: 00000183C335F6B0)
-    [00000183C3363340][6]: (li: 0x6{6}) IROP_GE (li: 0x2{2})
-    [00000183C3363100][6]: (null) IROP_TEST (null)
-node[7] <ANY> -> 8
-    (no instructions)
-node[8] <CONTINUE> -> 2(JMP) -> 9
-    [00000183C3362C00][8]: (null) IROP_JMP (null)
-node[9] <ANY> -> 2
+    [0000016E87043270][5]: (null) IROP_JMP (null)
+node[6] <TEST> -> 7(TRUE) -> 8(FALSE)
+    [0000016E87042630][6]: (null) IROP_ADEC (def: 0000016E8703F250)
+    [0000016E87042830][6]: (li: 0x6{6}) IROP_GE (li: 0x2{2})
+    [0000016E870429F0][6]: (null) IROP_TEST (null)
+node[7] <CONTINUE> -> 2(JMP) -> 8
+    [0000016E87042330][7]: (null) IROP_JMP (null)
+node[8] <ANY> -> 2
     (no instructions)
 >>>>> SUMMARY <<<<<
-node count: 10
+node count: 9
 node arr size: 16
-edge count: 14
+edge count: 13
 edge arr size: 16
 instruction count: 11
-memory size: 2352 bytes
+memory size: 2216 bytes
 
     loop_for:
-      [0](00000183C335F3A0): def method, Access: No Modifier, Return: JLT_RWD_VOID
+      [0](0000016E8703F480): def method, Access: No Modifier, Return: JLT_RWD_VOID
 
 ===== CONTROL FLOW GRAPH =====
 node[0] (entry point) <ANY> -> 1
-    [00000183C3362FC0][0]: (def: 00000183C3364970) <- (null) IROP_INIT (null)
-    [00000183C3363240][0]: (def: 00000183C3363EF0) <- (null) IROP_INIT (null)
-    [00000183C3363200][0]: (li: 0x0{0}) IROP_STORE (null)
-    [00000183C3362A40][0]: (def: 00000183C3364B30) <- (inst: 00000183C3363200) IROP_ASN (null)
-    [00000183C3362A80][0]: (def: 00000183C3364AC0) <- (null) IROP_INIT (null)
+    [0000016E87042BB0][0]: (def: 0000016E87043E50) <- (null) IROP_INIT (null)
+    [0000016E87042FF0][0]: (def: 0000016E870441D0) <- (null) IROP_INIT (null)
+    [0000016E870424F0][0]: (li: 0x0{0}) IROP_STORE (null)
+    [0000016E87042670][0]: (def: 0000016E87044160) <- (inst: 0000016E870424F0) IROP_ASN (null)
+    [0000016E870429B0][0]: (def: 0000016E870447F0) <- (null) IROP_INIT (null)
 node[1] <TEST> -> 5(FALSE) -> 4(TRUE)
-    [00000183C3362680][1]: (def: 00000183C3364B30) IROP_GT (def: 00000183C3364AC0)
-    [00000183C3362900][1]: (null) IROP_TEST (null)
+    [0000016E87042AF0][1]: (def: 0000016E87044160) IROP_GT (def: 0000016E870447F0)
+    [0000016E87042CB0][1]: (null) IROP_TEST (null)
 node[2] <ANY> -> 4
-    [00000183C3362CC0][2]: (inst: 00000183C33631C0) IROP_PHI (inst: 00000183C3362840)
+    [0000016E87042EF0][2]: (inst: 0000016E87042970) IROP_PHI (inst: 0000016E87042A70)
 node[3] <ANY> -> 2
-    [00000183C3362840][3]: (def: 00000183C3363EF0) IROP_STORE (null)
+    [0000016E87042A70][3]: (def: 0000016E870441D0) IROP_STORE (null)
 node[4] <TEST> -> 7(FALSE) -> 8(TRUE)
-    [00000183C3362800][4]: (inst: 00000183C3362680) IROP_PHI (inst: 00000183C3362CC0)
-    [00000183C3362B80][4]: (null) IROP_TEST (null)
+    [0000016E87042370][4]: (inst: 0000016E87042AF0) IROP_PHI (inst: 0000016E87042EF0)
+    [0000016E87042AB0][4]: (null) IROP_TEST (null)
 node[5] <ANY> -> 3(TRUE) -> 2(FALSE)
-    [00000183C33631C0][5]: (li: 0x2{2}) IROP_STORE (null)
-    [00000183C3362880][5]: (null) IROP_TEST (null)
+    [0000016E87042970][5]: (li: 0x2{2}) IROP_STORE (null)
+    [0000016E87042BF0][5]: (null) IROP_TEST (null)
 node[6] <ANY> -> 1(JMP)
-    [00000183C33632C0][6]: (null) IROP_AINC (def: 00000183C3364B30)
-    [00000183C3362EC0][6]: (null) IROP_AINC (def: 00000183C3364AC0)
-    [00000183C3362D80][6]: (null) IROP_AINC (def: 00000183C3363EF0)
+    [0000016E87042C30][6]: (null) IROP_AINC (def: 0000016E87044160)
+    [0000016E87042FB0][6]: (null) IROP_AINC (def: 0000016E870447F0)
+    [0000016E87042730][6]: (null) IROP_AINC (def: 0000016E870441D0)
 node[7] <ANY>
     (no instructions)
-node[8] <ANY> -> 9
-    (no instructions)
-node[9] <TEST> -> 10(TRUE) -> 11(FALSE)
-    [00000183C3362940][9]: (li: 0x4{4}) IROP_EQ (li: 0x9{9})
-    [00000183C3362980][9]: (null) IROP_TEST (null)
-node[10] <BREAK> -> 7(JMP) -> 11
-    [00000183C3363280][10]: (null) IROP_JMP (null)
-node[11] <TEST> -> 12(TRUE) -> 14(FALSE)
-    [00000183C33629C0][11]: (null) IROP_ADEC (def: 00000183C3364970)
-    [00000183C33630C0][11]: (li: 0x6{6}) IROP_GE (li: 0x2{2})
-    [00000183C3362F00][11]: (null) IROP_TEST (null)
-node[12] <ANY> -> 13
-    (no instructions)
-node[13] <CONTINUE> -> 6(JMP) -> 14
-    [00000183C3362AC0][13]: (null) IROP_JMP (null)
-node[14] <ANY> -> 6
+node[8] <TEST> -> 9(TRUE) -> 10(FALSE)
+    [0000016E87043030][8]: (li: 0x4{4}) IROP_EQ (li: 0x9{9})
+    [0000016E87042B30][8]: (null) IROP_TEST (null)
+node[9] <BREAK> -> 7(JMP) -> 10
+    [0000016E87042C70][9]: (null) IROP_JMP (null)
+node[10] <TEST> -> 11(TRUE) -> 12(FALSE)
+    [0000016E87042CF0][10]: (null) IROP_ADEC (def: 0000016E87043E50)
+    [0000016E870424B0][10]: (li: 0x6{6}) IROP_GE (li: 0x2{2})
+    [0000016E870426F0][10]: (null) IROP_TEST (null)
+node[11] <CONTINUE> -> 6(JMP) -> 12
+    [0000016E87043070][11]: (null) IROP_JMP (null)
+node[12] <ANY> -> 6
     (no instructions)
 >>>>> SUMMARY <<<<<
-node count: 15
+node count: 13
 node arr size: 16
-edge count: 21
+edge count: 19
 edge arr size: 32
 instruction count: 23
-memory size: 3880 bytes
+memory size: 3608 bytes
 
     Scanner:
-      [0](00000183C33508D0): import, FROM java.util
+      [0](0000016E870308D0): import, FROM java.util
 ===== LITERALS =====
 memory: 464 bytes
 load factor: 40.91%
 longest chain: 1
     1:
-      [0](00000183C335F410): number,1
+      [0](0000016E8703F4F0): number,1
     9:
-      [0](00000183C335F640): number,9
+      [0](0000016E8703F6B0): number,9
     7:
-      [0](00000183C335F480): number,7
+      [0](0000016E8703F410): number,7
     5:
-      [0](00000183C335F720): number,5
+      [0](0000016E8703F330): number,5
     0:
-      [0](00000183C335F1E0): number,0
+      [0](0000016E8703F560): number,0
     3:
-      [0](00000183C335F170): number,3
+      [0](0000016E8703F3A0): number,3
     2:
-      [0](00000183C335F100): number,2
+      [0](0000016E8703F1E0): number,2
     6:
-      [0](00000183C335F2C0): number,6
+      [0](0000016E8703F5D0): number,6
     4:
-      [0](00000183C335F800): number,4
+      [0](0000016E8703F790): number,4
 ===== LOOKUP STACK =====
 (lookup stack is empty)
 ===== DEFINITION POOL =====
-[0](00000183C3364970): def var, Access: No Modifier, Type: JLT_RWD_INT
-[1](00000183C3363EF0): def var, Access: No Modifier, Type: JLT_RWD_INT
-[2](00000183C3364B30): def var, Access: No Modifier, Type: JLT_RWD_INT
-[3](00000183C3364AC0): def var, Access: No Modifier, Type: JLT_RWD_INT
-[4](00000183C335F6B0): def var, Access: No Modifier, Type: JLT_RWD_INT
-[5](00000183C3364190): def var, Access: No Modifier, Type: JLT_RWD_INT
-[6](00000183C335F790): def var, Access: No Modifier, Type: JLT_RWD_INT
-[7](00000183C335F250): def var, Access: No Modifier, Type: JLT_RWD_INT
-[8](00000183C335F4F0): def var, Access: No Modifier, Type: JLT_RWD_SHORT
-[9](00000183C335F560): def var, Access: No Modifier, Type: JLT_RWD_INT
-[10](00000183C335F5D0): def var, Access: No Modifier, Type: JLT_RWD_INT
+[0](0000016E87043E50): def var, Access: No Modifier, Type: JLT_RWD_INT
+[1](0000016E870441D0): def var, Access: No Modifier, Type: JLT_RWD_INT
+[2](0000016E87044160): def var, Access: No Modifier, Type: JLT_RWD_INT
+[3](0000016E870447F0): def var, Access: No Modifier, Type: JLT_RWD_INT
+[4](0000016E8703F250): def var, Access: No Modifier, Type: JLT_RWD_INT
+[5](0000016E87044A90): def var, Access: No Modifier, Type: JLT_RWD_INT
+[6](0000016E8703F640): def var, Access: No Modifier, Type: JLT_RWD_INT
+[7](0000016E8703F800): def var, Access: No Modifier, Type: JLT_RWD_INT
+[8](0000016E8703F2C0): def var, Access: No Modifier, Type: JLT_RWD_SHORT
+[9](0000016E8703F720): def var, Access: No Modifier, Type: JLT_RWD_INT
+[10](0000016E8703F170): def var, Access: No Modifier, Type: JLT_RWD_INT
 >>>>> SUMMARY <<<<<
 definition count: 11
 pool memory size: 1144 bytes
