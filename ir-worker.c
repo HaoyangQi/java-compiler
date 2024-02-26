@@ -17,6 +17,7 @@ void init_cfg_worker(cfg_worker* worker)
     worker->next_outbound_strategy = EDGE_ANY;
     worker->execute_inverse = false;
     worker->grow_insert = false;
+    worker->is_next_asn_init = false;
 
     init_cfg(worker->graph);
 }
@@ -124,6 +125,14 @@ void cfg_worker_execution_strategy(cfg_worker* worker, bool inverse)
 void cfg_worker_next_grow_strategy(cfg_worker* worker, bool insert)
 {
     worker->grow_insert = insert;
+}
+
+/**
+ * mark next IROP_ASN strategy
+*/
+void cfg_worker_next_asn_strategy(cfg_worker* worker, bool is_init)
+{
+    worker->is_next_asn_init = is_init;
 }
 
 /**
@@ -279,9 +288,21 @@ instruction* cfg_worker_execute(
      * NOTE: validate what we can here, leave the rest
      * for further steps
     */
-    if (inst->lvalue && inst->lvalue->type == IR_ASN_REF_LITERAL)
+    if (inst->lvalue && inst->lvalue->type != IR_ASN_REF_DEFINITION)
     {
         ir_error(ir, JAVA_E_EXPRESSION_LITERAL_LVALUE);
+    }
+
+    /**
+     * def-use info update
+     *
+     * NOTE:
+     * irop == IROP_ASN here is not sufficient, because any operator
+     * can implicitly contain an assignment if lvalue is set
+    */
+    if (!worker->is_next_asn_init && inst->lvalue)
+    {
+        inst->lvalue->ver = ++((definition*)inst->lvalue->doi)->def_count;
     }
 
     /**
@@ -308,6 +329,7 @@ instruction* cfg_worker_execute(
             break;
     }
 
+    worker->is_next_asn_init = false;
     return inst;
 }
 

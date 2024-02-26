@@ -164,6 +164,12 @@ typedef enum
  * The following operator id is modelled but not allowed in final code:
  * 1. operator "? :", because it is an syntatic sugar which should be
  *    expanded in "if-else" form in code graph
+ *    (TODO: see cfg_worker_expand_logical_precedence)
+ * 2. logical connectors "||" and "&&": they will be transformed into logical
+ *    control flow during post-processing in walk_expression
+ *    (see cfg_worker_expand_logical_precedence)
+ * 2. increment/decrement operator "++" and "--": they will be transformed into
+ *    IROP_ADD and IROP_SUB during post-processing in walk_expression
  *
  * IROP_POS     sign +
  * IROP_NEG     sign -
@@ -197,7 +203,7 @@ typedef enum
  * IROP_TC      ternary: condition part (a ? TB)
  * IROP_TB,     ternary: branch part (c : d)
  * IROP_LMD     lambda
- * IROP_STORE   the instruction only stores a operand
+ * IROP_STORE   the instruction only stores an operand
  * IROP_INIT    default initialization of a variable
  * IROP_JMP     jump (triggers EDGE_JUMP)
  * IROP_RET     return
@@ -222,10 +228,10 @@ typedef enum
     IROP_MUL,
     IROP_DIV,
     IROP_MOD,
-    IROP_BINC,
-    IROP_AINC,
-    IROP_BDEC,
-    IROP_ADEC,
+    IROP_BINC, // internal-use ONLY
+    IROP_AINC, // internal-use ONLY
+    IROP_BDEC, // internal-use ONLY
+    IROP_ADEC, // internal-use ONLY
     IROP_SLS,
     IROP_SRS,
     IROP_URS,
@@ -243,8 +249,8 @@ typedef enum
     /* Logical */
 
     IROP_LNEG,
-    IROP_LAND,
-    IROP_LOR,
+    IROP_LAND, // internal-use ONLY
+    IROP_LOR,  // internal-use ONLY
 
     /* Bit-wise */
 
