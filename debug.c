@@ -1452,7 +1452,7 @@ static void debug_print_reference(reference* r)
     switch (r->type)
     {
         case IR_ASN_REF_DEFINITION:
-            printf("(def: %p)", r->doi);
+            printf("(def[%zd]: %p)", r->ver, r->doi);
             break;
         case IR_ASN_REF_INSTRUCTION:
             printf("(inst: %p)", r->doi);

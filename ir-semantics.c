@@ -261,6 +261,7 @@ static void ctx_class(java_ir* ir, tree_node* node)
                         operand = new_reference(IR_ASN_REF_INSTRUCTION, worker->cur_blk->inst_last);
 
                         // add assignment code
+                        cfg_worker_next_asn_strategy(TSW(ir), true);
                         cfg_worker_execute(ir, worker, IROP_ASN, &lvalue, &operand, NULL);
 
                         // cleanup

@@ -19,6 +19,9 @@
 // fast top scope worker getter (no NULL check)
 #define TSW(ir) ((ir)->scope_workers->worker)
 
+// some wrapper of def() variants
+#define def_li_dec32(ir, content) def_li_raw(ir, content, JLT_LTR_NUMBER, JT_NUM_DEC, JT_NUM_BIT_LENGTH_NORMAL)
+
 /**
  * def/use control bit flags
  *
@@ -308,6 +311,7 @@ typedef struct _cfg
 typedef struct _definition
 {
     java_node_query type;
+    size_t def_count;
     struct _definition* next;
 
     union
@@ -390,6 +394,12 @@ typedef struct _definition
  * 4. outbound strategy: indicates how implicit exit node is connected
  *                       to it successor
  *
+ * following control flags are defined:
+ * 1. execute_inverse: push instruction in front of start of current instruction list
+ * 2. grow_insert: allow next block grow to handle insertion
+ * 3. is_next_asn_init: mark next IROP_ASN instruction as part of initialization,
+ *                      so it will not increament version number
+ *
  * a CFG can have multiple exit node because every "return" statemnt
  * will behave as an exit node;
  * but a CFG can only have one implict exit node
@@ -401,6 +411,7 @@ typedef struct
     edge_type next_outbound_strategy;
     bool execute_inverse;
     bool grow_insert;
+    bool is_next_asn_init;
 } cfg_worker;
 
 /**
@@ -490,6 +501,14 @@ typedef struct
 
 char* t2s(java_token* token);
 definition* t2d(hash_table* table, java_token* token);
+primitive r2p(
+    java_ir* ir,
+    const char* content,
+    binary_data* data,
+    java_lexeme_type token_type,
+    java_number_type num_type,
+    java_number_bit_length num_bits
+);
 primitive t2p(java_ir* ir, java_token* t, binary_data* data);
 char* name_unit_concat(tree_node* from, tree_node* stop_before);
 
@@ -531,7 +550,20 @@ definition* use(
     def_use_control duc,
     java_error_id err_undef
 );
-definition* def_li(java_ir* ir, java_token* token);
+definition* def_li(
+    java_ir* ir,
+    char** content,
+    java_lexeme_type token_type,
+    java_number_type num_type,
+    java_number_bit_length num_bits
+);
+definition* def_li_raw(
+    java_ir* ir,
+    const char* raw,
+    java_lexeme_type token_type,
+    java_number_type num_type,
+    java_number_bit_length num_bits
+);
 definition* type2def(
     tree_node* node,
     java_node_query type,
@@ -567,6 +599,7 @@ basic_block* cfg_worker_grow(cfg_worker* worker);
 void cfg_worker_next_outbound_strategy(cfg_worker* worker, edge_type type);
 void cfg_worker_execution_strategy(cfg_worker* worker, bool inverse);
 void cfg_worker_next_grow_strategy(cfg_worker* worker, bool insert);
+void cfg_worker_next_asn_strategy(cfg_worker* worker, bool is_init);
 void cfg_worker_set_current_block_type(cfg_worker* worker, block_type t);
 void cfg_worker_jump(cfg_worker* worker, basic_block* to, bool change_cur, bool edge);
 void cfg_worker_grow_with_graph(cfg_worker* dest, cfg_worker* src);

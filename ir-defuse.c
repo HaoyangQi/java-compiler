@@ -121,43 +121,50 @@ definition* use(java_ir* ir, const char* name, def_use_control duc, java_error_i
  * generate definition for literal
  *
  * if token is not literal, funtion is no-op and NULL is returned
+ * if registration is not successful, content stays as-is;
+ * otherwise it is detached and set to NULL
  *
 */
-definition* def_li(java_ir* ir, java_token* token)
+definition* def_li(
+    java_ir* ir,
+    char** content,
+    java_lexeme_type token_type,
+    java_number_type num_type,
+    java_number_bit_length num_bits
+)
 {
+    if (!content) { return NULL; }
+
     definition* v = NULL;
-    char* content;
     hash_pair* pair;
     binary_data bin;
 
     // lookup
-    content = t2s(token);
-    pair = shash_table_get(&ir->tbl_literal, content);
+    pair = shash_table_get(&ir->tbl_literal, *content);
 
     // if key exists, we use; otherwise create
     if (pair)
     {
-        free(content);
         return pair->value;
     }
 
     // otherwise we register
-    switch (token->type)
+    switch (token_type)
     {
         case JLT_LTR_NUMBER:
             v = new_definition(JLT_LTR_NUMBER);
-            v->li_number.type = t2p(ir, token, &bin);
+            v->li_number.type = r2p(ir, *content, &bin, token_type, num_type, num_bits);
             v->li_number.imm = bin.number;
             break;
         case JLT_LTR_CHARACTER:
             v = new_definition(JLT_LTR_CHARACTER);
-            v->li_number.type = t2p(ir, token, &bin);
+            v->li_number.type = r2p(ir, *content, &bin, token_type, num_type, num_bits);
             v->li_number.imm = bin.number;
             break;
         case JLT_RWD_TRUE:
         case JLT_RWD_FALSE:
             v = new_definition(JLT_RWD_BOOLEAN);
-            v->li_number.type = t2p(ir, token, &bin);
+            v->li_number.type = r2p(ir, *content, &bin, token_type, num_type, num_bits);
             v->li_number.imm = bin.number;
             break;
         case JLT_RWD_NULL:
@@ -166,7 +173,7 @@ definition* def_li(java_ir* ir, java_token* token)
             break;
         case JLT_LTR_STRING:
             v = new_definition(JLT_LTR_STRING);
-            t2p(ir, token, &bin);
+            r2p(ir, *content, &bin, token_type, num_type, num_bits);
             v->li_string.stream = bin.stream;
             v->li_string.length = bin.len;
             v->li_string.wide_char = bin.wide_char;
@@ -175,17 +182,37 @@ definition* def_li(java_ir* ir, java_token* token)
             break;
     }
 
-    // register: content cannot be freed if successful
+    // register: content will be moved if successful
     if (v)
     {
-        shash_table_insert(&ir->tbl_literal, content, v);
-    }
-    else
-    {
-        free(content);
+        shash_table_insert(&ir->tbl_literal, *content, v);
+        *content = NULL;
     }
 
     return v;
+}
+
+/**
+ * generate definition for literal from raw data
+ *
+*/
+definition* def_li_raw(
+    java_ir* ir,
+    const char* raw,
+    java_lexeme_type token_type,
+    java_number_type num_type,
+    java_number_bit_length num_bits
+)
+{
+    size_t sz_raw = sizeof(char*) * (strlen(raw) + 1);
+    char* content = (char*)malloc_assert(sz_raw);
+    definition* def;
+
+    memcpy(content, raw, sz_raw);
+    def = def_li(ir, &content, token_type, num_type, num_bits);
+    free(content);
+
+    return def;
 }
 
 /**

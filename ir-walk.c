@@ -48,6 +48,7 @@ static reference* __interpret_operand(java_ir* ir, tree_node* base)
     tree_node* primary = base->first_child;
     java_token* token;
     char* content;
+    definition* __def = NULL;
 
     /**
      * TODO: other primary types
@@ -55,27 +56,29 @@ static reference* __interpret_operand(java_ir* ir, tree_node* base)
     if (primary->type == JNT_PRIMARY_COMPLEX)
     {
         token = primary->data->id.complex;
+        content = t2s(token);
 
         // try get literal definition
         // if token is not literal, funtion is no-op and NULL is returned
-        definition* __def = def_li(ir, token);
+        __def = def_li(ir, &content, token->type, token->number.type, token->number.bits);
 
         /**
          * TODO: interpret all token types
          * TODO: this includes sequence of JT_IDENTIFIER
          *       as field access
         */
-        if (token->type == JLT_LTR_NUMBER)
+        if (__def)
         {
             ref->type = IR_ASN_REF_LITERAL;
             ref->doi = __def;
         }
         else if (token->class == JT_IDENTIFIER)
         {
+            __def = use(ir, content, DU_CTL_LOOKUP_GLOBAL, JAVA_E_REF_UNDEFINED);
+
             ref->type = IR_ASN_REF_DEFINITION;
-            content = t2s(token);
-            ref->doi = use(ir, content, DU_CTL_LOOKUP_GLOBAL, JAVA_E_REF_UNDEFINED);
-            free(content);
+            ref->doi = __def;
+            ref->ver = __def ? __def->def_count : 0;
 
             /**
              * TODO: how to handle field access?
@@ -85,6 +88,8 @@ static reference* __interpret_operand(java_ir* ir, tree_node* base)
         {
             printf("TODO ");
         }
+
+        free(content);
     }
     else
     {
@@ -106,7 +111,7 @@ static reference* __interpret_operand(java_ir* ir, tree_node* base)
  *
  * op: JNT_OPERATOR
 */
-static bool __execute_instruction(
+static void __execute_instruction(
     java_ir* ir,
     cfg_worker* worker,
     tree_node* op,
@@ -117,7 +122,6 @@ static bool __execute_instruction(
     operator_id id = op->data->operator.id;
     reference* lvalue = NULL;
     bool validate_lvalue = false;
-    bool needs_logical_expansion = false;
 
     /**
      * reduce composite assignment operators
@@ -144,15 +148,75 @@ static bool __execute_instruction(
         case OPID_SHIFT_L_ASN:
         case OPID_SHIFT_R_ASN:
         case OPID_SHIFT_UR_ASN:
-            // need topy because use version will differ
+            // need copy because use version will differ
             lvalue = copy_reference(operand_1);
             validate_lvalue = true;
             break;
-        case OPID_LOGIC_AND:
-        case OPID_LOGIC_OR:
-        case OPID_TERNARY_1:
-        case OPID_TERNARY_2:
-            needs_logical_expansion = true;
+        case OPID_PRE_INC:
+        case OPID_PRE_DEC:
+            /**
+             * pre-inc/dec is simple
+             *
+             * do NOT convert op code here because we do not know
+             * where we use this part
+             *
+             * e.g.
+             * b = 1;
+             * ++b + b;
+             *
+             * becomes IR code:
+             * L0: b0 <- 1
+             * L1: b1 <- b0 + 1
+             * L2: b1 + b1
+             *
+             * for operand that references pre-inc/dec instruction,
+             * simply reference the newest version of the def
+            */
+            lvalue = copy_reference(operand_2);
+            operand_1 = new_reference(IR_ASN_REF_LITERAL, def_li_dec32(ir, "1"));
+            validate_lvalue = true;
+            break;
+        case OPID_POST_INC:
+        case OPID_POST_DEC:
+            /**
+             * post-inc/dec is a bit tricky
+             *
+             * do NOT convert op code here because we do not know
+             * where we use this part
+             *
+             * e.g.
+             * b = 1;
+             * b++ + b;
+             *
+             * the answer is 3
+             * "b++" yields 1, hence the init value;
+             * but "b" is now 2 because it is after "b++"
+             *
+             * becomes IR code:
+             * L0: b0 <- 1
+             * L1: STORE b0
+             * L2: b1 <- b0 + 1
+             * L3: L1 + b1
+             *
+             * so, for operand that references the post-inc/dec instruction,
+             * use the STORE value
+             * if directly references to the def, just use the newest one,
+             * which is the default behavior
+             *
+             * so op->data->operator.instruction references to STORE instruction
+            */
+
+            // first, prepare STORE instruction, and override instruction
+            // attached to this operator
+            lvalue = copy_reference(operand_2);
+            op->data->operator.instruction = cfg_worker_execute(
+                ir, worker, IROP_STORE, NULL, &lvalue, NULL);
+            delete_reference(lvalue);
+
+            // then, prepare what happens in fall-through
+            lvalue = copy_reference(operand_2);
+            operand_1 = new_reference(IR_ASN_REF_LITERAL, def_li_dec32(ir, "1"));
+            validate_lvalue = true;
             break;
         default:
             break;
@@ -170,15 +234,22 @@ static bool __execute_instruction(
     }
 
     // link the instruction to this op
-    op->data->operator.instruction = cfg_worker_execute(
-        ir, worker, expr_opid2irop(ir->expression, id), &lvalue, &operand_1, &operand_2);
+    // if there was an override occurred, do not override here
+    if (op->data->operator.instruction)
+    {
+        cfg_worker_execute(ir, worker, expr_opid2irop(ir->expression, id), &lvalue, &operand_1, &operand_2);
+    }
+    else
+    {
+        op->data->operator.instruction = cfg_worker_execute(
+            ir, worker, expr_opid2irop(ir->expression, id), &lvalue, &operand_1, &operand_2);
+    }
+
 
     // cleanup
     delete_reference(lvalue);
     delete_reference(operand_1);
     delete_reference(operand_2);
-
-    return needs_logical_expansion;
 }
 
 /**
@@ -235,6 +306,7 @@ void walk_expression(java_ir* ir, tree_node* expression)
     tree_node* base2;
     tree_node* top = expression->first_child;
     instruction* first = TSW(ir)->cur_blk ? TSW(ir)->cur_blk->inst_last : NULL;
+    operator_id opid;
     bool needs_logical_expansion = false;
 
     if (!top->next_sibling)
@@ -287,6 +359,7 @@ void walk_expression(java_ir* ir, tree_node* expression)
         // first operand is always the immediate previous one
         base1 = top->prev_sibling;
         base2 = NULL;
+        opid = top->data->operator.id;
 
         // base1 must be available
         if (!base1)
@@ -296,7 +369,7 @@ void walk_expression(java_ir* ir, tree_node* expression)
         }
 
         // adjust base2 if needed
-        if (expr_opid_operand_count(ir->expression, top->data->operator.id) == 2)
+        if (expr_opid_operand_count(ir->expression, opid) == 2)
         {
             // see the NOTE below for reasoning
             base2 = base1->prev_sibling;
@@ -337,14 +410,51 @@ void walk_expression(java_ir* ir, tree_node* expression)
          * left to make sure it always executes, otherwise the
          * short circuit might block it
         */
-        needs_logical_expansion = __execute_instruction(
+        __execute_instruction(
             ir, TSW(ir), top,
             __interpret_operand(ir, base2),
             __interpret_operand(ir, base1)
-        ) || needs_logical_expansion;
+        );
+
+        switch (opid)
+        {
+            case OPID_LOGIC_AND:
+            case OPID_LOGIC_OR:
+            case OPID_TERNARY_1:
+            case OPID_TERNARY_2:
+                needs_logical_expansion = true;
+                break;
+            default:
+                break;
+        }
 
         // reduction of current operator completed, move on
         top = top->next_sibling;
+    }
+
+    /**
+     * post-processing: transform pre-/post- inc/dec op code
+     *
+     * code itself is transformed in __execute_instruction, this routine
+     * simply changes opcode
+    */
+    for (instruction* probe = first ? first : TSW(ir)->cur_blk->inst_first;
+        probe != NULL;
+        probe = probe->next)
+    {
+        switch (probe->op)
+        {
+            case IROP_AINC:
+            case IROP_BINC:
+                probe->op = IROP_ADD;
+                break;
+            case IROP_ADEC:
+            case IROP_BDEC:
+                probe->op = IROP_SUB;
+                break;
+            default:
+                break;
+        }
     }
 
     // logical precedence
@@ -442,6 +552,7 @@ void __execute_variable_declaration(java_ir* ir, tree_node* stmt)
 
             // assignment code
             operand = new_reference(IR_ASN_REF_INSTRUCTION, TSW(ir)->cur_blk->inst_last);
+            cfg_worker_next_asn_strategy(TSW(ir), true);
             cfg_worker_execute(ir, TSW(ir), IROP_ASN, &lvalue, &operand, NULL);
 
             // cleanup

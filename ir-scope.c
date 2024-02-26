@@ -158,6 +158,7 @@ definition* new_definition(java_node_query type)
     definition* v = (definition*)malloc_assert(sizeof(definition));
 
     v->type = type;
+    v->def_count = 0;
     v->next = NULL;
 
     switch (type)

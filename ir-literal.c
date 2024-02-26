@@ -65,24 +65,30 @@ static uint64_t __bin_sanitize(java_ir* ir, uint64_t n, primitive p, number_trun
 }
 
 /**
- * Token-To-Primitive Routine
+ * Raw-Source-To-Primitive Routine
  *
- * data->number will be filled if token is a number
- * data->stream will be filled if token is a character or string
+ * data->number will be filled if it is a number
+ * data->stream will be filled if it is a character or string
  *
  * for character: u16 overflow bit will be set if the token
  * contains more then 2 bytes.
 */
-primitive t2p(java_ir* ir, java_token* t, binary_data* data)
+primitive r2p(
+    java_ir* ir,
+    const char* content,
+    binary_data* data,
+    java_lexeme_type token_type,
+    java_number_type num_type,
+    java_number_bit_length num_bits
+)
 {
     primitive p = IRPV_MAX;
-    char* content;
     number_truncation_status nts = NTS_SUCCESS;
 
     init_binary_data(data);
 
     // find primitive type
-    switch (t->type)
+    switch (token_type)
     {
         case JLT_RWD_TRUE:
         case JLT_RWD_FALSE:
@@ -92,7 +98,7 @@ primitive t2p(java_ir* ir, java_token* t, binary_data* data)
             p = SELECT_INT_DATA_SIZE(ir->arch->bits);
             break;
         case JLT_LTR_NUMBER:
-            switch (t->number.type)
+            switch (num_type)
             {
                 case JT_NUM_FP_DOUBLE:
                     p = IRPV_PRECISION_DOUBLE;
@@ -100,7 +106,7 @@ primitive t2p(java_ir* ir, java_token* t, binary_data* data)
                 case JT_NUM_FP_FLOAT:
                     p = IRPV_PRECISION_SINGLE;
                 default:
-                    p = SELECT_INT_DATA_SIZE(t->number.bits);
+                    p = SELECT_INT_DATA_SIZE(num_bits);
                     break;
             }
             break;
@@ -121,7 +127,7 @@ primitive t2p(java_ir* ir, java_token* t, binary_data* data)
      * NOTE: literal overflow is always non-fatal at compile-
      * time, though it may cause deviation at run-time
     */
-    switch (t->type)
+    switch (token_type)
     {
         case JLT_RWD_TRUE:
             data->number = 1;
@@ -131,14 +137,11 @@ primitive t2p(java_ir* ir, java_token* t, binary_data* data)
             data->number = 0;
             break;
         case JLT_LTR_NUMBER:
-            content = t2s(t);
-            nts = s2b(content, t->number.type, data);
+            nts = s2b(content, num_type, data);
             data->number = __bin_sanitize(ir, data->number, p, nts);
-            free(content);
             break;
         case JLT_LTR_CHARACTER:
             // get binary stream
-            content = t2s(t);
             nts = s2b(content, JT_NUM_MAX, data);
             data->number = 0;
             // get 16 bits from stream
@@ -151,18 +154,33 @@ primitive t2p(java_ir* ir, java_token* t, binary_data* data)
             data->number = __bin_sanitize(ir, data->number, p, nts);
             // cleanup
             free(data->stream);
-            free(content);
             data->stream = NULL;
             break;
         case JLT_LTR_STRING:
             // keep the entire stream
-            content = t2s(t);
             s2b(content, JT_NUM_MAX, data);
-            free(content);
             break;
         default:
             break;
     }
+
+    return p;
+}
+
+/**
+ * Token-To-Primitive Routine
+ *
+ * data->number will be filled if token is a number
+ * data->stream will be filled if token is a character or string
+ *
+ * for character: u16 overflow bit will be set if the token
+ * contains more then 2 bytes.
+*/
+primitive t2p(java_ir* ir, java_token* t, binary_data* data)
+{
+    char* content = t2s(t);
+    primitive p = r2p(ir, content, data, t->type, t->number.type, t->number.bits);
+    free(content);
 
     return p;
 }
