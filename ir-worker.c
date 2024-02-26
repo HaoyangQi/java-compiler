@@ -300,7 +300,7 @@ instruction* cfg_worker_execute(
      * irop == IROP_ASN here is not sufficient, because any operator
      * can implicitly contain an assignment if lvalue is set
     */
-    if (!worker->is_next_asn_init && inst->lvalue)
+    if (!worker->is_next_asn_init && inst->lvalue && irop != IROP_INIT)
     {
         inst->lvalue->ver = ++((definition*)inst->lvalue->doi)->def_count;
     }
