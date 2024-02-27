@@ -9,6 +9,8 @@
  * grow_insert: upon next grow, the outbound info will be moved to the
  *              new block, while inbound stays as-is
  *
+ * NOTE: do NOT initialize optimizer here because it needs a complete CFG
+ *
 */
 void init_cfg_worker(cfg_worker* worker)
 {
@@ -18,6 +20,7 @@ void init_cfg_worker(cfg_worker* worker)
     worker->execute_inverse = false;
     worker->grow_insert = false;
     worker->is_next_asn_init = false;
+    worker->optimizer = NULL;
 
     init_cfg(worker->graph);
 }
@@ -50,6 +53,7 @@ void release_cfg_worker(cfg_worker* worker, cfg* move_to)
         release_cfg(worker->graph);
     }
 
+    cfg_worker_ssa_release(worker);
     free(worker->graph);
 }
 

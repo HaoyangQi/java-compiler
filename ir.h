@@ -272,11 +272,6 @@ typedef struct _basic_block
 
     edge_array in;
     edge_array out;
-
-    // SSA: dominator set
-    node_set dominators;
-    // SSA: dominance frontier
-    node_set df;
 } basic_block;
 
 /**
@@ -402,6 +397,22 @@ typedef struct _definition
 } definition;
 
 /**
+ * Optimizer Data
+ *
+ * It contains data for SSA and other useful info
+ * from every node for code analysis and optization
+*/
+typedef struct
+{
+    basic_block* node;
+
+    // SSA: dominator set
+    node_set dominators;
+    // SSA: dominance frontier
+    node_set df;
+} ssa;
+
+/**
  * IR CFG Worker
  *
  * when a CFG is finalized, worker will contain following information:
@@ -429,6 +440,9 @@ typedef struct
     bool execute_inverse;
     bool grow_insert;
     bool is_next_asn_init;
+
+    // code analysis data
+    ssa* optimizer;
 } cfg_worker;
 
 /**
@@ -638,6 +652,9 @@ basic_block* cfg_worker_current_block_split(
 );
 void cfg_worker_expand_logical_precedence(java_ir* ir, cfg_worker* worker);
 
+void cfg_worker_ssa_release(cfg_worker* worker);
+void cfg_worker_ssa_build(cfg_worker* worker);
+
 void init_node_set(node_set* s);
 void init_node_set_with_copy(node_set* dest, const node_set* src);
 void release_node_set(node_set* s);
@@ -649,8 +666,6 @@ bool node_set_empty(const node_set* s);
 bool node_set_equal(const node_set* s1, const node_set* s2);
 void node_set_union(node_set* dest, const node_set* src);
 void node_set_intersect(node_set* dest, node_set* src);
-
-void ir_ssa_build(cfg_worker* worker);
 
 reference* new_reference(reference_type t, void* doi);
 reference* copy_reference(const reference* r);
