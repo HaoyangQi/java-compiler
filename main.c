@@ -20,7 +20,8 @@ static char* test_paths[] = {
     // "./test/class-decl-1.txt",
     // "./test/interface-decl-1.txt",
 
-    "./test/simple.txt",
+    // "./test/simple.txt",
+    "./test/ssa.txt",
 
     // "./test/general-no-block-and-statement.txt",
 

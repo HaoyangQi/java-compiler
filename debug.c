@@ -1676,7 +1676,7 @@ static void debug_print_definition(definition* v)
             printf("\n");
             break;
         case JLT_LTR_NUMBER:
-            printf("%llx\n", v->li_number.imm);
+            printf("0x%llx\n", v->li_number.imm);
             break;
         default:
             // no-op

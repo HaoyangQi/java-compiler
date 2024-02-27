@@ -228,6 +228,18 @@ typedef struct
 } edge_array;
 
 /**
+ * Basic Block Hash Set
+ *
+ * it uses the hash of node id as key to
+ * map to the basic block object
+*/
+typedef struct
+{
+    // type: hash_table<size_t, basic_block*>
+    hash_table tbl;
+} node_set;
+
+/**
  * Node type
  *
  * special IDs for graph manipulation
@@ -260,6 +272,11 @@ typedef struct _basic_block
 
     edge_array in;
     edge_array out;
+
+    // SSA: dominator set
+    node_set dominators;
+    // SSA: dominance frontier
+    node_set df;
 } basic_block;
 
 /**
@@ -620,6 +637,20 @@ basic_block* cfg_worker_current_block_split(
     bool split_before
 );
 void cfg_worker_expand_logical_precedence(java_ir* ir, cfg_worker* worker);
+
+void init_node_set(node_set* s);
+void init_node_set_with_copy(node_set* dest, const node_set* src);
+void release_node_set(node_set* s);
+bool node_set_contains(const node_set* s, const basic_block* entry);
+void node_set_add(node_set* s, basic_block* entry);
+void node_set_remove(node_set* s, basic_block* entry);
+basic_block* node_set_pop(node_set* s);
+bool node_set_empty(const node_set* s);
+bool node_set_equal(const node_set* s1, const node_set* s2);
+void node_set_union(node_set* dest, const node_set* src);
+void node_set_intersect(node_set* dest, node_set* src);
+
+void ir_ssa_build(cfg_worker* worker);
 
 reference* new_reference(reference_type t, void* doi);
 reference* copy_reference(const reference* r);

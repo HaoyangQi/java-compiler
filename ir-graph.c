@@ -50,6 +50,10 @@ static void node_delete(basic_block* block)
     free(block->in.arr);
     free(block->out.arr);
 
+    // delete SSA data
+    release_node_set(&block->dominators);
+    release_node_set(&block->df);
+
     // free node
     free(block);
 }
@@ -224,9 +228,23 @@ basic_block* cfg_new_basic_block(cfg* g)
     basic_block* n = (basic_block*)malloc_assert(sizeof(basic_block));
     memset(n, 0, sizeof(basic_block));
 
-    // register
+    /**
+     * initialize block
+     *
+     * do NOT initialize "dominator" set here because the
+     * algorithm calculates it requires it to be initialized
+     * as set of all nodes; so it must be initialized after
+     * CFG is finalized
+     * (see ir_ssa_compute_dominators)
+     *
+     * DF set is required to start from empty set, so we can
+     * initialize it here
+    */
     n->id = g->nodes.num;
     n->type = BLOCK_ANY;
+    init_node_set(&n->df);
+
+    // register
     g->nodes.arr[g->nodes.num] = n;
     g->nodes.num++;
 

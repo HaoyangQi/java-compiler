@@ -1,0 +1,31 @@
+class MyPackageClass {
+    void example_1_dominator_set() {
+        int a = 0;
+
+        if (a > 0) {
+            a = a + 1;
+        } else {
+            a = a - 1;
+        }
+
+        do {
+            a = a * 2;
+        } while (a < 100);
+
+        a = 1;
+    }
+
+    void example_2_df_set() {
+        int a = 0;
+
+        if (a < 0) {
+            if (a > 0) {
+                a = a + 1;
+            } else {
+                a = a - 1;
+            }
+        }
+
+        a = 1;
+    }
+}

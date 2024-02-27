@@ -35,6 +35,8 @@ typedef struct _hash_bucket
     void* key;
     void* value;
     bytes_length key_length;
+
+    struct _hash_bucket* prev;
     struct _hash_bucket* next;
 } hash_pair;
 
@@ -58,7 +60,7 @@ void release_hash_table(hash_table* table, pair_data_deleter deleter);
 
 size_t hash_table_longest_chain_length(hash_table* table);
 size_t hash_table_bucket_head_filled(hash_table* table);
-size_t hash_table_pairs(hash_table* table);
+size_t hash_table_pairs(const hash_table* table);
 float hash_table_load_factor(hash_table* table);
 size_t hash_table_memory_size(hash_table* table);
 
@@ -66,17 +68,21 @@ void pair_data_delete_full(void* k, void* v);
 void pair_data_delete_key(void* k, void* v);
 void pair_data_delete_value(void* k, void* v);
 
+hash_pair* new_pair(void* k, void* v, bytes_length len);
+
 void bhash_table_insert(hash_table* table, void* k, bytes_length len, void* v);
 bool bhash_table_update(hash_table* table, const void* k, bytes_length len, void* v);
-bool bhash_table_test(hash_table* table, const void* k, bytes_length len);
+bool bhash_table_test(const hash_table* table, const void* k, bytes_length len);
 void* bhash_table_find(hash_table* table, const void* k, bytes_length len);
-hash_pair* bhash_table_get(hash_table* table, const void* k, bytes_length len);
+hash_pair* bhash_table_get(const hash_table* table, const void* k, bytes_length len);
+hash_pair* bhash_table_remove(hash_table* table, const void* k, bytes_length len);
+hash_pair* bhash_table_pop(hash_table* table);
 
 void shash_table_insert(hash_table* table, char* k, void* v);
 bool shash_table_update(hash_table* table, const char* k, void* v);
 bool shash_table_test(hash_table* table, const char* k);
 void* shash_table_find(hash_table* table, const char* k);
-hash_pair* shash_table_get(hash_table* table, const char* k);
+hash_pair* shash_table_get(const hash_table* table, const char* k);
 
 void shash_table_bl_insert(hash_table* table, char* k, size_t v);
 bool shash_table_bl_update(hash_table* table, const char* k, size_t v);

@@ -85,7 +85,7 @@ size_t hash_table_bucket_head_filled(hash_table* table)
 /**
  * get number of pairs inserted
 */
-size_t hash_table_pairs(hash_table* table)
+size_t hash_table_pairs(const hash_table* table)
 {
     return table->num_pairs;
 }
@@ -134,13 +134,14 @@ void pair_data_delete_value(void* k, void* v)
 /**
  * create a key-value pair
 */
-static hash_pair* new_pair(void* k, void* v, bytes_length len)
+hash_pair* new_pair(void* k, void* v, bytes_length len)
 {
     hash_pair* b = (hash_pair*)malloc_assert(sizeof(hash_pair));
 
     b->key = k;
     b->value = v;
     b->key_length = len;
+    b->prev = NULL;
     b->next = NULL;
 
     return b;
@@ -208,6 +209,7 @@ void bhash_table_insert(hash_table* table, void* k, bytes_length len, void* v)
     if (table->bucket[index])
     {
         // O(1) insert: use new pair as the header
+        table->bucket[index]->prev = b;
         b->next = table->bucket[index];
     }
     else
@@ -247,7 +249,7 @@ bool bhash_table_update(hash_table* table, const void* k, bytes_length len, void
 /**
  * key test
 */
-bool bhash_table_test(hash_table* table, const void* k, bytes_length len)
+bool bhash_table_test(const hash_table* table, const void* k, bytes_length len)
 {
     size_t index = bhash(k, len) % table->bucket_size;
     hash_pair* b = table->bucket[index];
@@ -297,7 +299,7 @@ void* bhash_table_find(hash_table* table, const void* k, bytes_length len)
  *
  * NULL returned from this method is unambiguous: means key does not exist
 */
-hash_pair* bhash_table_get(hash_table* table, const void* k, bytes_length len)
+hash_pair* bhash_table_get(const hash_table* table, const void* k, bytes_length len)
 {
     size_t index = bhash(k, len) % table->bucket_size;
     hash_pair* b = table->bucket[index];
@@ -311,6 +313,74 @@ hash_pair* bhash_table_get(hash_table* table, const void* k, bytes_length len)
         }
 
         b = b->next;
+    }
+
+    return NULL;
+}
+
+/**
+ * detach a specific pair from hash table
+*/
+hash_pair* bhash_table_remove(hash_table* table, const void* k, bytes_length len)
+{
+    size_t index = bhash(k, len) % table->bucket_size;
+    hash_pair* b = table->bucket[index];
+
+    // lookup with collision check
+    while (b)
+    {
+        if (memcmp(b->key, k, len) == 0)
+        {
+            if (!b->prev && !b->next)
+            {
+                table->bucket[index] = NULL;
+                table->num_filled--;
+            }
+            else
+            {
+                if (b->prev)
+                {
+                    b->prev->next = b->next;
+                }
+
+                if (b->next)
+                {
+                    b->next->prev = b->prev;
+                }
+            }
+
+            table->num_pairs--;
+            return b;
+        }
+
+        b = b->next;
+    }
+
+    return NULL;
+}
+
+/**
+ * detach any pair from hash table
+*/
+hash_pair* bhash_table_pop(hash_table* table)
+{
+    hash_pair* b;
+
+    for (size_t index = 0; index < table->bucket_size; index++)
+    {
+        b = table->bucket[index];
+
+        if (b)
+        {
+            if (!b->next)
+            {
+                table->num_filled--;
+            }
+
+            table->bucket[index] = b->next;
+            table->num_pairs--;
+            return b;
+        }
     }
 
     return NULL;
@@ -351,7 +421,7 @@ void* shash_table_find(hash_table* table, const char* k)
 /**
  * string key get
 */
-hash_pair* shash_table_get(hash_table* table, const char* k)
+hash_pair* shash_table_get(const hash_table* table, const char* k)
 {
     return bhash_table_get(table, k, strlen(k));
 }
