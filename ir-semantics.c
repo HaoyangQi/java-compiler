@@ -319,6 +319,11 @@ static void ctx_class(java_ir* ir, tree_node* node)
 
                 // parse body
                 worker = walk_block(ir, declaration->next_sibling, false);
+
+                // convert CFG to SSA form
+                ir_ssa_build(worker);
+
+                // release worker
                 release_cfg_worker(worker, &desc->method.code);
                 free(worker);
 
