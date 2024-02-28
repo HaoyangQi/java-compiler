@@ -315,6 +315,18 @@ typedef struct _cfg
     basic_block* entry;
 } cfg;
 
+typedef struct _definition definition;
+
+/**
+ * Definition Pool
+*/
+typedef struct
+{
+    definition** arr;
+    size_t size;
+    size_t num;
+} definition_pool;
+
 /**
  * scope lookup table value descriptor
  *
@@ -324,7 +336,6 @@ typedef struct _definition
 {
     java_node_query type;
     size_t def_count;
-    struct _definition* next;
 
     union
     {
@@ -374,6 +385,7 @@ typedef struct _definition
             type_name return_type;
             // code
             cfg code;
+            definition_pool local_variables;
         } method;
 
         struct
@@ -435,6 +447,9 @@ typedef struct
 typedef struct
 {
     cfg* graph;
+    // all variable definitions in this CFG
+    definition_pool variables;
+
     basic_block* cur_blk;
     edge_type next_outbound_strategy;
     bool execute_inverse;
@@ -510,8 +525,6 @@ typedef struct
     hash_table tbl_global;
     // literal lookup table
     hash_table tbl_literal;
-    // local definition pool
-    definition* local_def_pool;
     // stack top symbol lookup
     scope_frame* scope_stack_top;
     // scope worker context stack
@@ -528,6 +541,8 @@ typedef struct
 
     // member declarator initialization code
     cfg* code_member_init;
+    // member variable definition pool
+    definition_pool member_variables;
 } java_ir;
 
 char* t2s(java_token* token);
@@ -543,6 +558,13 @@ primitive r2p(
 primitive t2p(java_ir* ir, java_token* t, binary_data* data);
 char* name_unit_concat(tree_node* from, tree_node* stop_before);
 
+void init_definition_pool(definition_pool* pool);
+void init_definition_pool_with_copy(definition_pool* dest, const definition_pool* src);
+void release_definition_pool(definition_pool* pool);
+void definition_pool_grow(definition_pool* pool, size_t by);
+void definition_pool_add(definition_pool* pool, definition* def);
+void definition_pool_merge(definition_pool* dest, definition_pool* src);
+
 void push_scope_worker(java_ir* ir);
 cfg_worker* get_scope_worker(java_ir* ir);
 cfg_worker* pop_scope_worker(java_ir* ir);
@@ -553,7 +575,7 @@ void pop_statement_context(java_ir* ir);
 
 void lookup_scope_deleter(char* k, definition* v);
 hash_table* lookup_new_scope(java_ir* ir, lookup_scope_type type);
-bool lookup_pop_scope(java_ir* ir, bool use_pool);
+bool lookup_pop_scope(java_ir* ir, definition_pool* pool);
 hash_table* lookup_global_scope(java_ir* ir);
 hash_table* lookup_working_scope(java_ir* ir);
 hash_table* lookup_top_scope(java_ir* ir);
@@ -624,7 +646,7 @@ bool cfg_empty(const cfg* g);
 void cfg_detach(cfg* g);
 
 void init_cfg_worker(cfg_worker* worker);
-void release_cfg_worker(cfg_worker* worker, cfg* move_to);
+void release_cfg_worker(cfg_worker* worker, cfg* move_to, definition_pool* pool);
 basic_block* cfg_worker_current_block(cfg_worker* worker);
 basic_block* cfg_worker_grow(cfg_worker* worker);
 void cfg_worker_next_outbound_strategy(cfg_worker* worker, edge_type type);
@@ -680,7 +702,7 @@ bool instruction_push_front(basic_block* node, instruction* inst);
 instruction* instruction_locate_enclosure_start(instruction* inst);
 
 void walk_expression(java_ir* ir, tree_node* expression);
-cfg_worker* walk_block(java_ir* ir, tree_node* block, bool use_new_scope);
+void walk_method(java_ir* ir, tree_node* node);
 
 void init_ir(java_ir* ir, java_expression* expression, java_error_stack* error);
 void release_ir(java_ir* ir);

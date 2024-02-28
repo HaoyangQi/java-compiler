@@ -599,7 +599,7 @@ void __execute_variable_declaration(java_ir* ir, tree_node* stmt)
 */
 
 void __execute_statement(java_ir* ir, tree_node* stmt);
-cfg_worker* walk_block(java_ir* ir, tree_node* block, bool use_new_scope);
+static cfg_worker* walk_block(java_ir* ir, tree_node* block, bool use_new_scope);
 
 /**
  * walk if statement
@@ -981,7 +981,7 @@ void __execute_statement_for(java_ir* ir, tree_node* stmt)
     // cleanup
     cfg_worker_jump(TSW(ir), sc->_break, true, false);
     pop_statement_context(ir);
-    lookup_pop_scope(ir, true);
+    lookup_pop_scope(ir, &TSW(ir)->variables);
 }
 
 /**
@@ -1214,11 +1214,13 @@ void __execute_statement(java_ir* ir, tree_node* stmt)
 }
 
 /**
- * TODO: Block AST Walk
+ * Block AST Walk
+ *
+ * merge_pool: if set, the pool will be merged to new stack top
  *
  * node: JNT_BLOCK
 */
-cfg_worker* walk_block(java_ir* ir, tree_node* block, bool use_new_scope)
+static cfg_worker* walk_block(java_ir* ir, tree_node* block, bool use_new_scope)
 {
     // prepare scope lookup
     if (use_new_scope)
@@ -1269,8 +1271,62 @@ cfg_worker* walk_block(java_ir* ir, tree_node* block, bool use_new_scope)
 
     if (use_new_scope)
     {
-        lookup_pop_scope(ir, true);
+        lookup_pop_scope(ir, &TSW(ir)->variables);
     }
 
     return pop_scope_worker(ir);
+}
+
+/**
+ * JNT_METHOD_DECL
+ * |
+ * +--- JNT_METHOD_HEADER
+ * |    |
+ * |    +--- JNT_FORMAL_PARAM_LIST
+ * |         |
+ * |         +--- param 1
+ * |         +--- ...
+ * |
+ * +--- JNT_METHOD_BODY
+ *
+ * node: JNT_METHOD_DECL
+*/
+void walk_method(java_ir* ir, tree_node* node)
+{
+    definition* method_def;
+    cfg_worker* worker;
+
+    // go to header
+    node = node->first_child;
+
+    // begin scope
+    lookup_new_scope(ir, LST_METHOD);
+
+    // on method, we only have global to lookup so no need to call use()
+    method_def = t2d(lookup_global_scope(ir), node->data->declarator.id.complex);
+
+    // fill all parameter declarations
+    def_params(ir, node->first_child);
+
+    // parse body (use current scope)
+    worker = walk_block(ir, node->next_sibling, false);
+
+    // we need to keep all definitions active
+    lookup_pop_scope(ir, &worker->variables);
+
+    // convert CFG to SSA form
+    cfg_worker_ssa_build(worker);
+
+    // release worker
+    release_cfg_worker(worker, &method_def->method.code, &method_def->method.local_variables);
+    free(worker);
+
+    /**
+     * TODO: we probably need a copy of member def to be moved into this one
+     * but... how to delete them? Because members are shared
+     *
+     * or... a better one: we simply reset version number for member def
+     * every time we run ssa_init on a method worker; we waste a bit of time
+     * but data is intact (no need to merge in this case, just use 2 pools)
+    */
 }

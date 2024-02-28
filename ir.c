@@ -1,6 +1,8 @@
 #include "ir.h"
 #include "node.h"
 
+#define DEFINITION_POOL_GROW_FACTOR (2)
+
 /**
  * initialize semantic analysis
  *
@@ -9,7 +11,6 @@
 */
 void init_ir(java_ir* ir, java_expression* expression, java_error_stack* error)
 {
-    ir->local_def_pool = NULL;
     ir->scope_stack_top = NULL;
     ir->arch = NULL;
     ir->expression = expression;
@@ -21,6 +22,7 @@ void init_ir(java_ir* ir, java_expression* expression, java_error_stack* error)
     init_hash_table(&ir->tbl_on_demand_packages, HASH_TABLE_DEFAULT_BUCKET_SIZE);
     init_hash_table(&ir->tbl_global, HASH_TABLE_DEFAULT_BUCKET_SIZE);
     init_hash_table(&ir->tbl_literal, HASH_TABLE_DEFAULT_BUCKET_SIZE);
+    init_definition_pool(&ir->member_variables);
 }
 
 /**
@@ -35,12 +37,12 @@ void release_ir(java_ir* ir)
     // delete literal lookup
     release_hash_table(&ir->tbl_literal, &lookup_scope_deleter);
     // delete entire lookup stack
-    while (lookup_pop_scope(ir, false));
+    while (lookup_pop_scope(ir, NULL));
     // delete member init code
     release_cfg(ir->code_member_init);
     free(ir->code_member_init);
-    // delete definition pool
-    definition_delete(ir->local_def_pool);
+    // delete pool
+    release_definition_pool(&ir->member_variables);
 }
 
 /**
@@ -215,4 +217,80 @@ void pop_statement_context(java_ir* ir)
     }
 
     free(c);
+}
+
+void init_definition_pool(definition_pool* pool)
+{
+    size_t sz = sizeof(definition*) * DEFINITION_POOL_GROW_FACTOR;
+
+    pool->arr = (definition**)malloc_assert(sz);
+    pool->num = 0;
+    pool->size = DEFINITION_POOL_GROW_FACTOR;
+
+    memset(pool->arr, 0, sz);
+}
+
+void init_definition_pool_with_copy(definition_pool* dest, const definition_pool* src)
+{
+    size_t sz = sizeof(definition*) * DEFINITION_POOL_GROW_FACTOR;
+
+    memcpy(dest, src, sizeof(definition_pool));
+    dest->arr = (definition**)malloc_assert(sz);
+    memcpy(dest->arr, src->arr, sz);
+}
+
+void release_definition_pool(definition_pool* pool)
+{
+    for (size_t i = 0; i < pool->num; i++)
+    {
+        definition_delete(pool->arr[i]);
+    }
+
+    free(pool->arr);
+}
+
+void definition_pool_grow(definition_pool* pool, size_t by)
+{
+    size_t old_size = pool->size;
+
+    if (pool->num + by <= old_size)
+    {
+        return;
+    }
+
+    // yes this is dumb, but let's keep it this way
+    while (pool->num + by > pool->size)
+    {
+        pool->size *= DEFINITION_POOL_GROW_FACTOR;
+    }
+
+    if (pool->size > old_size)
+    {
+        pool->arr = (definition**)realloc_assert(pool->arr, sizeof(definition*) * (pool->size));
+    }
+}
+
+void definition_pool_add(definition_pool* pool, definition* def)
+{
+    if (pool->arr)
+    {
+        definition_pool_grow(pool, 1);
+    }
+    else
+    {
+        init_definition_pool(pool);
+    }
+
+    pool->arr[pool->num] = def;
+    pool->num++;
+}
+
+void definition_pool_merge(definition_pool* dest, definition_pool* src)
+{
+    definition_pool_grow(dest, src->num);
+    memcpy(dest->arr + dest->num, src->arr, sizeof(definition*) * src->num);
+    dest->num += src->num;
+
+    // lazy detach
+    src->num = 0;
 }

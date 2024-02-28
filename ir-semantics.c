@@ -295,40 +295,9 @@ static void ctx_class(java_ir* ir, tree_node* node)
                 /**
                  * type
                  * |
-                 * method declaration
-                 * |
-                 * +--- header              <--- HERE
-                 * |    |
-                 * |    +--- param list
-                 * |         |
-                 * |         +--- param 1
-                 * |         +--- ...
-                 * |
-                 * +--- body
+                 * method declaration    <--- HERE
                 */
-                declaration = declaration->next_sibling->first_child;
-
-                // begin scope
-                lookup_new_scope(ir, LST_METHOD);
-
-                // on method, we only have global to lookup so no need to call use()
-                desc = t2d(table, declaration->data->declarator.id.complex);
-
-                // fill all parameter declarations
-                def_params(ir, declaration->first_child);
-
-                // parse body
-                worker = walk_block(ir, declaration->next_sibling, false);
-
-                // convert CFG to SSA form
-                cfg_worker_ssa_build(worker);
-
-                // release worker
-                release_cfg_worker(worker, &desc->method.code);
-                free(worker);
-
-                // we need to keep all definitions active
-                lookup_pop_scope(ir, true);
+                walk_method(ir, declaration->next_sibling);
             }
         }
 
@@ -336,15 +305,15 @@ static void ctx_class(java_ir* ir, tree_node* node)
     }
 
     // cleanup
-    if (!cfg_empty(member_init_worker.graph))
+    if (cfg_empty(member_init_worker.graph))
     {
-        // no init, just need a memory chunk here
-        ir->code_member_init = new_cfg_container();
-        release_cfg_worker(&member_init_worker, ir->code_member_init);
+        release_cfg_worker(&member_init_worker, NULL, NULL);
     }
     else
     {
-        release_cfg_worker(&member_init_worker, NULL);
+        // no init, just need a memory chunk here
+        ir->code_member_init = new_cfg_container();
+        release_cfg_worker(&member_init_worker, ir->code_member_init, &ir->member_variables);
     }
 }
 
@@ -353,7 +322,4 @@ static void ctx_class(java_ir* ir, tree_node* node)
 */
 static void ctx_interface(java_ir* ir, tree_node* node)
 {
-    hash_table* table = lookup_new_scope(ir, LST_INTERFACE);
-
-    lookup_pop_scope(ir, false);
 }
