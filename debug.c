@@ -1538,7 +1538,7 @@ static void debug_print_cfg(cfg* g)
     size_t node_out_count = 0;
     size_t node_in_count = 0;
 
-    printf("\n===== CONTROL FLOW GRAPH =====\n");
+    printf("===== CONTROL FLOW GRAPH =====\n");
 
     if (g->nodes.num == 0)
     {
@@ -1600,29 +1600,31 @@ static void debug_print_cfg(cfg* g)
     );
 }
 
+static void debug_print_definition_pool(definition_pool* pool);
+
 static void debug_print_definition(definition* v)
 {
     // header
     switch (v->type)
     {
         case JNT_IMPORT_DECL:
-            printf("import,");
+            printf("import, ");
             break;
         case JNT_CLASS_DECL:
-            printf("class,");
+            printf("class, ");
             break;
         case JNT_VAR_DECL:
-            printf("def %s,", v->variable.is_class_member ? "member var" : "var");
+            printf("def %s, ", v->variable.is_class_member ? "member var" : "var");
             break;
         case JNT_METHOD_DECL:
-            printf("def method,");
+            printf("def method, ");
             break;
         case JLT_LTR_NUMBER:
-            printf("number,");
+            printf("number, ");
             break;
         default:
             // no-op
-            printf("(UNREGISTERED: %d),", v->type);
+            printf("(UNREGISTERED: %d), ", v->type);
             break;
     }
 
@@ -1630,10 +1632,10 @@ static void debug_print_definition(definition* v)
     switch (v->type)
     {
         case JNT_IMPORT_DECL:
-            printf(" FROM %s\n", v->import.package_name);
+            printf("FROM %s\n", v->import.package_name);
             break;
         case JNT_CLASS_DECL:
-            printf(" Access: ");
+            printf("Access: ");
             debug_print_modifier_bit_flag(v->class.modifier);
             if (v->class.extend)
             {
@@ -1646,7 +1648,7 @@ static void debug_print_definition(definition* v)
             printf("\n");
             break;
         case JNT_VAR_DECL:
-            printf(" Access: ");
+            printf("Access: ");
             debug_print_modifier_bit_flag(v->variable.modifier);
             printf(", Type: ");
             if (v->variable.type.primitive != JLT_MAX)
@@ -1660,7 +1662,7 @@ static void debug_print_definition(definition* v)
             printf("\n");
             break;
         case JNT_METHOD_DECL:
-            printf(" Access: ");
+            printf("Access: ");
             debug_print_modifier_bit_flag(v->method.modifier);
             printf(", Return: ");
             if (v->method.return_type.primitive != JLT_MAX)
@@ -1672,6 +1674,7 @@ static void debug_print_definition(definition* v)
                 printf("%s", v->method.return_type.reference);
             }
             printf("\n");
+            debug_print_definition_pool(&v->method.local_variables);
             debug_print_cfg(&v->method.code);
             printf("\n");
             break;
@@ -1680,21 +1683,29 @@ static void debug_print_definition(definition* v)
             break;
         default:
             // no-op
-            printf(" (UNREGISTERED VALUE)\n");
+            printf("(UNREGISTERED VALUE)\n");
             break;
     }
 }
 
-static void debug_print_definitions(definition* v, size_t* cnt)
+static void debug_print_definition_pool(definition_pool* pool)
 {
-    for (size_t j = 0; v != NULL; j++)
+    printf("===== DEFINITION POOL =====\n");
+    printf("definition count: %zd\n", pool->num);
+    printf("pool memory size: %zd bytes\n",
+        sizeof(definition_pool) +
+        sizeof(definition*) * pool->size +
+        sizeof(definition) * pool->num
+    );
+
+    definition* v;
+
+    for (size_t i = 0; i < pool->num; i++)
     {
-        printf("[%zd](%p): ", j, v);
+        v = pool->arr[i];
+
+        printf("[%zd](%p): ", i, v);
         debug_print_definition(v);
-
-        if (cnt) { (*cnt)++; }
-
-        v = v->next;
     }
 }
 
@@ -1709,10 +1720,10 @@ static void debug_print_scope_frame_table(hash_table* table)
             while (p)
             {
                 // key
-                printf("    %s:\n      ", (char*)(p->key));
+                printf("    %s: ", (char*)(p->key));
 
                 // print all definitions of this name
-                debug_print_definitions(p->value, NULL);
+                debug_print_definition(p->value);
 
                 p = p->next;
             }
@@ -1818,28 +1829,11 @@ void debug_ir_lookup(java_ir* ir)
     }
 }
 
-void debug_print_definition_pool(java_ir* ir)
-{
-    size_t cnt = 0;
-
-    printf("===== DEFINITION POOL =====\n");
-
-    if (!ir->local_def_pool)
-    {
-        printf("(definition pool empty)\n");
-        return;
-    }
-
-    debug_print_definitions(ir->local_def_pool, &cnt);
-
-    printf(">>>>> SUMMARY <<<<<\n");
-    printf("definition count: %zd\n", cnt);
-    printf("pool memory size: %zd bytes\n", sizeof(definition) * cnt);
-}
-
 void debug_print_member_initialization(java_ir* ir)
 {
     printf("===== MEMBER INITIALIZATION =====\n");
+
+    debug_print_definition_pool(&ir->member_variables);
 
     if (!ir->code_member_init)
     {

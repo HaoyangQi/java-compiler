@@ -42,7 +42,7 @@ hash_table* lookup_new_scope(java_ir* ir, lookup_scope_type type)
  * care the order because we only book-keep the data so that code graphs can reference
  * from it
 */
-bool lookup_pop_scope(java_ir* ir, bool use_pool)
+bool lookup_pop_scope(java_ir* ir, definition_pool* pool)
 {
     scope_frame* top = ir->scope_stack_top;
 
@@ -51,7 +51,7 @@ bool lookup_pop_scope(java_ir* ir, bool use_pool)
     {
         hash_table* table = top->table;
 
-        if (use_pool)
+        if (pool)
         {
             for (size_t i = 0; i < table->bucket_size; i++)
             {
@@ -59,15 +59,9 @@ bool lookup_pop_scope(java_ir* ir, bool use_pool)
 
                 while (p)
                 {
-                    definition* local_def = p->value;
-
-                    // move definition to the pool
-                    local_def->next = ir->local_def_pool;
-                    ir->local_def_pool = local_def;
-
-                    // detach
+                    // move to pool
+                    definition_pool_add(pool, p->value);
                     p->value = NULL;
-
                     p = p->next;
                 }
             }
@@ -159,7 +153,6 @@ definition* new_definition(java_node_query type)
 
     v->type = type;
     v->def_count = 0;
-    v->next = NULL;
 
     switch (type)
     {
@@ -179,6 +172,7 @@ definition* new_definition(java_node_query type)
         case JNT_METHOD_DECL:
             v->method.modifier = JLT_UNDEFINED;
             __init_type_name(&v->method.return_type);
+            init_definition_pool(&v->method.local_variables);
             // no code CFG initialization here as parser will do it
             break;
         case JLT_LTR_NUMBER:
@@ -203,9 +197,9 @@ definition* new_definition(java_node_query type)
 /**
  * delete single definition
 */
-static definition* __definition_delete_single(definition* v)
+void definition_delete(definition* v)
 {
-    definition* n = v->next;
+    if (!v) { return; }
 
     switch (v->type)
     {
@@ -221,6 +215,7 @@ static definition* __definition_delete_single(definition* v)
             break;
         case JNT_METHOD_DECL:
             free(v->method.return_type.reference);
+            release_definition_pool(&v->method.local_variables);
             release_cfg(&v->method.code);
             break;
         case JLT_LTR_STRING:
@@ -236,25 +231,12 @@ static definition* __definition_delete_single(definition* v)
     }
 
     free(v);
-
-    return n;
-}
-
-/**
- * delete descriptor content
-*/
-void definition_delete(definition* v)
-{
-    while (v)
-    {
-        v = __definition_delete_single(v);
-    }
 }
 
 /**
  * copy single definition
 */
-definition* __definition_copy_single(definition* v)
+definition* definition_copy(definition* v)
 {
     definition* w = (definition*)malloc_assert(sizeof(definition));
 
@@ -279,38 +261,7 @@ definition* __definition_copy_single(definition* v)
             break;
     }
 
-    // clear pointer
-    w->next = NULL;
-
     return w;
-}
-
-/**
- * copy definition
-*/
-definition* definition_copy(definition* v)
-{
-    definition* head = NULL;
-    definition* cur = NULL;
-
-    while (v)
-    {
-        // if head is defined, so is cur
-        if (head)
-        {
-            cur->next = __definition_copy_single(v);
-            cur = cur->next;
-        }
-        else
-        {
-            cur = __definition_copy_single(v);
-            head = cur;
-        }
-
-        v = v->next;
-    }
-
-    return head;
 }
 
 /**

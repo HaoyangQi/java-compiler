@@ -23,6 +23,7 @@ void init_cfg_worker(cfg_worker* worker)
     worker->optimizer = NULL;
 
     init_cfg(worker->graph);
+    init_definition_pool(&worker->variables);
 }
 
 /**
@@ -38,8 +39,12 @@ void init_cfg_worker(cfg_worker* worker)
  * sufficient because of node and edge array, so we
  * simply make move target become the worker graph,
  * and wipe out worker graph data completely
+ *
+ * merge_to_pool: if set, the definition pool will be
+ * merged into an initialized pool, otherwise it will
+ * be released
 */
-void release_cfg_worker(cfg_worker* worker, cfg* move_to)
+void release_cfg_worker(cfg_worker* worker, cfg* move_to, definition_pool* merge_to_pool)
 {
     if (!worker) { return; }
 
@@ -53,8 +58,14 @@ void release_cfg_worker(cfg_worker* worker, cfg* move_to)
         release_cfg(worker->graph);
     }
 
+    if (merge_to_pool)
+    {
+        definition_pool_merge(merge_to_pool, &worker->variables);
+    }
+
     cfg_worker_ssa_release(worker);
     free(worker->graph);
+    release_definition_pool(&worker->variables);
 }
 
 /**
@@ -236,7 +247,7 @@ void cfg_worker_grow_with_graph(cfg_worker* dest, cfg_worker* src)
 
     // cleanup
     cfg_detach(src->graph);
-    release_cfg_worker(src, NULL);
+    release_cfg_worker(src, NULL, &dest->variables);
     free(src);
 }
 
