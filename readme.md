@@ -3,7 +3,7 @@
 A compiler architecture prototype that interprets a language based on Java.
 
 ## Open & Run The Project
-Visual Studio (2019) Toolchain for C/C++ is neededfor the project.
+Visual Studio (2019 and higher) Toolchain for C/C++ is neededfor the project.
 
 To open the project, run Visual Studio Developer Command Prompt in project root directory, and type `code .` to bring up Visual Studio Code.
 
