@@ -32,7 +32,11 @@ char* strmcpy_assert(const char* source)
         return NULL;
     }
 
-    char* s = (char*)malloc_assert(sizeof(char) * (strlen(source) + 1));
+    size_t len = strlen(source);
+    char* s = (char*)malloc_assert(sizeof(char) * (len + 1));
+
     strcpy(s, source);
+    s[len] = '\0';
+
     return s;
 }

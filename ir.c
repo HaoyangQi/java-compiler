@@ -4,25 +4,40 @@
 #define DEFINITION_POOL_GROW_FACTOR (2)
 
 /**
+ * import lookup deleter
+*/
+static void import_lookup_deleter(char* k, global_import* v)
+{
+    free(k);
+    delete_global_import(v);
+}
+
+/**
+ * top-level lookup deleter
+*/
+static void top_level_lookup_deleter(char* k, global_top_level* v)
+{
+    free(k);
+    delete_global_top_level(v);
+}
+
+/**
  * initialize semantic analysis
- *
- * code_member_init: no init for it here because it data section is only
- *                   a container for cfg worker
 */
 void init_ir(java_ir* ir, java_expression* expression, java_error_stack* error)
 {
+    ir->working_top_level = NULL;
     ir->scope_stack_top = NULL;
     ir->arch = NULL;
     ir->expression = expression;
     ir->error = error;
-    ir->code_member_init = NULL;
     ir->scope_workers = NULL;
     ir->statement_contexts = NULL;
 
-    init_hash_table(&ir->tbl_on_demand_packages, HASH_TABLE_DEFAULT_BUCKET_SIZE);
+    init_hash_table(&ir->tbl_import, HASH_TABLE_DEFAULT_BUCKET_SIZE);
+    init_hash_table(&ir->tbl_implicit_import, HASH_TABLE_DEFAULT_BUCKET_SIZE);
     init_hash_table(&ir->tbl_global, HASH_TABLE_DEFAULT_BUCKET_SIZE);
     init_hash_table(&ir->tbl_literal, HASH_TABLE_DEFAULT_BUCKET_SIZE);
-    init_definition_pool(&ir->member_variables);
 }
 
 /**
@@ -30,19 +45,16 @@ void init_ir(java_ir* ir, java_expression* expression, java_error_stack* error)
 */
 void release_ir(java_ir* ir)
 {
-    // delete on-demand import package names
-    release_hash_table(&ir->tbl_on_demand_packages, &pair_data_delete_key);
+    // delete import package names
+    release_hash_table(&ir->tbl_import, &import_lookup_deleter);
+    // delete implicit import names
+    release_hash_table(&ir->tbl_implicit_import, &import_lookup_deleter);
     // delete global name lookup
-    release_hash_table(&ir->tbl_global, &lookup_scope_deleter);
+    release_hash_table(&ir->tbl_global, &top_level_lookup_deleter);
     // delete literal lookup
-    release_hash_table(&ir->tbl_literal, &lookup_scope_deleter);
+    release_hash_table(&ir->tbl_literal, &definition_lookup_deleter);
     // delete entire lookup stack
     while (lookup_pop_scope(ir, NULL));
-    // delete member init code
-    release_cfg(ir->code_member_init);
-    free(ir->code_member_init);
-    // delete pool
-    release_definition_pool(&ir->member_variables);
 }
 
 /**
@@ -84,7 +96,7 @@ char* t2s(java_token* token)
 definition* t2d(hash_table* table, java_token* token)
 {
     char* registered_name = t2s(token);
-    definition* def = HT_STR2DEF(table, registered_name);
+    definition* def = shash_table_find(table, registered_name);
     free(registered_name);
 
     return def;
@@ -98,7 +110,7 @@ char* name_unit_concat(tree_node* from, tree_node* stop_before)
     string_list sl;
     char* s;
 
-    // construct package name list
+    // construct name list
     init_string_list(&sl);
     while (from != stop_before)
     {
@@ -106,7 +118,7 @@ char* name_unit_concat(tree_node* from, tree_node* stop_before)
         from = from->next_sibling;
     }
 
-    // now we concat the package name
+    // now we concat the name
     s = string_list_concat(&sl, ".");
     release_string_list(&sl);
 
@@ -293,4 +305,69 @@ void definition_pool_merge(definition_pool* dest, definition_pool* src)
 
     // lazy detach
     src->num = 0;
+}
+
+global_import* new_global_import()
+{
+    global_import* i = (global_import*)malloc_assert(sizeof(global_import));
+
+    i->package_name = NULL;
+
+    return i;
+}
+
+void delete_global_import(global_import* i)
+{
+    if (!i) { return; }
+
+    free(i->package_name);
+    free(i);
+}
+
+/**
+ * initialize a top-level descriptor
+ *
+ * NOTE: do NOT initialize code_member_init as it will be properly
+ *       handled in walk_class
+*/
+global_top_level* new_global_top_level(top_level_type type)
+{
+    global_top_level* top = (global_top_level*)malloc_assert(sizeof(global_top_level));
+
+    top->type = type;
+    top->modifier = JLT_RWD_PRIVATE;
+    top->extend = NULL;
+    top->implement = NULL;
+    top->num_implement = 0;
+    top->code_member_init = NULL;
+    top->node_top_level = NULL;
+
+    init_definition_pool(&top->member_init_variables);
+    init_hash_table(&top->tbl_member, HASH_TABLE_DEFAULT_BUCKET_SIZE);
+
+    return top;
+}
+
+void delete_global_top_level(global_top_level* top)
+{
+    if (!top) { return; }
+
+    // release all implement names
+    for (size_t i = 0; i < top->num_implement; i++)
+    {
+        free(top->implement[i]);
+    }
+
+    // delete member init code
+    release_definition_pool(&top->member_init_variables);
+    release_cfg(top->code_member_init);
+
+    // delete all members
+    release_hash_table(&top->tbl_member, &definition_lookup_deleter);
+
+    // cleanup
+    free(top->extend);
+    free(top->implement);
+    free(top->code_member_init);
+    free(top);
 }

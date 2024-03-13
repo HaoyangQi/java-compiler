@@ -20,8 +20,8 @@ static char* test_paths[] = {
     // "./test/class-decl-1.txt",
     // "./test/interface-decl-1.txt",
 
-    // "./test/simple.txt",
-    "./test/ssa.txt",
+    "./test/simple.txt",
+    // "./test/ssa.txt",
 
     // "./test/general-no-block-and-statement.txt",
 
@@ -68,8 +68,7 @@ int main(int argc, char* argv[])
         if (compile(&compiler, &arch, test_paths[i]))
         {
             debug_ast(&compiler.context);
-            debug_ir_on_demand_imports(&compiler.ir);
-            debug_print_member_initialization(&compiler.ir);
+            debug_print_global_import(&compiler.ir);
             debug_ir_global_names(&compiler.ir);
             debug_ir_literal(&compiler.ir);
             debug_ir_lookup(&compiler.ir);

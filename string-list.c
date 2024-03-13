@@ -16,6 +16,7 @@ void init_string_list(string_list* sl)
 {
     sl->first = NULL;
     sl->last = NULL;
+    sl->count = 0;
 }
 
 // delete entire list
@@ -31,9 +32,6 @@ void release_string_list(string_list* sl)
 
         e = sl->first;
     }
-
-    sl->first = NULL;
-    sl->last = NULL;
 }
 
 /**
@@ -62,6 +60,7 @@ void string_list_append(string_list* sl, void* str_data)
     }
 
     sl->last = e;
+    sl->count++;
 }
 
 // pop front
@@ -78,6 +77,7 @@ char* string_list_pop_front(string_list* sl)
     sl->first = e->next;
     free(e);
     sl->first->prev = NULL;
+    sl->count--;
 
     return s;
 }
@@ -105,4 +105,19 @@ char* string_list_concat(string_list* sl, const char* dlim)
     }
 
     return s;
+}
+
+// flatten into simple string array
+char** string_list_to_string_array(string_list* sl)
+{
+    string_list_item* e = sl->first;
+    char** arr = (char**)malloc_assert(sizeof(char*) * sl->count);
+
+    for (size_t i = 0; e != NULL; i++)
+    {
+        arr[i] = strmcpy_assert(e->s);
+        e = e->next;
+    }
+
+    return arr;
 }

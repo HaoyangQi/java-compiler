@@ -74,7 +74,7 @@ static reference* __interpret_operand(java_ir* ir, tree_node* base)
         }
         else if (token->class == JT_IDENTIFIER)
         {
-            __def = use(ir, content, DU_CTL_LOOKUP_GLOBAL, JAVA_E_REF_UNDEFINED);
+            __def = use(ir, content, DU_CTL_LOOKUP_TOP_LEVEL, JAVA_E_REF_UNDEFINED);
 
             ref->type = IR_ASN_REF_DEFINITION;
             ref->doi = __def;
@@ -528,7 +528,7 @@ void __execute_variable_declaration(java_ir* ir, tree_node* stmt)
     stmt = stmt->first_child;
 
     // get type definition
-    definition* type = type2def(stmt, JNT_VAR_DECL, JLT_UNDEFINED, false);
+    definition* type = type2def(stmt, DEFINITION_VARIABLE, JLT_UNDEFINED, false);
     definition* var;
     reference* lvalue;
     reference* operand;
@@ -887,7 +887,7 @@ void __execute_statement_for(java_ir* ir, tree_node* stmt)
     basic_block* test_expr_start; // loop-back node (NOT continue point!)
 
     // we need a scope for inits
-    lookup_new_scope(ir, LST_FOR);
+    lookup_new_scope(ir);
 
     // not sure what it is yet
     stmt = stmt->first_child;
@@ -1225,11 +1225,7 @@ static cfg_worker* walk_block(java_ir* ir, tree_node* block, bool use_new_scope)
     // prepare scope lookup
     if (use_new_scope)
     {
-        lookup_new_scope(ir, LST_NONE);
-    }
-    else
-    {
-        lookup_top_scope(ir);
+        lookup_new_scope(ir);
     }
 
     // prepare scope worker
@@ -1300,10 +1296,10 @@ void walk_method(java_ir* ir, tree_node* node)
     node = node->first_child;
 
     // begin scope
-    lookup_new_scope(ir, LST_METHOD);
+    lookup_new_scope(ir);
 
-    // on method, we only have global to lookup so no need to call use()
-    method_def = t2d(lookup_global_scope(ir), node->data->declarator.id.complex);
+    // on method, we only have top-level to lookup so no need to call use()
+    method_def = t2d(lookup_top_level_scope(ir), node->data->declarator.id.complex);
 
     // fill all parameter declarations
     def_params(ir, node->first_child);
@@ -1320,13 +1316,201 @@ void walk_method(java_ir* ir, tree_node* node)
     // release worker
     release_cfg_worker(worker, &method_def->method.code, &method_def->method.local_variables);
     free(worker);
+}
+
+/**
+ * walk "class declaration"
+ *
+ * since first pass is already performed in def_global,
+ * so in here we can know the tree of this top-level
+ * from global_top_level
+ *
+ * node: JNT_TOP_LEVEL
+*/
+void walk_class(java_ir* ir, global_top_level* class)
+{
+    // if ill-formed, no-op
+    if (!class) { return; }
+
+    hash_table* table = lookup_global_scope(ir);
+    tree_node* part = NULL;
+    tree_node* declaration = NULL;
+    definition* desc = NULL;
+    cfg_worker* worker = NULL;
+    reference* lvalue;
+    reference* operand;
+    cfg_worker member_init_worker;
+
+    init_cfg_worker(&member_init_worker);
+    lookup_top_level_begin(ir, class);
 
     /**
-     * TODO: we probably need a copy of member def to be moved into this one
-     * but... how to delete them? Because members are shared
-     *
-     * or... a better one: we simply reset version number for member def
-     * every time we run ssa_init on a method worker; we waste a bit of time
-     * but data is intact (no need to merge in this case, just use 2 pools)
+     * JNT_TOP_LEVEL                    <--- class->node_top_level
+     * |
+     * +--- JNT_CLASS_DECL
+     *      |
+     *      +--- JNT_CLASS_EXTENDS      <--- HERE
+     *      |    |
+     *      |    +--- Type
+     *      |
+     *      +--- JNT_CLASS_IMPLEMENTS
+     *      |    |
+     *      |    +--- JNT_INTERFACE_TYPE_LIST
+     *      |         |
+     *      |         +--- Type
+     *      |         |
+     *      |         +--- ...
+     *      |
+     *      +--- JNT_CLASS_BODY
+     *           |
+     *           +--- JNT_CLASS_BODY_DECL
+     *           |    |
+     *           |    +--- Type
+     *           |    |
+     *           |    +--- JNT_VAR_DECLARATORS | JNT_METHOD_DECL
+     *           |
+     *           +--- JNT_CLASS_BODY_DECL
+     *           |
+     *           +--- ...
     */
+    part = class->node_top_level->first_child->first_child;
+
+    // locate JNT_CLASS_BODY
+    while (part && part->type != JNT_CLASS_BODY)
+    {
+        part = part->next_sibling;
+    }
+
+    // reach first JNT_CLASS_BODY_DECL
+    part = part->first_child;
+
+    // code generation
+    while (part)
+    {
+        /**
+         * TODO: IR code generation for:
+         * 1. static initializer
+         * 2. constructor
+         * 3. member variable initializer
+         * 4. method block
+        */
+
+        // reach content
+        declaration = part->first_child;
+
+        if (declaration->type == JNT_STATIC_INIT)
+        {
+            /**
+             * TODO: static initializer
+            */
+        }
+        else if (declaration->type == JNT_CTOR_DECL)
+        {
+            /**
+             * TODO: constructor
+            */
+        }
+        else if (declaration->type == JNT_TYPE)
+        {
+            if (declaration->next_sibling->type == JNT_VAR_DECLARATORS)
+            {
+                declaration = declaration->next_sibling->first_child;
+
+                // we only have global to lookup so no need to call use()
+                desc = t2d(table, declaration->data->declarator.id.complex);
+
+                // reach initializer
+                declaration = declaration->first_child;
+
+                // create variable data chunk ref
+                lvalue = new_reference(IR_ASN_REF_DEFINITION, desc);
+
+                if (declaration)
+                {
+                    // if has a child, then it is the initializer
+                    if (declaration->type == JNT_EXPRESSION)
+                    {
+                        // parse right side
+                        push_scope_worker(ir);
+                        walk_expression(ir, declaration);
+
+                        // prepare assignment code
+                        worker = get_scope_worker(ir);
+                        operand = new_reference(IR_ASN_REF_INSTRUCTION, worker->cur_blk->inst_last);
+
+                        // add assignment code
+                        cfg_worker_next_asn_strategy(TSW(ir), true);
+                        cfg_worker_execute(ir, worker, IROP_ASN, &lvalue, &operand, NULL);
+
+                        // cleanup
+                        delete_reference(operand);
+
+                        // merge code
+                        worker = pop_scope_worker(ir);
+                        cfg_worker_grow_with_graph(&member_init_worker, worker);
+                    }
+                    else if (declaration->type == JNT_ARRAY_INIT)
+                    {
+                        /**
+                         * TODO: array (of expression) init code
+                        */
+                    }
+                }
+                else
+                {
+                    /**
+                     * otherwise we insert a dummy code, indicate that
+                     * the variable is defined here and some initialization required
+                    */
+                    cfg_worker_execute(ir, &member_init_worker, IROP_INIT, &lvalue, NULL, NULL);
+                }
+
+                // cleanup
+                delete_reference(lvalue);
+            }
+            else if (declaration->next_sibling->type == JNT_METHOD_DECL)
+            {
+                /**
+                 * type
+                 * |
+                 * method declaration    <--- HERE
+                */
+                walk_method(ir, declaration->next_sibling);
+            }
+        }
+
+        part = part->next_sibling;
+    }
+
+    // cleanup
+
+    if (cfg_empty(member_init_worker.graph))
+    {
+        release_cfg_worker(&member_init_worker, NULL, NULL);
+    }
+    else
+    {
+        // no init, just need a memory chunk here
+        class->code_member_init = new_cfg_container();
+        release_cfg_worker(&member_init_worker, class->code_member_init, &class->member_init_variables);
+    }
+
+    lookup_top_level_end(ir);
+}
+
+/**
+ * TODO:contextualize "interface declaration"
+*/
+void walk_interface(java_ir* ir, global_top_level* interface)
+{
+    // if ill-formed, no-op
+    if (!interface) { return; }
+
+    lookup_top_level_begin(ir, interface);
+
+    /**
+     * TODO:
+    */
+
+    lookup_top_level_end(ir);
 }

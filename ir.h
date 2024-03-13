@@ -13,9 +13,6 @@
 #include "string-list.h"
 #include "number.h"
 
-// hash table mapping string->definition wrapper
-#define HT_STR2DEF(t, s) ((definition*)shash_table_find(t, s))
-
 // fast top scope worker getter (no NULL check)
 #define TSW(ir) ((ir)->scope_workers->worker)
 
@@ -30,8 +27,8 @@
  *  bit |
  * -----+
  *   1  | copy data (default move)
- *   2  | lookup global scope (default no global lookup)
- *   3  | reserved
+ *   2  | lookup top-level scope
+ *   3  | method name: allow class name
  *   4  | reserved
  *   5  | reserved
  *   6  | reserved
@@ -42,31 +39,8 @@ typedef unsigned char def_use_control;
 
 #define DU_CTL_DEFAULT (0)
 #define DU_CTL_DATA_COPY (0x01)
-#define DU_CTL_LOOKUP_GLOBAL (0x02)
-
-/**
- * scope type
- *
- * LST_NONE: a generic scope with no header
- * we do not mark "switch" because its scope
- * does not allow symbol creation
-*/
-typedef enum
-{
-    LST_COMPILATION_UNIT,
-    LST_CLASS,
-    LST_INTERFACE,
-    LST_METHOD,
-    LST_NONE, // just a scope, no header
-    LST_IF,
-    LST_ELSE,
-    LST_FOR,
-    LST_WHILE,
-    LST_DO,
-    LST_TRY,
-    LST_CATCH,
-    LST_FINALLY,
-} lookup_scope_type;
+#define DU_CTL_LOOKUP_TOP_LEVEL (0x02)
+#define DU_CTL_METHOD_NAME (0x04)
 
 /**
  * Symbol Lookup Hierarchy
@@ -81,9 +55,6 @@ typedef enum
 */
 typedef struct _scope_frame
 {
-    // scope identifier
-    lookup_scope_type type;
-
     /**
      * TYPE: hash_table<char*, definition*>
     */
@@ -328,45 +299,32 @@ typedef struct
 } definition_pool;
 
 /**
+ * definition type
+ *
+*/
+typedef enum
+{
+    DEFINITION_VARIABLE,
+    DEFINITION_METHOD,
+    DEFINITION_NUMBER,
+    DEFINITION_CHARACTER,
+    DEFINITION_BOOLEAN,
+    DEFINITION_NULL,
+    DEFINITION_STRING,
+} definition_type;
+
+/**
  * scope lookup table value descriptor
  *
  * here we use node type for further classification
 */
 typedef struct _definition
 {
-    java_node_query type;
+    definition_type type;
     size_t def_count;
 
     union
     {
-        struct
-        {
-            // package name string
-            char* package_name;
-        } import;
-
-        struct
-        {
-            // modifier
-            lbit_flag modifier;
-            // max one super class allowed
-            char* extend;
-            // a list of names, separated by ','
-            char* implement;
-        } class;
-
-        struct
-        {
-            // max one super interface allowed
-            char* extend;
-        } interface;
-
-        struct
-        {
-            // modifier
-            lbit_flag modifier;
-        } constructor;
-
         struct
         {
             // if it is a member variable
@@ -509,22 +467,89 @@ typedef struct __statement_context
 } statement_context;
 
 /**
- * Top Level of Semantics
+ * Global Definition: Import Name
  *
- * on top level, each method occupies a tree of blocks
- * additionally, member initializers will occupy a
- * tree;
- *
- * all code graphs should be NULL by default
+ * for on-demand imports, key is package name, so
+ * this object is redundant
 */
 typedef struct
 {
-    // on-demand import package names
-    hash_table tbl_on_demand_packages;
-    // other global names
+    char* package_name;
+} global_import;
+
+/**
+ * Top Level Type
+*/
+typedef enum
+{
+    TOP_LEVEL_CLASS = 0,
+    TOP_LEVEL_INTERFACE = 1,
+} top_level_type;
+
+/**
+ * Global Definition: Top Level
+ *
+ * we need to preserve all names because a
+ * top level mey be referenced by others so
+ * we need to export them
+ *
+ * node_top_level: only used as a quick access after
+ *                 def_global, will not be used
+ *                 during serialization process
+ *
+*/
+typedef struct
+{
+    // top level type
+    top_level_type type;
+    // modifier
+    lbit_flag modifier;
+    // super (only one super allowed)
+    char* extend;
+    // a list of implement names
+    char** implement;
+    // number of implement names
+    size_t num_implement;
+    // variable pool for member initialization code
+    definition_pool member_init_variables;
+    // member initialization code
+    cfg* code_member_init;
+    // member definitions: map<string, definition*>
+    hash_table tbl_member;
+
+    // JNT_TOP_LEVEL node reference
+    tree_node* node_top_level;
+} global_top_level;
+
+/**
+ * Compilation Unit Abstraction
+ *
+ * tbl_import: all import names, it maps from class name to package name
+ *             for on-demand: it maps from package name to NULL
+ *
+ * tbl_implicit_import: all implicit import names that requires on-demand
+ *                      import to resolve, those names show up in code,
+ *                      but not listed in specific import statements
+ *
+ * tbl_global: top level implementation, it maps from the name to the
+ *             descriptor global_top_level
+ *
+ * tbl_literal: all literal data appeared in this file, it maps the
+ *              string content to the binary data
+*/
+typedef struct
+{
+    // imports: map<string, global_import*>
+    hash_table tbl_import;
+    // implicit imports: map<string, NULL>
+    hash_table tbl_implicit_import;
+    // top level: map<string, global_top_level*>
     hash_table tbl_global;
-    // literal lookup table
+    // literal: map<string, definition*>
     hash_table tbl_literal;
+
+    // current top level
+    global_top_level* working_top_level;
     // stack top symbol lookup
     scope_frame* scope_stack_top;
     // scope worker context stack
@@ -538,11 +563,6 @@ typedef struct
     java_expression* expression;
     // error data
     java_error_stack* error;
-
-    // member declarator initialization code
-    cfg* code_member_init;
-    // member variable definition pool
-    definition_pool member_variables;
 } java_ir;
 
 char* t2s(java_token* token);
@@ -565,6 +585,12 @@ void definition_pool_grow(definition_pool* pool, size_t by);
 void definition_pool_add(definition_pool* pool, definition* def);
 void definition_pool_merge(definition_pool* dest, definition_pool* src);
 
+global_import* new_global_import();
+void delete_global_import(global_import* i);
+
+global_top_level* new_global_top_level(top_level_type type);
+void delete_global_top_level(global_top_level* top);
+
 void push_scope_worker(java_ir* ir);
 cfg_worker* get_scope_worker(java_ir* ir);
 cfg_worker* pop_scope_worker(java_ir* ir);
@@ -573,17 +599,19 @@ statement_context* push_statement_context(java_ir* ir, statement_context_query t
 statement_context* get_statement_context(java_ir* ir, statement_context_query query);
 void pop_statement_context(java_ir* ir);
 
-void lookup_scope_deleter(char* k, definition* v);
-hash_table* lookup_new_scope(java_ir* ir, lookup_scope_type type);
+void definition_lookup_deleter(char* k, definition* v);
+hash_table* lookup_new_scope(java_ir* ir);
 bool lookup_pop_scope(java_ir* ir, definition_pool* pool);
 hash_table* lookup_global_scope(java_ir* ir);
+hash_table* lookup_top_level_scope(java_ir* ir);
 hash_table* lookup_working_scope(java_ir* ir);
-hash_table* lookup_top_scope(java_ir* ir);
+void lookup_top_level_begin(java_ir* ir, global_top_level* desc);
+void lookup_top_level_end(java_ir* ir);
 bool lookup_register(
     java_ir* ir,
     hash_table* table,
     char** name,
-    definition** desc,
+    void** desc,
     java_error_id err
 );
 
@@ -619,20 +647,18 @@ definition* def_li_raw(
 );
 definition* type2def(
     tree_node* node,
-    java_node_query type,
+    definition_type type,
     lbit_flag modifier,
     bool is_member
 );
 definition* def_var(java_ir* ir, tree_node* node, definition** type, def_use_control duc, bool is_member);
 void def_vars(java_ir* ir, tree_node* node, lbit_flag modifier, bool is_member);
 void def_params(java_ir* ir, tree_node* node);
-void def_method(java_ir* ir, tree_node* node, lbit_flag modifier);
-void def_class(java_ir* ir, tree_node* node);
+void def_global(java_ir* ir, tree_node* compilation_unit);
 
-definition* new_definition(java_node_query type);
+definition* new_definition(definition_type type);
 void definition_delete(definition* v);
 definition* definition_copy(definition* v);
-bool is_definition_valid(const definition* d);
 
 void edge_array_resize(edge_array* edges, size_t by);
 void node_array_resize(node_array* nodes, size_t by);
@@ -701,8 +727,8 @@ instruction* instruction_pop_back(basic_block* node);
 bool instruction_push_front(basic_block* node, instruction* inst);
 instruction* instruction_locate_enclosure_start(instruction* inst);
 
-void walk_expression(java_ir* ir, tree_node* expression);
-void walk_method(java_ir* ir, tree_node* node);
+void walk_class(java_ir* ir, global_top_level* class);
+void walk_interface(java_ir* ir, global_top_level* interface);
 
 void init_ir(java_ir* ir, java_expression* expression, java_error_stack* error);
 void release_ir(java_ir* ir);

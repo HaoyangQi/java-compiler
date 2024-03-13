@@ -3,6 +3,10 @@
 /**
  * hierarchical name register routine
  *
+ * NOTE: import scope and global scope will be enforced
+ *       during lookup because they are global names
+ *       that are reserved across entire compilation unit
+ *
  * if name has conflict, funtions ignores def_data_control
  * and keeps type_def as-is;
  * otherwise type_def will be set to NULL if data control is
@@ -27,15 +31,41 @@ definition* def(
 )
 {
     // test if declarator can be registered
-    if (use(ir, *name, duc, JAVA_E_MAX) != NULL)
+    if (use(ir, *name, duc, JAVA_E_MAX) || shash_table_get(&ir->tbl_import, *name))
     {
         ir_error(ir, err_dup);
         return NULL;
     }
+    else
+    {
+        /**
+         * global condition is a bit tricky due to constructor
+         *
+         * method name can have same name as the class name that
+         * is currently scoping. In this case this method is a
+         * constructor
+        */
+        hash_pair* __p = shash_table_get(&ir->tbl_global, *name);
+
+        if (__p && !(
+            __p->value == ir->working_top_level &&
+            ir->working_top_level->type == TOP_LEVEL_CLASS &&
+            (duc & DU_CTL_METHOD_NAME)))
+        {
+            ir_error(ir, err_dup);
+            return NULL;
+        }
+    }
 
     hash_table* table = lookup_working_scope(ir);
     bool copy_def = duc & DU_CTL_DATA_COPY;
-    definition* tdef = copy_def ? definition_copy(*type_def) : *type_def;
+    definition* tdef = NULL;
+
+    // only assign when parameter is not NULL
+    if (type_def)
+    {
+        tdef = copy_def ? definition_copy(*type_def) : *type_def;
+    }
 
     // register
     shash_table_insert(table, *name, tdef);
@@ -44,7 +74,7 @@ definition* def(
     *name = NULL;
 
     // only detach if the reference is moved successfully
-    if (!copy_def)
+    if (!copy_def && type_def)
     {
         *type_def = NULL;
     }
@@ -77,16 +107,25 @@ definition* def(
 /**
  * hierarchical name lookup routine
  *
- * NOTE: on-demand imports are not checked here, meaning definitions
- * are prioritized local definitions, and during linking, names
- * will be imported and check for ambiguity
+ * it uses a name, and when it is used, it means lookup in global
+ * and import scope is unecessary, because they do not consist
+ * valid name to "use"
  *
- * node: variable declarator
+ * NOTE: on-demand imports are not checked here, meaning definitions
+ * are prioritized as local definitions, and during linking, names
+ * will be imported and check for ambiguity
 */
 definition* use(java_ir* ir, const char* name, def_use_control duc, java_error_id err_undef)
 {
     scope_frame* cur = ir->scope_stack_top;
+    hash_table* top_level = lookup_top_level_scope(ir);
     hash_pair* p;
+
+    // nothing to look for
+    if (!cur && !top_level)
+    {
+        return NULL;
+    }
 
     // first we go through hierarchy
     while (cur)
@@ -101,10 +140,10 @@ definition* use(java_ir* ir, const char* name, def_use_control duc, java_error_i
         cur = cur->next;
     }
 
-    // if nothing we try global
-    if (duc & DU_CTL_LOOKUP_GLOBAL)
+    // if nothing we try top level
+    if (duc & DU_CTL_LOOKUP_TOP_LEVEL)
     {
-        p = shash_table_get(&ir->tbl_global, name);
+        p = shash_table_get(top_level, name);
     }
 
     // error check
@@ -152,27 +191,27 @@ definition* def_li(
     switch (token_type)
     {
         case JLT_LTR_NUMBER:
-            v = new_definition(JLT_LTR_NUMBER);
+            v = new_definition(DEFINITION_NUMBER);
             v->li_number.type = r2p(ir, *content, &bin, token_type, num_type, num_bits);
             v->li_number.imm = bin.number;
             break;
         case JLT_LTR_CHARACTER:
-            v = new_definition(JLT_LTR_CHARACTER);
+            v = new_definition(DEFINITION_CHARACTER);
             v->li_number.type = r2p(ir, *content, &bin, token_type, num_type, num_bits);
             v->li_number.imm = bin.number;
             break;
         case JLT_RWD_TRUE:
         case JLT_RWD_FALSE:
-            v = new_definition(JLT_RWD_BOOLEAN);
+            v = new_definition(DEFINITION_BOOLEAN);
             v->li_number.type = r2p(ir, *content, &bin, token_type, num_type, num_bits);
             v->li_number.imm = bin.number;
             break;
         case JLT_RWD_NULL:
             // NULL has no aux data
-            v = new_definition(JLT_RWD_NULL);
+            v = new_definition(DEFINITION_NULL);
             break;
         case JLT_LTR_STRING:
-            v = new_definition(JLT_LTR_STRING);
+            v = new_definition(DEFINITION_STRING);
             r2p(ir, *content, &bin, token_type, num_type, num_bits);
             v->li_string.stream = bin.stream;
             v->li_string.length = bin.len;
@@ -218,6 +257,8 @@ definition* def_li_raw(
 /**
  * interpret "type"
  *
+ * TODO: resolve type and import meta
+ *
  * it returns a definition regarding the type
  * modifier is optional, pass JLT_UNDEFINED
  * as "no modifier specified"
@@ -226,7 +267,7 @@ definition* def_li_raw(
 */
 definition* type2def(
     tree_node* node,
-    java_node_query type,
+    definition_type type,
     lbit_flag modifier,
     bool is_member
 )
@@ -235,7 +276,7 @@ definition* type2def(
 
     switch (type)
     {
-        case JNT_VAR_DECL:
+        case DEFINITION_VARIABLE:
             desc->variable.is_class_member = is_member;
             desc->variable.modifier = modifier;
             desc->variable.type.primitive = node->data->declarator.id.simple;
@@ -248,7 +289,7 @@ definition* type2def(
                 desc->variable.type.reference = name_unit_concat(node->first_child->first_child, NULL);
             }
             break;
-        case JNT_METHOD_DECL:
+        case DEFINITION_METHOD:
             desc->method.modifier = modifier;
             desc->method.return_type.primitive = node->data->declarator.id.simple;
             desc->method.return_type.dim = node->data->declarator.dimension;
@@ -286,7 +327,7 @@ definition* def_var(java_ir* ir, tree_node* node, definition** type, def_use_con
     definition* data = def(
         ir, &name, type,
         node->data->declarator.dimension,
-        duc | DU_CTL_LOOKUP_GLOBAL,
+        duc | DU_CTL_LOOKUP_TOP_LEVEL,
         is_member ? JAVA_E_MEMBER_VAR_DUPLICATE : JAVA_E_LOCAL_VAR_DUPLICATE,
         is_member ? JAVA_E_MEMBER_VAR_DIM_AMBIGUOUS : JAVA_E_LOCAL_VAR_DIM_AMBIGUOUS,
         is_member ? JAVA_E_MEMBER_VAR_DIM_DUPLICATE : JAVA_E_LOCAL_VAR_DIM_DUPLICATE
@@ -319,7 +360,7 @@ definition* def_var(java_ir* ir, tree_node* node, definition** type, def_use_con
 */
 void def_vars(java_ir* ir, tree_node* node, lbit_flag modifier, bool is_member)
 {
-    definition* desc = type2def(node, JNT_VAR_DECL, modifier, is_member);
+    definition* desc = type2def(node, DEFINITION_VARIABLE, modifier, is_member);
 
     // first JNT_VAR_DECL
     node = node->next_sibling->first_child;
@@ -365,7 +406,7 @@ void def_params(java_ir* ir, tree_node* node)
 
     while (node)
     {
-        definition* desc = type2def(node->first_child, JNT_VAR_DECL, JLT_UNDEFINED, false);
+        definition* desc = type2def(node->first_child, DEFINITION_VARIABLE, JLT_UNDEFINED, false);
         char* name = t2s(node->data->declarator.id.complex);
 
         /**
@@ -393,19 +434,14 @@ void def_params(java_ir* ir, tree_node* node)
 /**
  * register a method in lookup table
  *
- * TODO: method overloadiing
+ * TODO: method overloading
  * we need name mangling algorithm to encode parameter types into name string
  *
  * node: JNT_TYPE---JNT_METHOD_DECL
 */
-void def_method(java_ir* ir, tree_node* node, lbit_flag modifier)
+static void def_method(java_ir* ir, tree_node* node, lbit_flag modifier)
 {
-    definition* desc = type2def(
-        node,
-        JNT_METHOD_DECL,
-        modifier,
-        true
-    );
+    definition* desc = type2def(node, DEFINITION_METHOD, modifier, true);
 
     /**
      * type
@@ -430,7 +466,7 @@ void def_method(java_ir* ir, tree_node* node, lbit_flag modifier)
     def(
         ir, &name, &desc,
         node->data->declarator.dimension,
-        DU_CTL_LOOKUP_GLOBAL,
+        DU_CTL_LOOKUP_TOP_LEVEL | DU_CTL_METHOD_NAME,
         JAVA_E_METHOD_DUPLICATE,
         JAVA_E_METHOD_DIM_AMBIGUOUS,
         JAVA_E_METHOD_DIM_DUPLICATE
@@ -439,6 +475,83 @@ void def_method(java_ir* ir, tree_node* node, lbit_flag modifier)
     // cleanup
     free(name);
     definition_delete(desc);
+}
+
+/**
+ * contextualize "import"
+ *
+ * node: JNT_IMPORT_DECL
+*/
+static void def_import(java_ir* ir, tree_node* node)
+{
+    global_import* desc;
+    hash_pair* pair;
+    tree_node* name = node->first_child;
+    tree_node* last_unit = NULL;
+    char* registered_name = NULL;
+    char* pkg_name = NULL;
+
+    /**
+     * JNT_IMPORT_DECL
+     * |
+     * +--- Name
+     *      |
+     *      +--- Unit
+     *      |
+     *      +--- Unit
+     *      |
+     *      +--- ...
+    */
+    if (!node->data->import.on_demand)
+    {
+        // last name unit is the import target
+        last_unit = name->last_child;
+        registered_name = t2s(last_unit->data->id.complex);
+    }
+
+    // construct package name list
+    pkg_name = name_unit_concat(name->first_child, last_unit);
+
+    // register the class name if applicable
+    if (registered_name)
+    {
+        desc = new_global_import();
+        desc->package_name = pkg_name;
+    }
+    else
+    {
+        desc = NULL;
+        registered_name = pkg_name;
+    }
+
+    // name resolution must be unique
+    if (!lookup_register(ir, &ir->tbl_import, &registered_name, &desc, JAVA_E_MAX))
+    {
+        pair = shash_table_get(&ir->tbl_import, registered_name);
+
+        /**
+         * duplicate only happen when both are:
+         * 1. on-demand, OR
+         * 2. regular import
+         *
+         * AND
+         *
+         * the package name matches
+        */
+        if (((desc == NULL) == (pair->value == NULL)) &&
+            strcmp(pair->value ? ((global_import*)pair->value)->package_name : pair->key, pkg_name) == 0)
+        {
+            ir_error(ir, JAVA_E_IMPORT_DUPLICATE);
+        }
+        else
+        {
+            ir_error(ir, JAVA_E_IMPORT_AMBIGUOUS);
+        }
+    }
+
+    // cleanup: no need to free pkg_name as it was already moved
+    free(registered_name);
+    delete_global_import(desc);
 }
 
 /**
@@ -457,15 +570,8 @@ void def_method(java_ir* ir, tree_node* node, lbit_flag modifier)
  *
  * node: JNT_TOP_LEVEL
 */
-void def_class(java_ir* ir, tree_node* node)
+static void def_class(java_ir* ir, tree_node* node)
 {
-    hash_table* table = lookup_global_scope(ir);
-    definition* desc = NULL;
-    tree_node* part = NULL;
-    tree_node* probe = NULL;
-    string_list sl;
-    char* registered_name = NULL;
-
     /**
      * JNT_TOP_LEVEL
      * |
@@ -495,14 +601,16 @@ void def_class(java_ir* ir, tree_node* node)
      *           |
      *           +--- ...
     */
-    part = node->first_child;
+    tree_node* part = node->first_child;
+    tree_node* probe;
 
-    // get class name
-    registered_name = t2s(part->data->id.complex);
+    global_top_level* desc = new_global_top_level(TOP_LEVEL_CLASS);
+    char* registered_name = t2s(part->data->id.complex);
+    string_list sl;
 
     // definition data
-    desc = new_definition(JNT_CLASS_DECL);
-    desc->class.modifier = node->data->top_level_declaration.modifier;
+    desc->node_top_level = node;
+    desc->modifier = node->data->top_level_declaration.modifier;
 
     // [extends, implements, body]
     part = part->first_child;
@@ -511,7 +619,7 @@ void def_class(java_ir* ir, tree_node* node)
     if (part && part->type == JNT_CLASS_EXTENDS)
     {
         // extends->classtype->unit
-        desc->class.extend = name_unit_concat(part->first_child->first_child, NULL);
+        desc->extend = name_unit_concat(part->first_child->first_child, NULL);
         part = part->next_sibling;
     }
 
@@ -530,16 +638,29 @@ void def_class(java_ir* ir, tree_node* node)
         }
 
         // concat all names
-        desc->class.implement = string_list_concat(&sl, ",");
+        desc->implement = string_list_to_string_array(&sl);
+        desc->num_implement = sl.count;
         release_string_list(&sl);
 
         part = part->next_sibling;
     }
 
-    // class register & cleanup
-    lookup_register(ir, table, &registered_name, &desc, JAVA_E_CLASS_NAME_DUPLICATE);
-    free(registered_name);
-    definition_delete(desc);
+    // setup lookup hierarchy
+    lookup_top_level_begin(ir, desc);
+
+    // class register with import name conflict check
+    if (shash_table_get(&ir->tbl_import, registered_name) ||
+        !lookup_register(ir, lookup_global_scope(ir), &registered_name, &desc, JAVA_E_MAX))
+    {
+        ir_error(ir, JAVA_E_CLASS_NAME_DUPLICATE);
+
+        free(registered_name);
+        delete_global_top_level(desc);
+        lookup_top_level_end(ir);
+
+        // no need to continue as a conflict is found
+        return;
+    }
 
     // now we must have class body
     // otherwise it should not pass syntax parser
@@ -578,5 +699,83 @@ void def_class(java_ir* ir, tree_node* node)
         }
 
         part = part->next_sibling;
+    }
+
+    // cleanup
+    lookup_top_level_end(ir);
+}
+
+/**
+ * TODO:contextualize "interface declaration"
+ *
+ * parse an interface and all definitions within
+ *
+ * node: JNT_TOP_LEVEL
+*/
+static void def_interface(java_ir* ir, tree_node* node)
+{
+    global_top_level* desc = new_global_top_level(TOP_LEVEL_INTERFACE);
+
+    desc->node_top_level = node;
+
+    // setup lookup hierarchy
+    lookup_top_level_begin(ir, desc);
+
+    /**
+     * TODO:
+    */
+
+    // cleanup
+    lookup_top_level_end(ir);
+}
+
+/**
+ * Register all global definition
+ *
+ * node: JNT_UNIT
+*/
+void def_global(java_ir* ir, tree_node* compilation_unit)
+{
+    /**
+     * JNT_UNIT
+     * |
+     * +--- [JNT_PKG_DECL]
+     * |
+     * +--- {JNT_IMPORT_DECL}
+     * |
+     * +--- {JNT_CLASS_DECL|JNT_INTERFACE_DECL}
+    */
+    tree_node* node = compilation_unit->first_child;
+
+    // package
+    if (node && node->type == JNT_PKG_DECL)
+    {
+        /**
+         * TODO: handle pkg decl
+        */
+        node = node->next_sibling;
+    }
+
+    // imports
+    while (node && node->type == JNT_IMPORT_DECL)
+    {
+        def_import(ir, node);
+        node = node->next_sibling;
+    }
+
+    // top-levels
+    while (node && node->type == JNT_TOP_LEVEL)
+    {
+        // handle top level
+        if (node->first_child->type == JNT_CLASS_DECL)
+        {
+            def_class(ir, node);
+        }
+        else
+        {
+            def_interface(ir, node);
+        }
+
+        node = node->next_sibling;
     }
 }
