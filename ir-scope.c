@@ -3,10 +3,8 @@
 /**
  * lookup hierarchy table pair deleter
  *
- * TODO: we may need delete routine for semantic_variable_descriptor in the
- * future
 */
-void lookup_scope_deleter(char* k, definition* v)
+void definition_lookup_deleter(char* k, definition* v)
 {
     free(k);
     definition_delete(v);
@@ -15,12 +13,11 @@ void lookup_scope_deleter(char* k, definition* v)
 /**
  * push a new lookup node
 */
-hash_table* lookup_new_scope(java_ir* ir, lookup_scope_type type)
+hash_table* lookup_new_scope(java_ir* ir)
 {
     scope_frame* scope = (scope_frame*)malloc_assert(sizeof(scope_frame));
 
     // init
-    scope->type = type;
     scope->table = (hash_table*)malloc_assert(sizeof(hash_table));
     init_hash_table(scope->table, HASH_TABLE_DEFAULT_BUCKET_SIZE);
 
@@ -68,7 +65,7 @@ bool lookup_pop_scope(java_ir* ir, definition_pool* pool)
         }
 
         // release table
-        release_hash_table(top->table, &lookup_scope_deleter);
+        release_hash_table(top->table, &definition_lookup_deleter);
         free(top->table);
         ir->scope_stack_top = top->next;
         free(top);
@@ -80,7 +77,9 @@ bool lookup_pop_scope(java_ir* ir, definition_pool* pool)
 }
 
 /**
- * get current scope
+ * get current global scope
+ *
+ * TYPE: map<string, global_top_level*>
 */
 hash_table* lookup_global_scope(java_ir* ir)
 {
@@ -88,19 +87,43 @@ hash_table* lookup_global_scope(java_ir* ir)
 }
 
 /**
- * get hierarchical scope
+ * get current top-level scope
+ *
+ * TYPE: global_top_level.tbl_member: map<string, definition*>
 */
-hash_table* lookup_working_scope(java_ir* ir)
+hash_table* lookup_top_level_scope(java_ir* ir)
 {
-    return ir->scope_stack_top ? ir->scope_stack_top->table : &ir->tbl_global;
+    return ir->working_top_level ? &ir->working_top_level->tbl_member : NULL;
 }
 
 /**
- * get current scope
+ * get hierarchical scope
+ *
+ * TYPE: map<string, definition*>
+ *
+ * all definitions can go as high as ir->working_top_level, global
+ * is higher but it only stores reserved names (global_top_level)
+ * instead of definitions
 */
-hash_table* lookup_top_scope(java_ir* ir)
+hash_table* lookup_working_scope(java_ir* ir)
 {
-    return ir->scope_stack_top->table;
+    return ir->scope_stack_top ? ir->scope_stack_top->table : lookup_top_level_scope(ir);
+}
+
+/**
+ * attach top level definition to lookup hierarchy
+*/
+void lookup_top_level_begin(java_ir* ir, global_top_level* desc)
+{
+    ir->working_top_level = desc;
+}
+
+/**
+ * detach top level definition from lookup hierarchy
+*/
+void lookup_top_level_end(java_ir* ir)
+{
+    ir->working_top_level = NULL;
 }
 
 static void __init_type_name(type_name* t)
@@ -123,7 +146,7 @@ bool lookup_register(
     java_ir* ir,
     hash_table* table,
     char** name,
-    definition** desc,
+    void** desc,
     java_error_id err
 )
 {
@@ -147,7 +170,7 @@ bool lookup_register(
 /**
  * generate definition instance
 */
-definition* new_definition(java_node_query type)
+definition* new_definition(definition_type type)
 {
     definition* v = (definition*)malloc_assert(sizeof(definition));
 
@@ -156,37 +179,29 @@ definition* new_definition(java_node_query type)
 
     switch (type)
     {
-        case JNT_IMPORT_DECL:
-            v->import.package_name = NULL;
-            break;
-        case JNT_CLASS_DECL:
-            v->class.modifier = JLT_UNDEFINED;
-            v->class.extend = NULL;
-            v->class.implement = NULL;
-            break;
-        case JNT_VAR_DECL:
+        case DEFINITION_VARIABLE:
             v->variable.is_class_member = false;
             v->variable.modifier = JLT_UNDEFINED;
             __init_type_name(&v->variable.type);
             break;
-        case JNT_METHOD_DECL:
+        case DEFINITION_METHOD:
             v->method.modifier = JLT_UNDEFINED;
             __init_type_name(&v->method.return_type);
             init_definition_pool(&v->method.local_variables);
             // no code CFG initialization here as parser will do it
             break;
-        case JLT_LTR_NUMBER:
-        case JLT_RWD_BOOLEAN:
-        case JLT_LTR_CHARACTER:
+        case DEFINITION_NUMBER:
+        case DEFINITION_BOOLEAN:
+        case DEFINITION_CHARACTER:
             v->li_number.type = IRPV_MAX;
             v->li_number.imm = 0;
             break;
-        case JLT_LTR_STRING:
+        case DEFINITION_STRING:
             v->li_string.stream = NULL;
             v->li_string.length = 0;
             v->li_string.wide_char = false;
             break;
-        case JLT_RWD_NULL:
+        case DEFINITION_NULL:
         default:
             break;
     }
@@ -203,28 +218,21 @@ void definition_delete(definition* v)
 
     switch (v->type)
     {
-        case JNT_IMPORT_DECL:
-            free(v->import.package_name);
-            break;
-        case JNT_CLASS_DECL:
-            free(v->class.extend);
-            free(v->class.implement);
-            break;
-        case JNT_VAR_DECL:
+        case DEFINITION_VARIABLE:
             free(v->variable.type.reference);
             break;
-        case JNT_METHOD_DECL:
+        case DEFINITION_METHOD:
             free(v->method.return_type.reference);
             release_definition_pool(&v->method.local_variables);
             release_cfg(&v->method.code);
             break;
-        case JLT_LTR_STRING:
+        case DEFINITION_STRING:
             free(v->li_string.stream);
             break;
-        case JLT_LTR_NUMBER:
-        case JLT_RWD_BOOLEAN:
-        case JLT_LTR_CHARACTER:
-        case JLT_RWD_NULL:
+        case DEFINITION_NUMBER:
+        case DEFINITION_BOOLEAN:
+        case DEFINITION_CHARACTER:
+        case DEFINITION_NULL:
         default:
             // no-op
             break;
@@ -246,15 +254,17 @@ definition* definition_copy(definition* v)
     // now deep copy
     switch (v->type)
     {
-        case JNT_IMPORT_DECL:
-            w->import.package_name = strmcpy_assert(v->import.package_name);
-            break;
-        case JNT_CLASS_DECL:
-            w->class.extend = strmcpy_assert(v->class.extend);
-            w->class.implement = strmcpy_assert(v->class.implement);
-            break;
-        case JNT_VAR_DECL:
+        case DEFINITION_VARIABLE:
             w->variable.type.reference = strmcpy_assert(v->variable.type.reference);
+            break;
+        case DEFINITION_METHOD:
+            /**
+             * TODO: so far there is no use case for CFG copy
+             * so we leave it empty
+            */
+            fprintf(stderr, "TODO ERROR: internal error: method copy detected, but it is not implemented yet.\n");
+            w->method.return_type.reference = strmcpy_assert(v->method.return_type.reference);
+            memset(&w->method.code, 0, sizeof(cfg));
             break;
         default:
             // no-op
@@ -262,23 +272,4 @@ definition* definition_copy(definition* v)
     }
 
     return w;
-}
-
-/**
- * test if a definition is valid
- *
- * only specific node types are valid
-*/
-bool is_definition_valid(const definition* d)
-{
-    switch (d->type)
-    {
-        case JNT_IMPORT_DECL:
-        case JNT_CLASS_DECL:
-        case JNT_VAR_DECL:
-        case JNT_METHOD_DECL:
-            return true;
-        default:
-            return false;
-    }
 }

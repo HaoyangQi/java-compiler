@@ -83,6 +83,58 @@ static const debug_number_data test_numbers[] = {
     { "\\1234567", JT_NUM_MAX },
 };
 
+static void __format_print_binary_stream(const char* stream, size_t bin_len)
+{
+    size_t flag;
+    char hex_tbl_print[8];
+    char hex_tbl_cur;
+    unsigned char pr;
+
+    printf("            HEX             |  CHAR  \n");
+    printf("----------------------------+--------\n");
+
+    for (size_t i = 0, j = 0; i < bin_len; i++)
+    {
+        flag = i % 8;
+        hex_tbl_cur = isgraph(stream[i]) ? stream[i] : '.';
+
+        if (i != 0 && (i == bin_len - 1 || flag == 0))
+        {
+            if (i == bin_len - 1)
+            {
+                hex_tbl_print[flag] = hex_tbl_cur;
+                i++;
+            }
+
+            for (size_t k = j; k < j + 8; k++)
+            {
+                pr = stream[k];
+
+                if (k >= i)
+                {
+                    if (k - j == 4) { printf("      "); }
+                    else { printf("   "); }
+                }
+                else if (k - j == 4) { printf("    %02X", pr); }
+                else if (k - j > 0) { printf(" %02X", pr); }
+                else { printf("%02X", pr); }
+            }
+
+            printf("   ");
+
+            for (size_t k = j; k < i; k++)
+            {
+                printf("%c", hex_tbl_print[k - j]);
+            }
+
+            printf("\n");
+            j = i;
+        }
+
+        hex_tbl_print[flag] = hex_tbl_cur;
+    }
+}
+
 static void debug_print_memory(byte* mem, long size, long line_break)
 {
     for (long i = 0; i < size; i++)
@@ -102,17 +154,27 @@ static void debug_print_memory(byte* mem, long size, long line_break)
     }
 }
 
-void debug_report_hash_table_summary(hash_table* table, const char* title)
+static void debug_shash_table(hash_table* table)
 {
-    if (title)
-    {
-        printf("%s:\n", title);
-    }
+    printf("===== HASH TABLE =====\n");
+    printf("memory: %zd bytes\n", hash_table_memory_size(table));
+    printf("load factor: %.2f%%\n", hash_table_load_factor(table) * 100.0f);
+    printf("longest chain: %zd\n", hash_table_longest_chain_length(table));
 
-    printf("    count: %d\n", num_java_reserved_words);
-    printf("    memory: %zd bytes\n", hash_table_memory_size(table));
-    printf("    load factor: %.2f%%\n", hash_table_load_factor(table) * 100.0f);
-    printf("    longest chain: %zd\n", hash_table_longest_chain_length(table));
+    for (size_t i = 0; i < table->bucket_size; i++)
+    {
+        printf("    ");
+
+        hash_pair* p = table->bucket[i];
+
+        while (p)
+        {
+            printf("(%s, %p)->", (char*)(p->key), p->value);
+            p = p->next;
+        }
+
+        printf("(null)\n");
+    }
 }
 
 void debug_report(compiler* compiler)
@@ -120,7 +182,11 @@ void debug_report(compiler* compiler)
     printf("===== COMPILER RUNTIME REPORT =====\n");
 
     printf("Language version: %d\n", compiler->version);
-    debug_report_hash_table_summary(&compiler->rw_lookup_table, "Reserved word");
+    printf("Reserved word:\n");
+    printf("    count: %d\n", num_java_reserved_words);
+    printf("    memory: %zd bytes\n", hash_table_memory_size(&compiler->rw_lookup_table));
+    printf("    load factor: %.2f%%\n", hash_table_load_factor(&compiler->rw_lookup_table) * 100.0f);
+    printf("    longest chain: %zd\n", hash_table_longest_chain_length(&compiler->rw_lookup_table));
     printf("Expression static data size: %zd bytes\n",
         sizeof(java_expression) +
         sizeof(java_operator) * OPID_MAX +
@@ -645,7 +711,7 @@ static void debug_print_operator(java_parser* parser, operator_id id)
     debug_print_lexeme_type(OP_TOKEN(parser->expression->definition[id]));
 }
 
-void debug_print_number_bit_length(java_number_bit_length l)
+static void debug_print_number_bit_length(java_number_bit_length l)
 {
     switch (l)
     {
@@ -661,7 +727,7 @@ void debug_print_number_bit_length(java_number_bit_length l)
     }
 }
 
-void debug_print_number_type(java_number_type number)
+static void debug_print_number_type(java_number_type number)
 {
     switch (number)
     {
@@ -689,7 +755,7 @@ void debug_print_number_type(java_number_type number)
     }
 }
 
-void debug_print_token_content(java_token* token)
+static void debug_print_token_content(java_token* token)
 {
     if (!token || !token->from || !token->to)
     {
@@ -1179,32 +1245,9 @@ void debug_ast(java_parser* parser)
     debug_print_ast(parser, parser->ast_root, 0);
 }
 
-void debug_shash_table(hash_table* table)
-{
-    printf("===== HASH TABLE =====\n");
-    printf("memory: %zd bytes\n", hash_table_memory_size(table));
-    printf("load factor: %.2f%%\n", hash_table_load_factor(table) * 100.0f);
-    printf("longest chain: %zd\n", hash_table_longest_chain_length(table));
-
-    for (size_t i = 0; i < table->bucket_size; i++)
-    {
-        printf("    ");
-
-        hash_pair* p = table->bucket[i];
-
-        if (p)
-        {
-            while (p)
-            {
-                printf("(%s, %p)->", (char*)(p->key), p->value);
-                p = p->next;
-            }
-        }
-
-        printf("(null)\n");
-    }
-}
-
+/**
+ * NOTE: do NOT delete this one as it is useful for bucket size calculation
+*/
 void debug_java_symbol_lookup_table_no_collision_test(bool use_prime_size)
 {
     printf("=====symbol table hash test (enforce prime size: %s)=====\n", use_prime_size ? "true" : "false");
@@ -1252,30 +1295,6 @@ void debug_java_symbol_lookup_table_no_collision_test(bool use_prime_size)
     release_hash_table(&t, NULL);
 
     printf("================================\n");
-}
-
-void debug_ir_on_demand_imports(java_ir* ir)
-{
-    hash_table* table = &ir->tbl_on_demand_packages;
-
-    printf("===== ON-DEMAND IMPORT PACKAGES =====\n");
-    printf("memory: %zd bytes\n", hash_table_memory_size(table));
-    printf("load factor: %.2f%%\n", hash_table_load_factor(table) * 100.0f);
-    printf("longest chain: %zd\n", hash_table_longest_chain_length(table));
-
-    for (size_t i = 0; i < table->bucket_size; i++)
-    {
-        hash_pair* p = table->bucket[i];
-
-        if (p)
-        {
-            while (p)
-            {
-                printf("    %s\n", (char*)(p->key));
-                p = p->next;
-            }
-        }
-    }
 }
 
 static void debug_print_irop(operation irop)
@@ -1499,16 +1518,22 @@ static void debug_print_reference(reference* r)
     }
 }
 
-static void debug_print_instructions(instruction* inst, size_t* cnt)
+static void debug_print_instructions(instruction* inst, size_t* cnt, size_t depth)
 {
     if (!inst)
     {
-        printf("    (no instructions)\n");
+        printf("|");
+        for (size_t d = 0; d < depth; d++) { printf("    "); }
+        printf("(no instructions)\n");
+
+        return;
     }
 
     while (inst)
     {
-        printf("    [%p][%zd]: ", inst, inst->node->id);
+        printf("|");
+        for (size_t d = 0; d < depth; d++) { printf("    "); }
+        printf("[%p][%zd]: ", inst, inst->node->id);
 
         if (inst->lvalue)
         {
@@ -1529,7 +1554,7 @@ static void debug_print_instructions(instruction* inst, size_t* cnt)
     }
 }
 
-static void debug_print_cfg(cfg* g)
+static void debug_print_cfg(cfg* g, size_t depth)
 {
     basic_block* b;
     instruction* inst;
@@ -1538,20 +1563,23 @@ static void debug_print_cfg(cfg* g)
     size_t node_out_count = 0;
     size_t node_in_count = 0;
 
-    printf("===== CONTROL FLOW GRAPH =====\n");
-
     if (g->nodes.num == 0)
     {
+        for (size_t d = 0; d < depth; d++) { printf("    "); }
         printf("(empty)\n");
         return;
     }
 
     for (size_t i = 0; i < g->nodes.num; i++)
     {
+        printf("|");
+
         b = g->nodes.arr[i];
 
         node_out_count += b->out.size;
         node_in_count += b->in.size;
+
+        for (size_t d = 0; d < depth; d++) { printf("    "); }
 
         // print node header
         printf("node[%zd]%s", b->id, b == g->entry ? " (entry point) " : " ");
@@ -1581,7 +1609,7 @@ static void debug_print_cfg(cfg* g)
         }
         printf("\n");
 
-        debug_print_instructions(b->inst_first, &instruction_count);
+        debug_print_instructions(b->inst_first, &instruction_count, depth + 1);
     }
 
     printf(">>>>> SUMMARY <<<<<\n");
@@ -1600,27 +1628,33 @@ static void debug_print_cfg(cfg* g)
     );
 }
 
-static void debug_print_definition_pool(definition_pool* pool);
+static void debug_print_definition_pool(definition_pool* pool, size_t depth);
 
-static void debug_print_definition(definition* v)
+static void debug_print_definition(definition* v, size_t depth)
 {
     // header
     switch (v->type)
     {
-        case JNT_IMPORT_DECL:
-            printf("import, ");
-            break;
-        case JNT_CLASS_DECL:
-            printf("class, ");
-            break;
-        case JNT_VAR_DECL:
+        case DEFINITION_VARIABLE:
             printf("def %s, ", v->variable.is_class_member ? "member var" : "var");
             break;
-        case JNT_METHOD_DECL:
+        case DEFINITION_METHOD:
             printf("def method, ");
             break;
-        case JLT_LTR_NUMBER:
+        case DEFINITION_NUMBER:
             printf("number, ");
+            break;
+        case DEFINITION_CHARACTER:
+            printf("char, ");
+            break;
+        case DEFINITION_BOOLEAN:
+            printf("bool, ");
+            break;
+        case DEFINITION_NULL:
+            printf("null, ");
+            break;
+        case DEFINITION_STRING:
+            printf("string, ");
             break;
         default:
             // no-op
@@ -1631,23 +1665,7 @@ static void debug_print_definition(definition* v)
     // value
     switch (v->type)
     {
-        case JNT_IMPORT_DECL:
-            printf("FROM %s\n", v->import.package_name);
-            break;
-        case JNT_CLASS_DECL:
-            printf("Access: ");
-            debug_print_modifier_bit_flag(v->class.modifier);
-            if (v->class.extend)
-            {
-                printf(" extends %s", v->class.extend);
-            }
-            if (v->class.implement)
-            {
-                printf(" implements %s", v->class.implement);
-            }
-            printf("\n");
-            break;
-        case JNT_VAR_DECL:
+        case DEFINITION_VARIABLE:
             printf("Access: ");
             debug_print_modifier_bit_flag(v->variable.modifier);
             printf(", Type: ");
@@ -1661,7 +1679,7 @@ static void debug_print_definition(definition* v)
             }
             printf("\n");
             break;
-        case JNT_METHOD_DECL:
+        case DEFINITION_METHOD:
             printf("Access: ");
             debug_print_modifier_bit_flag(v->method.modifier);
             printf(", Return: ");
@@ -1674,12 +1692,26 @@ static void debug_print_definition(definition* v)
                 printf("%s", v->method.return_type.reference);
             }
             printf("\n");
-            debug_print_definition_pool(&v->method.local_variables);
-            debug_print_cfg(&v->method.code);
+            debug_print_definition_pool(&v->method.local_variables, depth + 1);
+            debug_print_cfg(&v->method.code, depth + 1);
             printf("\n");
             break;
-        case JLT_LTR_NUMBER:
+        case DEFINITION_NUMBER:
             printf("0x%llx\n", v->li_number.imm);
+            break;
+        case DEFINITION_CHARACTER:
+            printf("0x%llx (16-bit wide-char)\n", v->li_number.imm);
+            break;
+        case DEFINITION_BOOLEAN:
+            printf("0x%llx (%s)\n", v->li_number.imm, v->li_number.imm ? "true" : "false");
+            break;
+        case DEFINITION_STRING:
+            printf("%zd byte(s), %s wide character\n", v->li_string.length, v->li_string.wide_char ? "has" : "no");
+            __format_print_binary_stream(v->li_string.stream, v->li_string.length);
+            printf("\n");
+            break;
+        case DEFINITION_NULL:
+            printf("(n/a)\n");
             break;
         default:
             // no-op
@@ -1688,11 +1720,12 @@ static void debug_print_definition(definition* v)
     }
 }
 
-static void debug_print_definition_pool(definition_pool* pool)
+static void debug_print_definition_pool(definition_pool* pool, size_t depth)
 {
-    printf("===== DEFINITION POOL =====\n");
-    printf("definition count: %zd\n", pool->num);
-    printf("pool memory size: %zd bytes\n",
+    printf(">");
+    for (size_t d = 0; d < depth; d++) { printf("    "); }
+    printf("Definition Pool: %zd definition(s), %zd byte(s)\n",
+        pool->num,
         sizeof(definition_pool) +
         sizeof(definition*) * pool->size +
         sizeof(definition) * pool->num
@@ -1704,29 +1737,58 @@ static void debug_print_definition_pool(definition_pool* pool)
     {
         v = pool->arr[i];
 
+        printf(">");
+        for (size_t d = 0; d < depth + 1; d++) { printf("    "); }
         printf("[%zd](%p): ", i, v);
-        debug_print_definition(v);
+        debug_print_definition(v, depth + 1);
     }
 }
 
-static void debug_print_scope_frame_table(hash_table* table)
+static void debug_print_name_definition_table(hash_table* table, size_t depth)
 {
     for (size_t i = 0; i < table->bucket_size; i++)
     {
         hash_pair* p = table->bucket[i];
 
-        if (p)
+        while (p)
         {
-            while (p)
-            {
-                // key
-                printf("    %s: ", (char*)(p->key));
+            for (size_t d = 0; d < depth; d++) { printf("    "); }
 
-                // print all definitions of this name
-                debug_print_definition(p->value);
+            // key
+            printf("%s: ", (char*)(p->key));
 
-                p = p->next;
-            }
+            // print all definitions of this name
+            debug_print_definition(p->value, depth);
+
+            p = p->next;
+        }
+    }
+}
+
+void debug_print_global_import(java_ir* ir)
+{
+    hash_table* table = &ir->tbl_import;
+
+    printf("\n===== IMPORTS =====\n");
+    printf("count: %zd\n", table->num_pairs);
+    printf("memory: %zd bytes\n", hash_table_memory_size(table));
+    printf("load factor: %.2f%%\n", hash_table_load_factor(table) * 100.0f);
+    printf("longest chain: %zd\n", hash_table_longest_chain_length(table));
+
+    for (size_t i = 0; i < ir->tbl_import.bucket_size; i++)
+    {
+        hash_pair* p = ir->tbl_import.bucket[i];
+
+        while (p)
+        {
+            // key
+            printf("    %s: %s%s\n",
+                (char*)(p->key),
+                p->value ? "FROM " : "(ON-DEMAND)",
+                p->value ? ((global_import*)p->value)->package_name : ""
+            );
+
+            p = p->next;
         }
     }
 }
@@ -1734,30 +1796,89 @@ static void debug_print_scope_frame_table(hash_table* table)
 void debug_ir_global_names(java_ir* ir)
 {
     hash_table* table = lookup_global_scope(ir);
+    global_top_level* top;
 
-    printf("===== GLOBAL NAMES =====\n");
+    printf("\n===== GLOBAL NAMES =====\n");
+    printf("count: %zd\n", table->num_pairs);
     printf("memory: %zd bytes\n", hash_table_memory_size(table));
     printf("load factor: %.2f%%\n", hash_table_load_factor(table) * 100.0f);
     printf("longest chain: %zd\n", hash_table_longest_chain_length(table));
 
-    debug_print_scope_frame_table(table);
+    for (size_t i = 0; i < table->bucket_size; i++)
+    {
+        for (hash_pair* p = table->bucket[i]; p != NULL; p = p->next)
+        {
+            printf("    %s: ", (char*)(p->key));
+
+            top = p->value;
+
+            // ill-formed
+            if (!top)
+            {
+                printf("(null)\n");
+                continue;
+            }
+
+            switch (top->type)
+            {
+                case TOP_LEVEL_CLASS:
+                    printf("Access: ");
+                    debug_print_modifier_bit_flag(top->modifier);
+
+                    if (top->extend)
+                    {
+                        printf(" extends %s", top->extend);
+                    }
+
+                    if (top->implement)
+                    {
+                        printf(" implements: ");
+
+                        for (size_t j = 0; j < top->num_implement; j++)
+                        {
+                            printf("%s, ", top->implement[j]);
+                        }
+                    }
+
+                    printf("%zd member(s)\n", top->tbl_member.num_pairs);
+
+                    printf("        Member Variable Initialization:\n");
+                    debug_print_definition_pool(&top->member_init_variables, 3);
+                    debug_print_cfg(top->code_member_init, 3);
+                    printf("\n");
+
+                    printf("        Member:\n");
+                    debug_print_name_definition_table(&top->tbl_member, 2);
+
+                    break;
+                case TOP_LEVEL_INTERFACE:
+                    /**
+                     * TODO:
+                    */
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
 }
 
 void debug_ir_literal(java_ir* ir)
 {
     hash_table* table = &ir->tbl_literal;
 
-    printf("===== LITERALS =====\n");
+    printf("\n===== LITERALS =====\n");
+    printf("count: %zd\n", table->num_pairs);
     printf("memory: %zd bytes\n", hash_table_memory_size(table));
     printf("load factor: %.2f%%\n", hash_table_load_factor(table) * 100.0f);
     printf("longest chain: %zd\n", hash_table_longest_chain_length(table));
 
-    debug_print_scope_frame_table(table);
+    debug_print_name_definition_table(table, 1);
 }
 
 void debug_ir_lookup(java_ir* ir)
 {
-    printf("===== LOOKUP STACK =====\n");
+    printf("\n===== LOOKUP STACK =====\n");
 
     scope_frame* lh = ir->scope_stack_top;
 
@@ -1769,53 +1890,7 @@ void debug_ir_lookup(java_ir* ir)
 
     while (lh)
     {
-        printf(">>>>>>>>>> ");
-
-        switch (lh->type)
-        {
-            case LST_COMPILATION_UNIT:
-                printf("Compilation Scope\n");
-                break;
-            case LST_CLASS:
-                printf("Class Scope\n");
-                break;
-            case LST_INTERFACE:
-                printf("Interface Scope\n");
-                break;
-            case LST_METHOD:
-                printf("Method Scope\n");
-                break;
-            case LST_NONE:
-                printf("Scope\n");
-                break;
-            case LST_IF:
-                printf("If Scope\n");
-                break;
-            case LST_ELSE:
-                printf("Else Scope\n");
-                break;
-            case LST_FOR:
-                printf("For Scope\n");
-                break;
-            case LST_WHILE:
-                printf("While Scope\n");
-                break;
-            case LST_DO:
-                printf("Do Scope\n");
-                break;
-            case LST_TRY:
-                printf("Try Scope\n");
-                break;
-            case LST_CATCH:
-                printf("Catch Scope\n");
-                break;
-            case LST_FINALLY:
-                printf("Finally Scope\n");
-                break;
-            default:
-                printf("(UNKNOWN SCOPE TYPE)\n");
-                break;
-        }
+        printf(">>>>>>>>>>\n");
 
         hash_table* table = lh->table;
 
@@ -1823,30 +1898,15 @@ void debug_ir_lookup(java_ir* ir)
         printf("load factor: %.2f%%\n", hash_table_load_factor(table) * 100.0f);
         printf("longest chain: %zd\n", hash_table_longest_chain_length(table));
 
-        debug_print_scope_frame_table(table);
+        debug_print_name_definition_table(table, 1);
 
         lh = lh->next;
     }
 }
 
-void debug_print_member_initialization(java_ir* ir)
-{
-    printf("===== MEMBER INITIALIZATION =====\n");
-
-    debug_print_definition_pool(&ir->member_variables);
-
-    if (!ir->code_member_init)
-    {
-        printf("(No code)\n");
-        return;
-    }
-
-    debug_print_cfg(ir->code_member_init);
-}
-
 void debug_number_library()
 {
-    printf("===== NUMBER LIBRARY TEST =====\n");
+    printf("\n===== NUMBER LIBRARY TEST =====\n");
     printf("max int64: %lld\n", 0x7FFFFFFFFFFFFFFF);
     printf("max uint64: %llu\n", 0xFFFFFFFFFFFFFFFF);
 
@@ -1860,8 +1920,6 @@ void debug_number_library()
     float fp_single;
     size_t flag;
     bool pr_bar;
-    char hex_tbl_print[8];
-    char hex_tbl_cur;
 
     for (size_t i = 0; i < len; i++)
     {
@@ -1873,50 +1931,11 @@ void debug_number_library()
         // string stream is special
         if (t == JT_NUM_MAX)
         {
-            printf("stream\n", c);
+            printf("stream\n");
             printf("    bytes: %zd\n", bin.len);
             printf("    has wide char: %d\n", bin.wide_char);
 
-            printf("            HEX             |  CHAR  \n");
-            printf("----------------------------+--------\n");
-            for (size_t i = 0, j = 0; i < bin.len; i++)
-            {
-                flag = i % 8;
-                hex_tbl_cur = isgraph(bin.stream[i]) ? bin.stream[i] : '.';
-
-                if (i != 0 && (i == bin.len - 1 || flag == 0))
-                {
-                    if (i == bin.len - 1)
-                    {
-                        hex_tbl_print[flag] = hex_tbl_cur;
-                        i++;
-                    }
-
-                    for (size_t k = j; k < j + 8; k++)
-                    {
-                        if (k >= i)
-                        {
-                            if (k - j == 4) { printf("      "); }
-                            else { printf("   "); }
-                        }
-                        else if (k - j == 4) { printf("    %02X", (unsigned char)bin.stream[k]); }
-                        else if (k - j > 0) { printf(" %02X", (unsigned char)bin.stream[k]); }
-                        else { printf("%02X", (unsigned char)bin.stream[k]); }
-                    }
-
-                    printf("   ");
-
-                    for (size_t k = j; k < i; k++)
-                    {
-                        printf("%c", hex_tbl_print[k - j]);
-                    }
-
-                    printf("\n");
-                    j = i;
-                }
-
-                hex_tbl_print[flag] = hex_tbl_cur;
-            }
+            __format_print_binary_stream(bin.stream, bin.len);
 
             printf("\n");
             continue;
