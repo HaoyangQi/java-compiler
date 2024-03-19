@@ -2411,7 +2411,7 @@ static tree_node* parse_constructor_declaration(java_parser* parser)
     tree_node* node = ast_node_constructor_declaration();
 
     // ID (
-    consume_token(parser, node->data->id.complex);
+    consume_token(parser, node->data->declarator.id.complex);
     consume_token(parser, NULL);
 
     // [FormalParameterList]

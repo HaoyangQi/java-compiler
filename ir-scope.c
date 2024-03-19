@@ -186,6 +186,8 @@ definition* new_definition(definition_type type)
 
     v->type = type;
     v->def_count = 0;
+    v->sid = 0;
+    v->root_code_walk = NULL;
 
     switch (type)
     {
@@ -196,6 +198,9 @@ definition* new_definition(definition_type type)
             break;
         case DEFINITION_METHOD:
             v->method.modifier = JLT_UNDEFINED;
+            v->method.is_constructor = false;
+            v->method.parameter_count = 0;
+            v->method.parameters = NULL;
             __init_type_name(&v->method.return_type);
             init_definition_pool(&v->method.local_variables);
             // no code CFG initialization here as parser will do it
@@ -233,6 +238,7 @@ void definition_delete(definition* v)
             break;
         case DEFINITION_METHOD:
             free(v->method.return_type.reference);
+            free(v->method.parameters);
             release_definition_pool(&v->method.local_variables);
             release_cfg(&v->method.code);
             break;

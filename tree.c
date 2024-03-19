@@ -71,13 +71,13 @@ void tree_node_delete(tree_node* node)
             case JNT_INTERFACE_TYPE_UNIT:
             case JNT_CLASS_DECL:
             case JNT_INTERFACE_DECL:
-            case JNT_CTOR_DECL:
             case JNT_PRIMARY_COMPLEX:
             case JNT_STATEMENT_BREAK:
             case JNT_STATEMENT_CONTINUE:
             case JNT_STATEMENT_LABEL:
                 free(node->data->id.complex);
                 break;
+            case JNT_CTOR_DECL:
             case JNT_METHOD_HEADER:
             case JNT_FORMAL_PARAM:
             case JNT_VAR_DECL:

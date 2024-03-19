@@ -317,7 +317,7 @@ global_top_level* new_global_top_level(top_level_type type)
     top->implement = NULL;
     top->num_implement = 0;
     top->code_member_init = NULL;
-    top->node_top_level = NULL;
+    top->node_first_body_decl = NULL;
     top->num_member_variable = 0;
 
     init_definition_pool(&top->member_init_variables);

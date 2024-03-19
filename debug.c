@@ -1006,7 +1006,7 @@ static void debug_print_ast_node(java_parser* parser, tree_node* node)
             break;
         case JNT_CTOR_DECL:
             printf("Constructor Declaration: ");
-            debug_print_token_content(node->data->id.complex);
+            debug_print_token_content(node->data->declarator.id.complex);
             break;
         case JNT_TYPE:
             printf("Type: ");
@@ -1641,6 +1641,10 @@ static void debug_print_definition_pool(definition_pool* pool, size_t depth);
 
 static void debug_print_definition(definition* v, size_t depth)
 {
+    static const char* method_regular = "method";
+    static const char* method_ctor = "constructor";
+    java_lexeme_type lex_type;
+
     switch (v->type)
     {
         case DEFINITION_VARIABLE:
@@ -1669,10 +1673,33 @@ static void debug_print_definition(definition* v, size_t depth)
             printf("\n");
             break;
         case DEFINITION_METHOD:
-            printf("def method, ");
+            printf("def %s, ", v->method.is_constructor ? method_ctor : method_regular);
 
             printf("Access: ");
             debug_print_modifier_bit_flag(v->method.modifier);
+
+            printf(", Parameter Count: %zd(", v->method.parameter_count);
+            for (size_t i = 0; i < v->method.parameter_count; i++)
+            {
+                if (i > 0) { printf(" "); }
+
+                lex_type = v->method.parameters[i]->variable.type.primitive;
+
+                for (size_t j = v->method.parameters[i]->variable.type.dim; j > 0; j--)
+                {
+                    printf("[");
+                }
+
+                if (lex_type == JLT_MAX)
+                {
+                    printf("L%s;", v->method.parameters[i]->variable.type.reference);
+                }
+                else
+                {
+                    printf("%c", primitive_type_to_jil_type(lex_type));
+                }
+            }
+            printf(")");
 
             printf(", Return: ");
             if (v->method.return_type.primitive != JLT_MAX)

@@ -320,11 +320,14 @@ typedef enum
 */
 typedef struct _definition
 {
+    // definition type
     definition_type type;
+    // used by dataflow analysis
     size_t def_count;
-
     // serialization id, used during IR emit process
     size_t sid;
+    // internal-only: the code walk root
+    tree_node* root_code_walk;
 
     union
     {
@@ -342,6 +345,12 @@ typedef struct _definition
         {
             // modifier
             lbit_flag modifier;
+            // if method is a constructor
+            bool is_constructor;
+            // parameter count
+            size_t parameter_count;
+            // ordered parameter definition
+            struct _definition** parameters;
             // return type
             type_name return_type;
             // code
@@ -496,10 +505,6 @@ typedef enum
  * top level mey be referenced by others so
  * we need to export them
  *
- * node_top_level: only used as a quick access after
- *                 def_global, will not be used
- *                 during serialization process
- *
 */
 typedef struct
 {
@@ -524,8 +529,8 @@ typedef struct
 
     /* following fields are internal-use only */
 
-    // JNT_TOP_LEVEL node reference
-    tree_node* node_top_level;
+    // internal-only: first JNT_CLASS_BODY_DECL node reference
+    tree_node* node_first_body_decl;
     // member definition order tracker
     size_t num_member_variable;
 } global_top_level;
@@ -657,7 +662,7 @@ definition* type2def(
 );
 definition* def_var(java_ir* ir, tree_node* node, definition** type, def_use_control duc, bool is_member);
 void def_vars(java_ir* ir, tree_node* node, lbit_flag modifier, bool is_member);
-void def_params(java_ir* ir, tree_node* node);
+void def_params(java_ir* ir, tree_node* node, definition** ordered_list);
 void def_global(java_ir* ir, tree_node* compilation_unit);
 
 definition* new_definition(definition_type type);
@@ -733,6 +738,8 @@ instruction* instruction_locate_enclosure_start(instruction* inst);
 
 void walk_class(java_ir* ir, global_top_level* class);
 void walk_interface(java_ir* ir, global_top_level* interface);
+
+char primitive_type_to_jil_type(java_lexeme_type p);
 
 void init_ir(java_ir* ir, java_expression* expression, java_error_stack* error);
 void release_ir(java_ir* ir);
