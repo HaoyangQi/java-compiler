@@ -25,6 +25,7 @@ typedef struct _string_list
 void init_string_list(string_list* sl);
 void release_string_list(string_list* sl);
 void string_list_append(string_list* sl, char* str_data, bool copy);
+void string_list_append_char(string_list* sl, char c);
 char* string_list_pop_front(string_list* sl);
 char* string_list_concat(string_list* sl, const char* dlim);
 char** string_list_to_string_array(string_list* sl);

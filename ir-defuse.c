@@ -1,4 +1,5 @@
 #include "ir.h"
+#include "jil.h"
 
 /**
  * hierarchical name register routine
@@ -332,19 +333,208 @@ definition* type2def(
 }
 
 /**
+ * get a string that identifies param names
+ * it returns NULL if parameter list is empty or undefined
+ *
+ * node: JNT_FORMAL_PARAM_LIST | NULL
+*/
+static char* get_param_list_type_name(java_ir* ir, tree_node* node, size_t* counter)
+{
+    /**
+     * type check provides robustness especially to contructor's AST
+     *
+     * contructor does not have header guard to guarantee first child
+     * must be JNT_FORMAL_PARAM_LIST | NULL
+     *
+     * if list not detected, then no parameter, so counter = 0
+    */
+    if (!node || node->type != JNT_FORMAL_PARAM_LIST)
+    {
+        if (counter) { *counter = 0; }
+        return NULL;
+    }
+
+    char* result;
+    char c;
+    size_t param_count = 0;
+    string_list sl;
+
+    init_string_list(&sl);
+
+    /**
+     * JNT_FORMAL_PARAM_LIST
+     * |
+     * +--- JNT_FORMAL_PARAM    <--- HERE
+     * |    |
+     * |    +--- Type
+     * |         |
+     * |         +--- Name
+     * |              |
+     * |              +--- Unit
+     * |
+     * +--- JNT_FORMAL_PARAM
+     * |    |
+     * |    +--- Type
+     * |
+     * +--- ...
+    */
+    node = node->first_child;
+
+    while (node)
+    {
+        // parse dimensions
+        for (size_t i = node->first_child->data->declarator.dimension; i > 0; i--)
+        {
+            string_list_append_char(&sl, JIL_TYPE_ARRAY_DIM);
+        }
+
+        // parse primitive type
+        c = primitive_type_to_jil_type(node->first_child->data->declarator.id.simple);
+
+        if (c)
+        {
+            string_list_append_char(&sl, c);
+        }
+        else
+        {
+            // parse reference type name
+            string_list_append_char(&sl, JIL_TYPE_OBJECT);
+            string_list_append(&sl, name_unit_concat(node->first_child->first_child->first_child, NULL), false);
+            string_list_append_char(&sl, ';');
+        }
+
+        param_count++;
+        node = node->next_sibling;
+    }
+
+    // prepare result
+    result = string_list_concat(&sl, NULL);
+    if (counter) { *counter = param_count; }
+
+    // cleanup
+    release_string_list(&sl);
+    return result;
+}
+
+/**
+ * Get mangled method name
+ *
+ * it is a string representation of a name includes method name and
+ * all parameter code name concatenated in order
+ *
+ * this name uniquely defines a method reference
+ *
+ * an optional counter param_count is used for parameter count
+ *
+ * node: JNT_METHOD_HEADER | JNT_CTOR_DECL
+*/
+static char* get_full_method_name(java_ir* ir, tree_node* node, size_t* param_count)
+{
+    /**
+     * JNT_METHOD_HEADER | JNT_CTOR_DECL    <--- HERE
+     * |
+     * +--- JNT_FORMAL_PARAM_LIST
+     *      |
+     *      +--- param 1
+     *      +--- ...
+     *
+     * one thing to note here is that JNT_CTOR_DECL's
+     * first child is either JNT_FORMAL_PARAM_LIST or
+     * JNT_CTOR_BODY, unlike method which will have
+     * JNT_METHOD_HEADER as a guard to make sure its
+     * child is always JNT_FORMAL_PARAM_LIST.
+     *
+     * get_param_list_type_name will cover this case
+     * for constructor, so no further adjustment
+     * needs to be done here
+    */
+    char* name = t2s(node->data->declarator.id.complex);
+    char* param_name = get_param_list_type_name(ir, node->first_child, param_count);
+    size_t len_n, len_p;
+
+    if (param_name)
+    {
+        len_n = strlen(name);
+        len_p = strlen(param_name);
+        name = (char*)realloc_assert(name, sizeof(char) * (len_n + len_p + 1));
+
+        strcpy(name + len_n, param_name);
+        free(param_name);
+
+        name[len_n + len_p] = '\0';
+    }
+
+    return name;
+}
+
+/**
+ * register a constructor in lookup table
+ *
+ * It looks similar to def_method, but the implementation
+ * is separated for better readability and capability for
+ * future development
+ *
+ * node: JNT_CTOR_DECL
+*/
+static void def_constructor(java_ir* ir, tree_node* node, lbit_flag modifier)
+{
+    definition* desc = new_definition(DEFINITION_METHOD);
+    definition* method;
+    char* name;
+    size_t param_count;
+
+    /**
+     * Get Name
+     *
+     * JNT_CTOR_DECL                      <--- HERE
+     * |
+     * +--- JNT_FORMAL_PARAM_LIST
+     * |    |
+     * |    +--- param 1
+     * |    +--- ...
+     * |
+     * +--- JNT_CTOR_BODY
+    */
+    name = get_full_method_name(ir, node, &param_count);
+
+    // register
+    method = def(
+        ir, &name, &desc, 0,
+        DU_CTL_LOOKUP_TOP_LEVEL | DU_CTL_METHOD_NAME,
+        JAVA_E_METHOD_DUPLICATE,
+        JAVA_E_METHOD_DIM_AMBIGUOUS,
+        JAVA_E_METHOD_DIM_DUPLICATE
+    );
+
+    if (method)
+    {
+        method->method.is_constructor = true;
+        method->method.modifier = modifier;
+        method->root_code_walk = node;
+        method->method.parameter_count = param_count;
+        method->method.parameters = (definition**)malloc_assert(sizeof(definition*) * param_count);
+    }
+
+    // cleanup
+    free(name);
+    definition_delete(desc);
+}
+
+/**
  * register a variable in lookup table
  *
  * returns the definition data reference of the variable registered;
  * NULL otherwise
  *
- * JNT_VAR_DECL
- * |
- * +--- JNT_EXPRESSION
- *
  * node: JNT_VAR_DECL
 */
 definition* def_var(java_ir* ir, tree_node* node, definition** type, def_use_control duc, bool is_member)
 {
+    /**
+     * JNT_VAR_DECL          <--- HERE
+     * |
+     * +--- JNT_EXPRESSION   <--- root_code_walk if is_member=true
+    */
     char* name = t2s(node->data->declarator.id.complex);
 
     definition* data = def(
@@ -356,6 +546,15 @@ definition* def_var(java_ir* ir, tree_node* node, definition** type, def_use_con
         is_member ? JAVA_E_MEMBER_VAR_DIM_DUPLICATE : JAVA_E_LOCAL_VAR_DIM_DUPLICATE
     );
 
+    /**
+     * initializer code walk for members are not immediately processed,
+     * so the code tree is logged to speed up the re-access
+    */
+    if (is_member)
+    {
+        data->root_code_walk = node->first_child;
+    }
+
     // if succeeds, name is NULL here so it is safe
     free(name);
 
@@ -365,27 +564,25 @@ definition* def_var(java_ir* ir, tree_node* node, definition** type, def_use_con
 /**
  * register all declarators under one type in lookup table
  *
- * NOTE: this method will skip initializers
- *
- * JNT_TYPE
- * |
- * JNT_VAR_DECLARATORS
- * |
- * +--- JNT_VAR_DECL
- * |    |
- * |    +--- JNT_EXPRESSION
- * |
- * +--- JNT_VAR_DECL
- * |
- * +--- ...
- *
  * node: JNT_TYPE
 */
 void def_vars(java_ir* ir, tree_node* node, lbit_flag modifier, bool is_member)
 {
     definition* desc = type2def(node, DEFINITION_VARIABLE, modifier, is_member);
 
-    // first JNT_VAR_DECL
+    /**
+     * JNT_TYPE
+     * |
+     * JNT_VAR_DECLARATORS
+     * |
+     * +--- JNT_VAR_DECL          <--- HERE
+     * |    |
+     * |    +--- JNT_EXPRESSION
+     * |
+     * +--- JNT_VAR_DECL
+     * |
+     * +--- ...
+    */
     node = node->next_sibling->first_child;
 
     // register, every id has same type
@@ -403,14 +600,25 @@ void def_vars(java_ir* ir, tree_node* node, lbit_flag modifier, bool is_member)
 /**
  * register a variable in lookup table
  *
+ * An optional container ordered_list is provided to maintain
+ * a ordered parameter definition reference list
+ *
+ * ordered_list must have same length as children count of
+ * JNT_FORMAL_PARAM_LIST
+ *
  * node: JNT_FORMAL_PARAM_LIST
 */
-void def_params(java_ir* ir, tree_node* node)
+void def_params(java_ir* ir, tree_node* node, definition** ordered_list)
 {
     if (!node)
     {
         return;
     }
+
+    definition* desc;
+    definition* param;
+    char* name;
+    size_t idx = 0;
 
     /**
      * JNT_FORMAL_PARAM_LIST
@@ -429,15 +637,15 @@ void def_params(java_ir* ir, tree_node* node)
 
     while (node)
     {
-        definition* desc = type2def(node->first_child, DEFINITION_VARIABLE, JLT_UNDEFINED, false);
-        char* name = t2s(node->data->declarator.id.complex);
+        desc = type2def(node->first_child, DEFINITION_VARIABLE, JLT_UNDEFINED, false);
+        name = t2s(node->data->declarator.id.complex);
 
         /**
          * 1. move name and desc
          * 2. do NOT lookup global scope: parameter name is scoped so it can co-exist
          *    with class member with same name
         */
-        def(
+        param = def(
             ir, &name, &desc,
             node->data->declarator.dimension,
             DU_CTL_DEFAULT,
@@ -446,47 +654,55 @@ void def_params(java_ir* ir, tree_node* node)
             JAVA_E_PARAM_DUPLICATE
         );
 
+        // maintain order if applicable
+        if (ordered_list)
+        {
+            ordered_list[idx] = param;
+        }
+
         // cleanup
         free(name);
         definition_delete(desc);
 
         node = node->next_sibling;
+        idx++;
     }
 }
 
 /**
  * register a method in lookup table
  *
- * TODO: method overloading
- * we need name mangling algorithm to encode parameter types into name string
- *
- * node: JNT_TYPE---JNT_METHOD_DECL
+ * node: JNT_TYPE
 */
 static void def_method(java_ir* ir, tree_node* node, lbit_flag modifier)
 {
     definition* desc = type2def(node, DEFINITION_METHOD, modifier, true);
+    definition* method;
+    tree_node* node_method_decl = node->next_sibling;
+    char* name;
+    size_t param_count;
 
     /**
-     * type
+     * JNT_TYPE
      * |
-     * method declaration
+     * JNT_METHOD_DECL                    <--- root_code_walk
      * |
-     * +--- header
+     * +--- JNT_METHOD_HEADER             <--- HERE
      * |    |
-     * |    +--- param list
+     * |    +--- JNT_FORMAL_PARAM_LIST
      * |         |
      * |         +--- param 1
      * |         +--- ...
      * |
-     * +--- body
+     * +--- JNT_METHOD_BODY
     */
-    node = node->next_sibling->first_child;
+    node = node_method_decl->first_child;
 
     // get name
-    char* name = t2s(node->data->declarator.id.complex);
+    name = get_full_method_name(ir, node, &param_count);
 
     // register
-    def(
+    method = def(
         ir, &name, &desc,
         node->data->declarator.dimension,
         DU_CTL_LOOKUP_TOP_LEVEL | DU_CTL_METHOD_NAME,
@@ -494,6 +710,22 @@ static void def_method(java_ir* ir, tree_node* node, lbit_flag modifier)
         JAVA_E_METHOD_DIM_AMBIGUOUS,
         JAVA_E_METHOD_DIM_DUPLICATE
     );
+
+    if (method)
+    {
+        /**
+         * body code walk for method is not immediately processed,
+         * so the code tree is logged to speed up the re-access
+         *
+         * but... marking JNT_METHOD_BODY is incorrect because
+         * parameters needs to be re-walks under scope of the
+         * method, so the method walk root needs to be the root
+         * of entire method: JNT_METHOD_DECL
+        */
+        method->root_code_walk = node_method_decl;
+        method->method.parameter_count = param_count;
+        method->method.parameters = (definition**)malloc_assert(sizeof(definition*) * param_count);
+    }
 
     // cleanup
     free(name);
@@ -598,7 +830,7 @@ static void def_class(java_ir* ir, tree_node* node)
     /**
      * JNT_TOP_LEVEL
      * |
-     * +--- JNT_CLASS_DECL      <--- HERE
+     * +--- JNT_CLASS_DECL                       <--- HERE
      *      |
      *      +--- JNT_CLASS_EXTENDS
      *      |    |
@@ -614,7 +846,7 @@ static void def_class(java_ir* ir, tree_node* node)
      *      |
      *      +--- JNT_CLASS_BODY
      *           |
-     *           +--- JNT_CLASS_BODY_DECL
+     *           +--- JNT_CLASS_BODY_DECL        <--- node_first_body_decl
      *           |    |
      *           |    +--- Type
      *           |    |
@@ -632,7 +864,6 @@ static void def_class(java_ir* ir, tree_node* node)
     string_list sl;
 
     // definition data
-    desc->node_top_level = node;
     desc->modifier = node->data->top_level_declaration.modifier;
 
     // [extends, implements, body]
@@ -668,6 +899,12 @@ static void def_class(java_ir* ir, tree_node* node)
         part = part->next_sibling;
     }
 
+    // now we must have class body
+    // otherwise it should not pass syntax parser
+
+    // log first body declaration
+    desc->node_first_body_decl = part->first_child;
+
     // setup lookup hierarchy
     lookup_top_level_begin(ir, desc);
 
@@ -685,8 +922,7 @@ static void def_class(java_ir* ir, tree_node* node)
         return;
     }
 
-    // now we must have class body
-    // otherwise it should not pass syntax parser
+    ////////// desc is NULL after this line //////////
 
     // each part is a class body declaration
     part = part->first_child;
@@ -699,9 +935,7 @@ static void def_class(java_ir* ir, tree_node* node)
 
         if (probe->type == JNT_CTOR_DECL)
         {
-            /**
-             * TODO: constructor
-            */
+            def_constructor(ir, probe, part->data->top_level_declaration.modifier);
         }
         else if (probe->type == JNT_TYPE)
         {
@@ -739,7 +973,10 @@ static void def_interface(java_ir* ir, tree_node* node)
 {
     global_top_level* desc = new_global_top_level(TOP_LEVEL_INTERFACE);
 
-    desc->node_top_level = node;
+    /**
+     * TODO: locate first body decl and log it
+    */
+    // desc->node_first_body_decl = part;
 
     // setup lookup hierarchy
     lookup_top_level_begin(ir, desc);

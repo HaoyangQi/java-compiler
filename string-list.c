@@ -61,6 +61,24 @@ void string_list_append(string_list* sl, char* str_data, bool copy)
     sl->count++;
 }
 
+/**
+ * append element by passing a character
+ *
+*/
+void string_list_append_char(string_list* sl, char c)
+{
+    if (!c)
+    {
+        return;
+    }
+
+    char* s = (char*)malloc_assert(sizeof(char) * 2);
+    s[0] = c;
+    s[1] = '\0';
+
+    string_list_append(sl, s, false);
+}
+
 // pop front
 char* string_list_pop_front(string_list* sl)
 {
@@ -83,8 +101,8 @@ char* string_list_pop_front(string_list* sl)
 /**
  * concat all strings with delimiter
  *
- * delimiter can be NULL, in this case, strings are separated
- * by '\0'
+ * when dlim = NULL, atring are concatenation without any separator
+ * when dlim[0] = '\0', strings are separated by '\0'
  *
  * if list is empty, it returns NULL
 */
@@ -96,7 +114,7 @@ char* string_list_concat(string_list* sl, const char* dlim)
     char* s;
     char* p;
     bool has_dlim = dlim && dlim[0] != '\0';
-    size_t dlen = has_dlim ? strlen(dlim) : 1;
+    size_t dlen = dlim == NULL ? 0 : (dlim[0] == '\0' ? 1 : strlen(dlim));
     size_t total_length = (sl->count - 1) * dlen;
     size_t total_size;
 
@@ -130,7 +148,7 @@ char* string_list_concat(string_list* sl, const char* dlim)
                 strcpy(p, dlim);
             }
 
-            // if no dlim, simply move pointer by 1 char leaving a \0 in-between
+            // if dlim = '\0', simply move pointer by 1 char leaving a \0 in-between
             p += dlen;
         }
     }

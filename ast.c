@@ -334,7 +334,9 @@ tree_node* ast_node_constructor_declaration()
     tree_node* node = ast_node_new(JNT_CTOR_DECL);
 
     node->data = ast_node_data_new();
-    node->data->id.complex = ast_node_data_new_token();
+    node->data->declarator.id.simple = JLT_MAX; // unused
+    node->data->declarator.id.complex = ast_node_data_new_token();
+    node->data->declarator.dimension = 0; // unused
 
     return node;
 }
@@ -365,6 +367,7 @@ tree_node* ast_node_method_header()
     tree_node* node = ast_node_new(JNT_METHOD_HEADER);
 
     node->data = ast_node_data_new();
+    node->data->declarator.id.simple = JLT_MAX; // unused
     node->data->declarator.id.complex = ast_node_data_new_token();
     node->data->declarator.dimension = 0;
 
@@ -417,6 +420,7 @@ tree_node* ast_node_formal_parameter()
     tree_node* node = ast_node_new(JNT_FORMAL_PARAM);
 
     node->data = ast_node_data_new();
+    node->data->declarator.id.simple = JLT_MAX; // unused
     node->data->declarator.id.complex = ast_node_data_new_token();
     node->data->declarator.dimension = 0;
 
@@ -481,6 +485,7 @@ tree_node* ast_node_variable_declarator()
     tree_node* node = ast_node_new(JNT_VAR_DECL);
 
     node->data = ast_node_data_new();
+    node->data->declarator.id.simple = JLT_MAX; // unused
     node->data->declarator.id.complex = ast_node_data_new_token();
     node->data->declarator.dimension = 0;
 

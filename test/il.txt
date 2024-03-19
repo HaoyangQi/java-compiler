@@ -11,7 +11,13 @@ class MyPackageClass extends C1 implements C2, C3 {
     short r4;
     String s = "Hello, World!";
 
-    private int calc(int x, int y, short r2) {
+    MyPackageClass() {}
+    
+    MyPackageClass(int r) {
+        r2 = r;
+    }
+
+    private int calc(int x, int y, String.Impl sr1, short r2) {
         if (2 > 1)
         {
             x + y;
