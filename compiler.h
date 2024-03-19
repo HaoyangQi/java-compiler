@@ -8,6 +8,7 @@
 #include "parser.h"
 #include "expression.h"
 #include "ir.h"
+#include "il.h"
 #include "error.h"
 
 typedef struct

@@ -323,6 +323,9 @@ typedef struct _definition
     definition_type type;
     size_t def_count;
 
+    // serialization id, used during IR emit process
+    size_t sid;
+
     union
     {
         struct
@@ -516,9 +519,15 @@ typedef struct
     cfg* code_member_init;
     // member definitions: map<string, definition*>
     hash_table tbl_member;
+    // literal: map<string, definition*>
+    hash_table tbl_literal;
+
+    /* following fields are internal-use only */
 
     // JNT_TOP_LEVEL node reference
     tree_node* node_top_level;
+    // member definition order tracker
+    size_t num_member_variable;
 } global_top_level;
 
 /**
@@ -533,9 +542,6 @@ typedef struct
  *
  * tbl_global: top level implementation, it maps from the name to the
  *             descriptor global_top_level
- *
- * tbl_literal: all literal data appeared in this file, it maps the
- *              string content to the binary data
 */
 typedef struct
 {
@@ -545,8 +551,6 @@ typedef struct
     hash_table tbl_implicit_import;
     // top level: map<string, global_top_level*>
     hash_table tbl_global;
-    // literal: map<string, definition*>
-    hash_table tbl_literal;
 
     // current top level
     global_top_level* working_top_level;
@@ -579,7 +583,6 @@ primitive t2p(java_ir* ir, java_token* t, binary_data* data);
 char* name_unit_concat(tree_node* from, tree_node* stop_before);
 
 void init_definition_pool(definition_pool* pool);
-void init_definition_pool_with_copy(definition_pool* dest, const definition_pool* src);
 void release_definition_pool(definition_pool* pool);
 void definition_pool_grow(definition_pool* pool, size_t by);
 void definition_pool_add(definition_pool* pool, definition* def);
@@ -604,6 +607,7 @@ hash_table* lookup_new_scope(java_ir* ir);
 bool lookup_pop_scope(java_ir* ir, definition_pool* pool);
 hash_table* lookup_global_scope(java_ir* ir);
 hash_table* lookup_top_level_scope(java_ir* ir);
+hash_table* lookup_top_level_literal_scope(java_ir* ir);
 hash_table* lookup_working_scope(java_ir* ir);
 void lookup_top_level_begin(java_ir* ir, global_top_level* desc);
 void lookup_top_level_end(java_ir* ir);

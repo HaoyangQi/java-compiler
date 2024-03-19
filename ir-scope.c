@@ -97,6 +97,16 @@ hash_table* lookup_top_level_scope(java_ir* ir)
 }
 
 /**
+ * get current top-level literal scope
+ *
+ * TYPE: global_top_level.tbl_literal: map<string, definition*>
+*/
+hash_table* lookup_top_level_literal_scope(java_ir* ir)
+{
+    return ir->working_top_level ? &ir->working_top_level->tbl_literal : NULL;
+}
+
+/**
  * get hierarchical scope
  *
  * TYPE: map<string, definition*>

@@ -37,17 +37,15 @@ void release_string_list(string_list* sl)
 /**
  * append element
  *
- * str_data is void* becuase the list enforces string data
- * to be a copy, so literal is not allowed
 */
-void string_list_append(string_list* sl, void* str_data)
+void string_list_append(string_list* sl, char* str_data, bool copy)
 {
     if (!str_data)
     {
         return;
     }
 
-    string_list_item* e = new_string_list_item((char*)str_data);
+    string_list_item* e = new_string_list_item(copy ? strmcpy_assert(str_data) : str_data);
 
     if (sl->first)
     {
@@ -82,26 +80,59 @@ char* string_list_pop_front(string_list* sl)
     return s;
 }
 
-// concat
+/**
+ * concat all strings with delimiter
+ *
+ * delimiter can be NULL, in this case, strings are separated
+ * by '\0'
+ *
+ * if list is empty, it returns NULL
+*/
 char* string_list_concat(string_list* sl, const char* dlim)
 {
-    string_list_item* e = sl->first;
-    char* s = (char*)malloc_assert(sizeof(char));
+    if (!sl || sl->count == 0) { return NULL; }
 
-    s[0] = '\0';
-    while (e)
+    string_list_item* e;
+    char* s;
+    char* p;
+    bool has_dlim = dlim && dlim[0] != '\0';
+    size_t dlen = has_dlim ? strlen(dlim) : 1;
+    size_t total_length = (sl->count - 1) * dlen;
+    size_t total_size;
+
+    /**
+     * first pass: calculate total length
+    */
+    for (e = sl->first; e != NULL; e = e->next)
     {
-        size_t dlim_len = e->next ? strlen(dlim) : 0;
+        total_length += strlen(e->s);
+    }
 
-        s = (char*)realloc_assert(s, sizeof(char) * (strlen(s) + strlen(e->s) + dlim_len + 1));
-        strcpy(s + strlen(s), e->s);
+    // allocate and initialize content
+    total_size = sizeof(char) * (total_length + 1);
+    s = (char*)malloc_assert(total_size);
+    memset(s, 0, total_size);
 
-        if (dlim_len)
+    /**
+     * second pass: fill the content
+    */
+    for (e = sl->first, p = s; e != NULL; e = e->next)
+    {
+        // copy string content
+        strcpy(p, e->s);
+        p += strlen(e->s);
+
+        // copy dlimiter
+        if (e->next)
         {
-            strcpy(s + strlen(s), dlim);
-        }
+            if (has_dlim)
+            {
+                strcpy(p, dlim);
+            }
 
-        e = e->next;
+            // if no dlim, simply move pointer by 1 char leaving a \0 in-between
+            p += dlen;
+        }
     }
 
     return s;

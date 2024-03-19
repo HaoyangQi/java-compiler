@@ -80,6 +80,23 @@ definition* def(
     }
 
     /**
+     * mark sid if it is a member
+     *
+     * this information is needed because the order of member variable declaration needs to be
+     * preserved for object size calculation with struct padding
+    */
+    if (tdef && tdef->variable.is_class_member)
+    {
+        if (!ir->working_top_level || lookup_top_level_scope(ir) != table)
+        {
+            fprintf(stderr, "TODO ERROR: internal error: member variable detected inside local scope.\n");
+        }
+
+        tdef->sid = ir->working_top_level->num_member_variable;
+        ir->working_top_level->num_member_variable++;
+    }
+
+    /**
      * dimension check
      *
      * Java allows any of the array declaration form:
@@ -174,12 +191,18 @@ definition* def_li(
 {
     if (!content) { return NULL; }
 
+    hash_table* literals = lookup_top_level_literal_scope(ir);
     definition* v = NULL;
     hash_pair* pair;
     binary_data bin;
 
+    if (!literals)
+    {
+        fprintf(stderr, "TODO ERROR: internal error: literal detected outside of top level scope.\n");
+    }
+
     // lookup
-    pair = shash_table_get(&ir->tbl_literal, *content);
+    pair = shash_table_get(literals, *content);
 
     // if key exists, we use; otherwise create
     if (pair)
@@ -224,7 +247,7 @@ definition* def_li(
     // register: content will be moved if successful
     if (v)
     {
-        shash_table_insert(&ir->tbl_literal, *content, v);
+        shash_table_insert(literals, *content, v);
         *content = NULL;
     }
 
@@ -633,7 +656,7 @@ static void def_class(java_ir* ir, tree_node* node)
         init_string_list(&sl);
         while (probe)
         {
-            string_list_append(&sl, name_unit_concat(probe->first_child, NULL));
+            string_list_append(&sl, name_unit_concat(probe->first_child, NULL), false);
             probe = probe->next_sibling;
         }
 
