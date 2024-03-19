@@ -1,0 +1,409 @@
+===== COMPILER RUNTIME REPORT =====
+Language version: 1
+Reserved word:
+    count: 50
+    memory: 4824 bytes
+    load factor: 14.16%
+    longest chain: 1
+Expression static data size: 1072 bytes
+Error static data size: 574 bytes
+===== END OF REPORT =====
+
+File 1: ./test/il.txt
+all dominator sets:
+0: 0
+1: 0 1
+2: 2 0
+3: 0 3
+4: 0 3 4
+5: 0 3 5
+6: 0 3 6
+all DF sets:
+0:
+1: 2
+2:
+3: 2
+4: 5
+5: 2
+6: 5
+all dominator sets:
+0: 0
+all DF sets:
+0:
+all dominator sets:
+0: 0
+all DF sets:
+0:
+===== ABSTRACT SYNTAX TREE =====
+Compilation Unit
+  Package Declaration
+    Name
+      Unit: mypack
+  Import Declaration (On-demand: false)
+    Name
+      Unit: java
+      Unit: text
+      Unit: DecimalFormat
+  Import Declaration (On-demand: false)
+    Name
+      Unit: java
+      Unit: util
+      Unit: InputMismatchException
+  Import Declaration (On-demand: false)
+    Name
+      Unit: java
+      Unit: util
+      Unit: Scanner
+  Import Declaration (On-demand: true)
+    Name
+      Unit: somepackage
+  Top Level: No Modifier
+    Class Declaration: MyPackageClass
+      Class Extends
+        Class Type
+          Unit: C1
+      Class Implements
+        Interface Type List
+          Interface Type
+            Unit: C2
+          Interface Type
+            Unit: C3
+      Class Body
+        Class Body Declaration: No Modifier
+          Type: JLT_RWD_INT
+          Variable Declarators
+            Variable Declarator: r2
+              Expression
+                Primary
+                  1
+                Primary
+                  2
+                OP[19]: OPID_GREAT -> JLT_SYM_ANGLE_BRACKET_CLOSE ">"
+                Primary
+                  3
+                Primary
+                  4
+                Primary
+                  5
+                OP[9]: OPID_MUL -> JLT_SYM_ASTERISK "*"
+                OP[12]: OPID_ADD -> JLT_SYM_PLUS "+"
+                Primary
+                  6
+                Primary
+                  7
+                OP[13]: OPID_SUB -> JLT_SYM_MINUS "-"
+                OP[30]: OPID_TERNARY_2 -> JLT_SYM_COLON ":"
+                OP[29]: OPID_TERNARY_1 -> JLT_SYM_QUESTION "?"
+        Class Body Declaration: No Modifier
+          Type: JLT_RWD_INT
+          Variable Declarators
+            Variable Declarator: r3
+              Expression
+                Primary
+                  0
+        Class Body Declaration: No Modifier
+          Type: JLT_RWD_SHORT
+          Variable Declarators
+            Variable Declarator: r4
+        Class Body Declaration: No Modifier
+          Type: (Complex Type Shown In Sub-Tree)
+            Class Type
+              Unit: String
+          Variable Declarators
+            Variable Declarator: s
+              Expression
+                Primary
+                  "Hello, World!"
+        Class Body Declaration: No Modifier
+          Constructor Declaration: MyPackageClass
+            Constructor Body
+        Class Body Declaration: No Modifier
+          Constructor Declaration: MyPackageClass
+            Formal Parameter List
+              Formal Parameter: r
+                Type: JLT_RWD_INT
+            Constructor Body
+              Expression Statement
+                Expression
+                  Primary
+                    r2
+                  Primary
+                    r
+                  OP[31]: OPID_ASN -> JLT_SYM_EQUAL "="
+        Class Body Declaration: private
+          Type: JLT_RWD_INT
+          Method Declaration
+            Method Header: calc
+              Formal Parameter List
+                Formal Parameter: x
+                  Type: JLT_RWD_INT
+                Formal Parameter: y
+                  Type: JLT_RWD_INT
+                Formal Parameter: sr1
+                  Type: (Complex Type Shown In Sub-Tree)
+                    Class Type
+                      Unit: String
+                      Unit: Impl
+                Formal Parameter: r2
+                  Type: JLT_RWD_SHORT
+            Method Body
+              Block
+                If Statement
+                  Expression
+                    Primary
+                      2
+                    Primary
+                      1
+                    OP[19]: OPID_GREAT -> JLT_SYM_ANGLE_BRACKET_CLOSE ">"
+                  Block
+                    Expression Statement
+                      Expression
+                        Primary
+                          x
+                        Primary
+                          y
+                        OP[12]: OPID_ADD -> JLT_SYM_PLUS "+"
+                    Expression Statement
+                      Expression
+                        Primary
+                          r3
+                        Primary
+                          r2
+                        Primary
+                          6
+                        OP[13]: OPID_SUB -> JLT_SYM_MINUS "-"
+                        Primary
+                          y
+                        OP[12]: OPID_ADD -> JLT_SYM_PLUS "+"
+                        OP[31]: OPID_ASN -> JLT_SYM_EQUAL "="
+                    Return Statement
+                      Expression
+                        Primary
+                          3
+                  If Statement
+                    Expression
+                      Primary
+                        r2
+                      Primary
+                        x
+                      OP[17]: OPID_LESS -> JLT_SYM_ANGLE_BRACKET_OPEN "<"
+                    Block
+                      Variable Declaration
+                        Local Variable Declaration
+                          Type: JLT_RWD_INT
+                          Variable Declarators
+                            Variable Declarator: tmp
+                              Expression
+                                Primary
+                                  9
+                      Expression Statement
+                        Expression
+                          Primary
+                            y
+                          Primary
+                            2
+                          OP[32]: OPID_ADD_ASN -> JLT_SYM_ADD_ASSIGNMENT "+="
+                      Variable Declaration
+                        Local Variable Declaration
+                          Type: JLT_RWD_INT
+                          Variable Declarators
+                            Variable Declarator: tmp2
+                      Expression Statement
+                        Expression
+                          Primary
+                            tmp
+                          Primary
+                            tmp
+                          Primary
+                            y
+                          Primary
+                            9
+                          OP[9]: OPID_MUL -> JLT_SYM_ASTERISK "*"
+                          OP[13]: OPID_SUB -> JLT_SYM_MINUS "-"
+                          OP[31]: OPID_ASN -> JLT_SYM_EQUAL "="
+                      Return Statement
+                        Expression
+                          Primary
+                            tmp2
+                    Block
+                      Return Statement
+                        Expression
+                          Primary
+                            r3
+                Return Statement
+                  Expression
+                    Primary
+                      0
+  Top Level: No Modifier
+    Class Declaration: SomeOtherClass
+      Class Body
+        Class Body Declaration: No Modifier
+          Type: JLT_RWD_INT
+          Variable Declarators
+            Variable Declarator: a
+              Expression
+                Primary
+                  1
+
+===== IMPORTS =====
+count: 4
+memory: 248 bytes
+load factor: 36.36%
+longest chain: 2
+    somepackage: (ON-DEMAND)
+    Scanner: FROM java.util
+    DecimalFormat: FROM java.text
+    InputMismatchException: FROM java.util
+
+===== GLOBAL NAMES =====
+count: 2
+memory: 168 bytes
+load factor: 18.18%
+longest chain: 1
+    MyPackageClass: Access: No Modifier extends C1 implements: C2, C3
+*       Member Variable Initialization:
+>            Definition Pool: 0 definition(s), 40 byte(s)
+|            node[0] (entry point) <ANY> -> 1
+|                [00000200D5D5C8E0][0]: (li unknown: 0x1a) IROP_STORE (null)
+|                [00000200D5D5C960][0]: (def[0]: 00000200D5D5A960) <- (inst: 00000200D5D5C8E0) IROP_ASN (null)
+|            node[1] <ANY> -> 2
+|                [00000200D5D5D3E0][1]: (li: 0x1{1}) IROP_GT (li: 0x2{2})
+|                [00000200D5D5CC20][1]: (li: 0x4{4}) IROP_MUL (li: 0x5{5})
+|                [00000200D5D5D060][1]: (li: 0x3{3}) IROP_ADD (inst: 00000200D5D5CC20)
+|                [00000200D5D5CF20][1]: (li: 0x6{6}) IROP_SUB (li: 0x7{7})
+|                [00000200D5D5CA20][1]: (inst: 00000200D5D5D060) IROP_TB (inst: 00000200D5D5CF20)
+|                [00000200D5D5CAE0][1]: (inst: 00000200D5D5D3E0) IROP_TC (inst: 00000200D5D5CA20)
+|                [00000200D5D5CEA0][1]: (def[0]: 00000200D5D50E90) <- (inst: 00000200D5D5CAE0) IROP_ASN (null)
+|            node[2] <ANY>
+|                [00000200D5D5CE60][2]: (li: 0x0{0}) IROP_STORE (null)
+|                [00000200D5D5CBE0][2]: (def[0]: 00000200D5D5A800) <- (inst: 00000200D5D5CE60) IROP_ASN (null)
+|                [00000200D5D5CF60][2]: (def[0]: 00000200D5D5A8B0) <- (null) IROP_INIT (null)
+>>>>> SUMMARY <<<<<
+node count: 3
+node arr size: 4
+edge count: 2
+edge arr size: 2
+instruction count: 12
+memory size: 1128 bytes
+
+*       Member: 7 member(s)
+            calcIILString.Impl;S: def method, Access: private, Parameter Count: 4(I I LString.Impl; S), Return: JLT_RWD_INT
+>                Definition Pool: 6 definition(s), 1048 byte(s)
+>                    [0](00000200D5D5E3E0): def var, Access: No Modifier, Type: JLT_RWD_INT
+>                    [1](00000200D5D5D680): def var, Access: No Modifier, Type: JLT_RWD_INT
+>                    [2](00000200D5D5B6F0): def var, Access: No Modifier, Type: JLT_RWD_SHORT
+>                    [3](00000200D5D5B590): def var, Access: No Modifier, Type: JLT_RWD_INT
+>                    [4](00000200D5D5ACD0): def var, Access: No Modifier, Type: JLT_RWD_INT
+>                    [5](00000200D5D5B640): def var, Access: No Modifier, Type: String.Impl
+|                node[0] (entry point) <TEST> -> 1(TRUE) -> 3(FALSE)
+|                    [00000200D5D5D4A0][0]: (li: 0x2{2}) IROP_GT (li: 0x1{1})
+|                    [00000200D5D5CB60][0]: (null) IROP_TEST (null)
+|                node[1] <RETURN> -> 2
+|                    [00000200D5D5CFE0][1]: (def[0]: 00000200D5D5ACD0) IROP_ADD (def[0]: 00000200D5D5B590)
+|                    [00000200D5D5C920][1]: (def[0]: 00000200D5D5B6F0) IROP_SUB (li: 0x6{6})
+|                    [00000200D5D5CD20][1]: (inst: 00000200D5D5C920) IROP_ADD (def[0]: 00000200D5D5B590)
+|                    [00000200D5D5D0A0][1]: (def[1]: 00000200D5D5A800) <- (inst: 00000200D5D5CD20) IROP_ASN (null)
+|                    [00000200D5D5C8A0][1]: (li: 0x3{3}) IROP_STORE (null)
+|                    [00000200D5D5CCA0][1]: (inst: 00000200D5D5C8A0) IROP_RET (null)
+|                node[2] <RETURN>
+|                    [00000200D5D5D360][2]: (li: 0x0{0}) IROP_STORE (null)
+|                    [00000200D5D5CD60][2]: (inst: 00000200D5D5D360) IROP_RET (null)
+|                node[3] <TEST> -> 4(TRUE) -> 6(FALSE)
+|                    [00000200D5D5CCE0][3]: (def[0]: 00000200D5D5B6F0) IROP_LT (def[0]: 00000200D5D5ACD0)
+|                    [00000200D5D5C560][3]: (null) IROP_TEST (null)
+|                node[4] <RETURN> -> 5
+|                    [00000200D5D5D020][4]: (li: 0x9{9}) IROP_STORE (null)
+|                    [00000200D5D5CEE0][4]: (def[0]: 00000200D5D5D680) <- (inst: 00000200D5D5D020) IROP_ASN (null)
+|                    [00000200D5D5D160][4]: (def[1]: 00000200D5D5B590) <- (def[0]: 00000200D5D5B590) IROP_ADD (li: 0x2{2})
+|                    [00000200D5D5D2E0][4]: (def[0]: 00000200D5D5E3E0) <- (null) IROP_INIT (null)
+|                    [00000200D5D5CDA0][4]: (def[1]: 00000200D5D5B590) IROP_MUL (li: 0x9{9})
+|                    [00000200D5D5CE20][4]: (def[0]: 00000200D5D5D680) IROP_SUB (inst: 00000200D5D5CDA0)
+|                    [00000200D5D5C9E0][4]: (def[1]: 00000200D5D5D680) <- (inst: 00000200D5D5CE20) IROP_ASN (null)
+|                    [00000200D5D5C5E0][4]: (def[0]: 00000200D5D5E3E0) IROP_STORE (null)
+|                    [00000200D5D5C9A0][4]: (inst: 00000200D5D5C5E0) IROP_RET (null)
+|                node[5] <ANY> -> 2
+|                    (no instructions)
+|                node[6] <RETURN> -> 5
+|                    [00000200D5D5CDE0][6]: (def[1]: 00000200D5D5A800) IROP_STORE (null)
+|                    [00000200D5D5CBA0][6]: (inst: 00000200D5D5CDE0) IROP_RET (null)
+>>>>> SUMMARY <<<<<
+node count: 7
+node arr size: 8
+edge count: 8
+edge arr size: 8
+instruction count: 23
+memory size: 2416 bytes
+
+            MyPackageClass: def constructor, Access: No Modifier, Parameter Count: 0(), Return: (null)
+>                Definition Pool: 0 definition(s), 40 byte(s)
+|                node[0] (entry point) <ANY>
+|                    (no instructions)
+>>>>> SUMMARY <<<<<
+node count: 1
+node arr size: 2
+edge count: 0
+edge arr size: 2
+instruction count: 0
+memory size: 168 bytes
+
+            s: def member var, order 3, Access: No Modifier, Type: String
+            r2: def member var, order 0, Access: No Modifier, Type: JLT_RWD_INT
+            MyPackageClassI: def constructor, Access: No Modifier, Parameter Count: 1(I), Return: (null)
+>                Definition Pool: 1 definition(s), 200 byte(s)
+>                    [0](00000200D5D5E070): def var, Access: No Modifier, Type: JLT_RWD_INT
+|                node[0] (entry point) <ANY>
+|                    [00000200D5D5CA60][0]: (def[1]: 00000200D5D50E90) <- (def[0]: 00000200D5D5E070) IROP_ASN (null)
+>>>>> SUMMARY <<<<<
+node count: 1
+node arr size: 2
+edge count: 0
+edge arr size: 2
+instruction count: 1
+memory size: 224 bytes
+
+            r3: def member var, order 1, Access: No Modifier, Type: JLT_RWD_INT
+            r4: def member var, order 2, Access: No Modifier, Type: JLT_RWD_SHORT
+
+*       Literals: 10 literal(s)
+            1: number, 0x1
+            9: number, 0x9
+            7: number, 0x7
+            5: number, 0x5
+            0: number, 0x0
+            3: number, 0x3
+            "Hello, World!": string, 26 byte(s), no wide character
+                            HEX             |  CHAR
+                ----------------------------+--------
+                00 48 00 65    00 6C 00 6C   .H.e.l.l
+                00 6F 00 2C    00 20 00 57   .o.,...W
+                00 6F 00 72    00 6C 00 64   .o.r.l.d
+                00 21                        .!
+
+            2: number, 0x2
+            6: number, 0x6
+            4: number, 0x4
+
+    SomeOtherClass: Access: No Modifier
+*       Member Variable Initialization:
+>            Definition Pool: 0 definition(s), 40 byte(s)
+|            node[0] (entry point) <ANY>
+|                [00000200D5D5CFA0][0]: (li: 0x1{1}) IROP_STORE (null)
+|                [00000200D5D5D0E0][0]: (def[0]: 00000200D5D5AC20) <- (inst: 00000200D5D5CFA0) IROP_ASN (null)
+>>>>> SUMMARY <<<<<
+node count: 1
+node arr size: 2
+edge count: 0
+edge arr size: 2
+instruction count: 2
+memory size: 280 bytes
+
+*       Member: 1 member(s)
+            a: def member var, order 0, Access: No Modifier, Type: JLT_RWD_INT
+
+*       Literals: 1 literal(s)
+            1: number, 0x1
+
+
+===== LOOKUP STACK =====
+(lookup stack is empty)
+Press any key to continue . . .
