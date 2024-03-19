@@ -132,6 +132,9 @@ bool compile(compiler* compiler, architecture* arch, char* source_path)
         return false;
     }
 
+    // emit IR
+    jil_emit(&compiler->ir);
+
     /**
      * TODO:
      * also: before we return, we need to check if error stack

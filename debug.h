@@ -22,6 +22,5 @@ void debug_ast(java_parser* parser);
 void debug_java_symbol_lookup_table_no_collision_test(bool use_prime_size);
 void debug_print_global_import(java_ir* ir);
 void debug_ir_global_names(java_ir* ir);
-void debug_ir_literal(java_ir* ir);
 
 #endif

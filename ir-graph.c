@@ -4,19 +4,7 @@
 */
 
 #include "ir.h"
-
-/**
- * edge array size increment factor
- *
- * this value is carefully selected because:
- * common branch in CFG is binary, hence 2 edges,
- * with 2 more nodes
- *
- * and when size needs to grow, the new size is
- * calculated by: cur_size * factor
-*/
-#define EDGE_ARRAY_SIZE_INCREMENT_FACTOR (2)
-#define NODE_ARRAY_SIZE_INCREMENT_FACTOR (2)
+#include "utils.h"
 
 /**
  * edge instance deletion
@@ -59,11 +47,11 @@ static void node_delete(basic_block* block)
 */
 static void edge_array_init(edge_array* edges)
 {
-    edges->arr = (cfg_edge**)malloc_assert(sizeof(cfg_edge*) * EDGE_ARRAY_SIZE_INCREMENT_FACTOR);
+    edges->arr = (cfg_edge**)malloc_assert(sizeof(cfg_edge*) * 2);
     edges->num = 0;
-    edges->size = EDGE_ARRAY_SIZE_INCREMENT_FACTOR;
+    edges->size = 2;
 
-    memset(edges->arr, 0, sizeof(cfg_edge*) * EDGE_ARRAY_SIZE_INCREMENT_FACTOR);
+    memset(edges->arr, 0, sizeof(cfg_edge*) * 2);
 }
 
 /**
@@ -71,21 +59,11 @@ static void edge_array_init(edge_array* edges)
 */
 void edge_array_resize(edge_array* edges, size_t by)
 {
-    size_t old_size = edges->size;
+    size_t new_size = edges->num + by;
 
-    if (edges->num + by <= old_size)
+    if (new_size > edges->size)
     {
-        return;
-    }
-
-    // yes this is dumb, but let's keep it this way
-    while (edges->num + by > edges->size)
-    {
-        edges->size *= EDGE_ARRAY_SIZE_INCREMENT_FACTOR;
-    }
-
-    if (edges->size > old_size)
-    {
+        edges->size = find_next_pow2_size(new_size);
         edges->arr = (cfg_edge**)realloc_assert(edges->arr, sizeof(cfg_edge*) * (edges->size));
     }
 }
@@ -108,11 +86,11 @@ static void edge_array_delete(edge_array* edges)
 */
 static void node_array_init(node_array* nodes)
 {
-    nodes->arr = (basic_block**)malloc_assert(sizeof(basic_block*) * NODE_ARRAY_SIZE_INCREMENT_FACTOR);
+    nodes->arr = (basic_block**)malloc_assert(sizeof(basic_block*) * 2);
     nodes->num = 0;
-    nodes->size = NODE_ARRAY_SIZE_INCREMENT_FACTOR;
+    nodes->size = 2;
 
-    memset(nodes->arr, 0, sizeof(basic_block*) * NODE_ARRAY_SIZE_INCREMENT_FACTOR);
+    memset(nodes->arr, 0, sizeof(basic_block*) * 2);
 }
 
 /**
@@ -120,21 +98,11 @@ static void node_array_init(node_array* nodes)
 */
 void node_array_resize(node_array* nodes, size_t by)
 {
-    size_t old_size = nodes->size;
+    size_t new_size = nodes->num + by;
 
-    if (nodes->num + by <= old_size)
+    if (new_size > nodes->size)
     {
-        return;
-    }
-
-    // yes this is dumb, but let's keep it this way
-    while (nodes->num + by > nodes->size)
-    {
-        nodes->size *= NODE_ARRAY_SIZE_INCREMENT_FACTOR;
-    }
-
-    if (nodes->size > old_size)
-    {
+        nodes->size = find_next_pow2_size(new_size);
         nodes->arr = (basic_block**)realloc_assert(nodes->arr, sizeof(basic_block*) * (nodes->size));
     }
 }

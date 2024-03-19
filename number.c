@@ -1,4 +1,5 @@
 #include "number.h"
+#include "utils.h"
 
 #define FP32_MAN_BIT_LENGTH (23)
 #define FP32_EXP_BIT_LENGTH_MASK (0xFF)
@@ -183,16 +184,11 @@ static bool number_zero(const number* n)
 
 static void number_append_char(number* n, char c)
 {
-    size_t old_size = n->size;
+    size_t new_size = n->len + 1;
 
-    // yes this is dumb, but let's keep it this way
-    while (n->len + 1 > n->size)
+    while (new_size > n->size)
     {
-        n->size *= 2;
-    }
-
-    if (n->size > old_size)
-    {
+        n->size = find_next_pow2_size(new_size);
         n->s = (char*)realloc_assert(n->s, sizeof(char) * n->size);
     }
 
@@ -210,16 +206,11 @@ static void number_append_char(number* n, char c)
 
 static void number_append_char16(number* n, char hi, char lo)
 {
-    size_t old_size = n->size;
+    size_t new_size = n->len + 2;
 
-    // yes this is dumb, but let's keep it this way
-    while (n->len + 2 > n->size)
+    while (new_size > n->size)
     {
-        n->size *= 2;
-    }
-
-    if (n->size > old_size)
-    {
+        n->size = find_next_pow2_size(new_size);
         n->s = (char*)realloc_assert(n->s, sizeof(char) * n->size);
     }
 

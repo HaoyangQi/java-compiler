@@ -1,7 +1,6 @@
 #include "ir.h"
 #include "node.h"
-
-#define DEFINITION_POOL_GROW_FACTOR (2)
+#include "utils.h"
 
 /**
  * import lookup deleter
@@ -37,7 +36,6 @@ void init_ir(java_ir* ir, java_expression* expression, java_error_stack* error)
     init_hash_table(&ir->tbl_import, HASH_TABLE_DEFAULT_BUCKET_SIZE);
     init_hash_table(&ir->tbl_implicit_import, HASH_TABLE_DEFAULT_BUCKET_SIZE);
     init_hash_table(&ir->tbl_global, HASH_TABLE_DEFAULT_BUCKET_SIZE);
-    init_hash_table(&ir->tbl_literal, HASH_TABLE_DEFAULT_BUCKET_SIZE);
 }
 
 /**
@@ -51,8 +49,6 @@ void release_ir(java_ir* ir)
     release_hash_table(&ir->tbl_implicit_import, &import_lookup_deleter);
     // delete global name lookup
     release_hash_table(&ir->tbl_global, &top_level_lookup_deleter);
-    // delete literal lookup
-    release_hash_table(&ir->tbl_literal, &definition_lookup_deleter);
     // delete entire lookup stack
     while (lookup_pop_scope(ir, NULL));
 }
@@ -114,7 +110,7 @@ char* name_unit_concat(tree_node* from, tree_node* stop_before)
     init_string_list(&sl);
     while (from != stop_before)
     {
-        string_list_append(&sl, t2s(from->data->id.complex));
+        string_list_append(&sl, t2s(from->data->id.complex), false);
         from = from->next_sibling;
     }
 
@@ -233,22 +229,13 @@ void pop_statement_context(java_ir* ir)
 
 void init_definition_pool(definition_pool* pool)
 {
-    size_t sz = sizeof(definition*) * DEFINITION_POOL_GROW_FACTOR;
+    size_t sz = sizeof(definition*) * 2;
 
     pool->arr = (definition**)malloc_assert(sz);
     pool->num = 0;
-    pool->size = DEFINITION_POOL_GROW_FACTOR;
+    pool->size = 2;
 
     memset(pool->arr, 0, sz);
-}
-
-void init_definition_pool_with_copy(definition_pool* dest, const definition_pool* src)
-{
-    size_t sz = sizeof(definition*) * DEFINITION_POOL_GROW_FACTOR;
-
-    memcpy(dest, src, sizeof(definition_pool));
-    dest->arr = (definition**)malloc_assert(sz);
-    memcpy(dest->arr, src->arr, sz);
 }
 
 void release_definition_pool(definition_pool* pool)
@@ -263,21 +250,11 @@ void release_definition_pool(definition_pool* pool)
 
 void definition_pool_grow(definition_pool* pool, size_t by)
 {
-    size_t old_size = pool->size;
+    size_t new_size = pool->num + by;
 
-    if (pool->num + by <= old_size)
+    if (new_size > pool->size)
     {
-        return;
-    }
-
-    // yes this is dumb, but let's keep it this way
-    while (pool->num + by > pool->size)
-    {
-        pool->size *= DEFINITION_POOL_GROW_FACTOR;
-    }
-
-    if (pool->size > old_size)
-    {
+        pool->size = find_next_pow2_size(new_size);
         pool->arr = (definition**)realloc_assert(pool->arr, sizeof(definition*) * (pool->size));
     }
 }
@@ -341,9 +318,11 @@ global_top_level* new_global_top_level(top_level_type type)
     top->num_implement = 0;
     top->code_member_init = NULL;
     top->node_top_level = NULL;
+    top->num_member_variable = 0;
 
     init_definition_pool(&top->member_init_variables);
     init_hash_table(&top->tbl_member, HASH_TABLE_DEFAULT_BUCKET_SIZE);
+    init_hash_table(&top->tbl_literal, HASH_TABLE_DEFAULT_BUCKET_SIZE);
 
     return top;
 }
@@ -364,6 +343,7 @@ void delete_global_top_level(global_top_level* top)
 
     // delete all members
     release_hash_table(&top->tbl_member, &definition_lookup_deleter);
+    release_hash_table(&top->tbl_literal, &definition_lookup_deleter);
 
     // cleanup
     free(top->extend);
