@@ -359,9 +359,10 @@ typedef struct
 } definition_string;
 
 /**
- * scope lookup table value descriptor
+ * Definition Information
  *
- * here we use node type for further classification
+ * The union contains typed references for each
+ * definition type.
 */
 typedef struct _definition
 {
