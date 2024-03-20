@@ -1304,7 +1304,7 @@ static void walk_constructor(java_ir* ir, definition* ctor_def)
     // fill all parameter declarations
     if (node->type == JNT_FORMAL_PARAM_LIST)
     {
-        def_params(ir, node, ctor_def->method.parameters);
+        def_params(ir, node, ctor_def->method->parameters);
         node = node->next_sibling;
     }
 
@@ -1318,7 +1318,7 @@ static void walk_constructor(java_ir* ir, definition* ctor_def)
     cfg_worker_ssa_build(worker);
 
     // release worker
-    release_cfg_worker(worker, &ctor_def->method.code, &ctor_def->method.local_variables);
+    release_cfg_worker(worker, &ctor_def->method->code, &ctor_def->method->local_variables);
     free(worker);
 }
 
@@ -1415,7 +1415,7 @@ static void walk_method(java_ir* ir, definition* method_def)
     lookup_new_scope(ir);
 
     // fill all parameter declarations
-    def_params(ir, node->first_child, method_def->method.parameters);
+    def_params(ir, node->first_child, method_def->method->parameters);
 
     // parse body (use current scope)
     worker = walk_block(ir, node->next_sibling, false);
@@ -1427,7 +1427,7 @@ static void walk_method(java_ir* ir, definition* method_def)
     cfg_worker_ssa_build(worker);
 
     // release worker
-    release_cfg_worker(worker, &method_def->method.code, &method_def->method.local_variables);
+    release_cfg_worker(worker, &method_def->method->code, &method_def->method->local_variables);
     free(worker);
 }
 
@@ -1475,7 +1475,7 @@ void walk_class(java_ir* ir, global_top_level* class)
                     walk_field(ir, desc, &member_init_worker);
                     break;
                 case DEFINITION_METHOD:
-                    if (desc->method.is_constructor)
+                    if (desc->method->is_constructor)
                     {
                         walk_constructor(ir, desc);
                     }

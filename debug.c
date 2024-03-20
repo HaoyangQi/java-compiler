@@ -1487,8 +1487,8 @@ static void debug_print_reference(reference* r)
             break;
         case IR_ASN_REF_LITERAL:
             d = r->doi;
-            n = d->li_number.imm;
-            switch (d->li_number.type)
+            n = d->li_number->imm;
+            switch (d->li_number->type)
             {
                 case IRPV_INTEGER_BIT_8:
                     printf("(li: 0x%llx{%d})", n, (int8_t)n);
@@ -1648,7 +1648,7 @@ static void debug_print_definition(definition* v, size_t depth)
     switch (v->type)
     {
         case DEFINITION_VARIABLE:
-            if (v->variable.is_class_member)
+            if (v->variable->is_class_member)
             {
                 printf("def member var, order %zd, ", v->sid);
             }
@@ -1658,41 +1658,41 @@ static void debug_print_definition(definition* v, size_t depth)
             }
 
             printf("Access: ");
-            debug_print_modifier_bit_flag(v->variable.modifier);
+            debug_print_modifier_bit_flag(v->variable->modifier);
 
             printf(", Type: ");
-            if (v->variable.type.primitive != JLT_MAX)
+            if (v->variable->type.primitive != JLT_MAX)
             {
-                debug_print_lexeme_type(v->variable.type.primitive);
+                debug_print_lexeme_type(v->variable->type.primitive);
             }
             else
             {
-                printf("%s", v->variable.type.reference);
+                printf("%s", v->variable->type.reference);
             }
 
             printf("\n");
             break;
         case DEFINITION_METHOD:
-            printf("def %s, ", v->method.is_constructor ? method_ctor : method_regular);
+            printf("def %s, ", v->method->is_constructor ? method_ctor : method_regular);
 
             printf("Access: ");
-            debug_print_modifier_bit_flag(v->method.modifier);
+            debug_print_modifier_bit_flag(v->method->modifier);
 
-            printf(", Parameter Count: %zd(", v->method.parameter_count);
-            for (size_t i = 0; i < v->method.parameter_count; i++)
+            printf(", Parameter Count: %zd(", v->method->parameter_count);
+            for (size_t i = 0; i < v->method->parameter_count; i++)
             {
                 if (i > 0) { printf(" "); }
 
-                lex_type = v->method.parameters[i]->variable.type.primitive;
+                lex_type = v->method->parameters[i]->variable->type.primitive;
 
-                for (size_t j = v->method.parameters[i]->variable.type.dim; j > 0; j--)
+                for (size_t j = v->method->parameters[i]->variable->type.dim; j > 0; j--)
                 {
                     printf("[");
                 }
 
                 if (lex_type == JLT_MAX)
                 {
-                    printf("L%s;", v->method.parameters[i]->variable.type.reference);
+                    printf("L%s;", v->method->parameters[i]->variable->type.reference);
                 }
                 else
                 {
@@ -1702,34 +1702,34 @@ static void debug_print_definition(definition* v, size_t depth)
             printf(")");
 
             printf(", Return: ");
-            if (v->method.return_type.primitive != JLT_MAX)
+            if (v->method->return_type.primitive != JLT_MAX)
             {
-                debug_print_lexeme_type(v->method.return_type.primitive);
+                debug_print_lexeme_type(v->method->return_type.primitive);
             }
             else
             {
-                printf("%s", v->method.return_type.reference);
+                printf("%s", v->method->return_type.reference);
             }
 
             printf("\n");
 
-            debug_print_definition_pool(&v->method.local_variables, depth + 1);
-            debug_print_cfg(&v->method.code, depth + 1);
+            debug_print_definition_pool(&v->method->local_variables, depth + 1);
+            debug_print_cfg(&v->method->code, depth + 1);
 
             printf("\n");
             break;
         case DEFINITION_NUMBER:
-            printf("number, 0x%llx\n", v->li_number.imm);
+            printf("number, 0x%llx\n", v->li_number->imm);
             break;
         case DEFINITION_CHARACTER:
-            printf("character, 0x%llx (16-bit wide-char)\n", v->li_number.imm);
+            printf("character, 0x%llx (16-bit wide-char)\n", v->li_number->imm);
             break;
         case DEFINITION_BOOLEAN:
-            printf("boolean, 0x%llx (%s)\n", v->li_number.imm, v->li_number.imm ? "true" : "false");
+            printf("boolean, 0x%llx (%s)\n", v->li_number->imm, v->li_number->imm ? "true" : "false");
             break;
         case DEFINITION_STRING:
-            printf("string, %zd byte(s), %s wide character\n", v->li_string.length, v->li_string.wide_char ? "has" : "no");
-            __format_print_binary_stream(v->li_string.stream, v->li_string.length, depth + 1);
+            printf("string, %zd byte(s), %s wide character\n", v->li_string->length, v->li_string->wide_char ? "has" : "no");
+            __format_print_binary_stream(v->li_string->stream, v->li_string->length, depth + 1);
             printf("\n");
             break;
         case DEFINITION_NULL:

@@ -86,7 +86,7 @@ definition* def(
      * this information is needed because the order of member variable declaration needs to be
      * preserved for object size calculation with struct padding
     */
-    if (tdef && tdef->variable.is_class_member)
+    if (tdef && tdef->variable->is_class_member)
     {
         if (!ir->working_top_level || lookup_top_level_scope(ir) != table)
         {
@@ -109,7 +109,7 @@ definition* def(
     */
     if (name_dims > 0)
     {
-        if (tdef->variable.type.dim != name_dims)
+        if (tdef->variable->type.dim != name_dims)
         {
             ir_error(ir, err_dim_amb);
         }
@@ -216,19 +216,19 @@ definition* def_li(
     {
         case JLT_LTR_NUMBER:
             v = new_definition(DEFINITION_NUMBER);
-            v->li_number.type = r2p(ir, *content, &bin, token_type, num_type, num_bits);
-            v->li_number.imm = bin.number;
+            v->li_number->type = r2p(ir, *content, &bin, token_type, num_type, num_bits);
+            v->li_number->imm = bin.number;
             break;
         case JLT_LTR_CHARACTER:
             v = new_definition(DEFINITION_CHARACTER);
-            v->li_number.type = r2p(ir, *content, &bin, token_type, num_type, num_bits);
-            v->li_number.imm = bin.number;
+            v->li_number->type = r2p(ir, *content, &bin, token_type, num_type, num_bits);
+            v->li_number->imm = bin.number;
             break;
         case JLT_RWD_TRUE:
         case JLT_RWD_FALSE:
             v = new_definition(DEFINITION_BOOLEAN);
-            v->li_number.type = r2p(ir, *content, &bin, token_type, num_type, num_bits);
-            v->li_number.imm = bin.number;
+            v->li_number->type = r2p(ir, *content, &bin, token_type, num_type, num_bits);
+            v->li_number->imm = bin.number;
             break;
         case JLT_RWD_NULL:
             // NULL has no aux data
@@ -237,9 +237,9 @@ definition* def_li(
         case JLT_LTR_STRING:
             v = new_definition(DEFINITION_STRING);
             r2p(ir, *content, &bin, token_type, num_type, num_bits);
-            v->li_string.stream = bin.stream;
-            v->li_string.length = bin.len;
-            v->li_string.wide_char = bin.wide_char;
+            v->li_string->stream = bin.stream;
+            v->li_string->length = bin.len;
+            v->li_string->wide_char = bin.wide_char;
             break;
         default:
             break;
@@ -301,28 +301,28 @@ definition* type2def(
     switch (type)
     {
         case DEFINITION_VARIABLE:
-            desc->variable.is_class_member = is_member;
-            desc->variable.modifier = modifier;
-            desc->variable.type.primitive = node->data->declarator.id.simple;
-            desc->variable.type.dim = node->data->declarator.dimension;
+            desc->variable->is_class_member = is_member;
+            desc->variable->modifier = modifier;
+            desc->variable->type.primitive = node->data->declarator.id.simple;
+            desc->variable->type.dim = node->data->declarator.dimension;
 
             // if not primitive type, then it must be a reference type
-            if (desc->variable.type.primitive == JLT_MAX)
+            if (desc->variable->type.primitive == JLT_MAX)
             {
                 // type->class_type->unit
-                desc->variable.type.reference = name_unit_concat(node->first_child->first_child, NULL);
+                desc->variable->type.reference = name_unit_concat(node->first_child->first_child, NULL);
             }
             break;
         case DEFINITION_METHOD:
-            desc->method.modifier = modifier;
-            desc->method.return_type.primitive = node->data->declarator.id.simple;
-            desc->method.return_type.dim = node->data->declarator.dimension;
+            desc->method->modifier = modifier;
+            desc->method->return_type.primitive = node->data->declarator.id.simple;
+            desc->method->return_type.dim = node->data->declarator.dimension;
 
             // if not primitive type, then it must be a reference type
-            if (desc->method.return_type.primitive == JLT_MAX)
+            if (desc->method->return_type.primitive == JLT_MAX)
             {
                 // type->class_type->unit
-                desc->method.return_type.reference = name_unit_concat(node->first_child->first_child, NULL);
+                desc->method->return_type.reference = name_unit_concat(node->first_child->first_child, NULL);
             }
             break;
         default:
@@ -508,11 +508,11 @@ static void def_constructor(java_ir* ir, tree_node* node, lbit_flag modifier)
 
     if (method)
     {
-        method->method.is_constructor = true;
-        method->method.modifier = modifier;
+        method->method->is_constructor = true;
+        method->method->modifier = modifier;
         method->root_code_walk = node;
-        method->method.parameter_count = param_count;
-        method->method.parameters = (definition**)malloc_assert(sizeof(definition*) * param_count);
+        method->method->parameter_count = param_count;
+        method->method->parameters = (definition**)malloc_assert(sizeof(definition*) * param_count);
     }
 
     // cleanup
@@ -723,8 +723,8 @@ static void def_method(java_ir* ir, tree_node* node, lbit_flag modifier)
          * of entire method: JNT_METHOD_DECL
         */
         method->root_code_walk = node_method_decl;
-        method->method.parameter_count = param_count;
-        method->method.parameters = (definition**)malloc_assert(sizeof(definition*) * param_count);
+        method->method->parameter_count = param_count;
+        method->method->parameters = (definition**)malloc_assert(sizeof(definition*) * param_count);
     }
 
     // cleanup

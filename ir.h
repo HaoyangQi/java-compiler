@@ -313,6 +313,51 @@ typedef enum
     DEFINITION_STRING,
 } definition_type;
 
+typedef struct
+{
+    // if it is a member variable
+    bool is_class_member;
+    // modifier
+    lbit_flag modifier;
+    // type
+    type_name type;
+} definition_variable;
+
+typedef struct
+{
+    // modifier
+    lbit_flag modifier;
+    // if method is a constructor
+    bool is_constructor;
+    // parameter count
+    size_t parameter_count;
+    // ordered parameter definition
+    definition** parameters;
+    // return type
+    type_name return_type;
+    // code
+    cfg code;
+    definition_pool local_variables;
+} definition_method;
+
+typedef struct
+{
+    // primitive type
+    primitive type;
+    // literal value
+    uint64_t imm;
+} definition_number;
+
+typedef struct
+{
+    // 16-bit character binary stream
+    char* stream;
+    // number of bytes of stream
+    size_t length;
+    // if stream contains 16-bit wide character
+    bool wide_char;
+} definition_string;
+
 /**
  * scope lookup table value descriptor
  *
@@ -329,52 +374,14 @@ typedef struct _definition
     // internal-only: the code walk root
     tree_node* root_code_walk;
 
+    // typed definition data access
+    // pointer-only here!
     union
     {
-        struct
-        {
-            // if it is a member variable
-            bool is_class_member;
-            // modifier
-            lbit_flag modifier;
-            // type
-            type_name type;
-        } variable;
-
-        struct
-        {
-            // modifier
-            lbit_flag modifier;
-            // if method is a constructor
-            bool is_constructor;
-            // parameter count
-            size_t parameter_count;
-            // ordered parameter definition
-            struct _definition** parameters;
-            // return type
-            type_name return_type;
-            // code
-            cfg code;
-            definition_pool local_variables;
-        } method;
-
-        struct
-        {
-            // primitive type
-            primitive type;
-            // literal value
-            uint64_t imm;
-        } li_number;
-
-        struct
-        {
-            // 16-bit character binary stream
-            char* stream;
-            // number of bytes of stream
-            size_t length;
-            // if stream contains 16-bit wide character
-            bool wide_char;
-        } li_string;
+        definition_variable* variable;
+        definition_method* method;
+        definition_number* li_number;
+        definition_string* li_string;
     };
 } definition;
 

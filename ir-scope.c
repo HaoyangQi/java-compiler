@@ -183,38 +183,40 @@ bool lookup_register(
 definition* new_definition(definition_type type)
 {
     definition* v = (definition*)malloc_assert(sizeof(definition));
+    memset(v, 0, sizeof(definition));
 
     v->type = type;
-    v->def_count = 0;
-    v->sid = 0;
-    v->root_code_walk = NULL;
 
     switch (type)
     {
         case DEFINITION_VARIABLE:
-            v->variable.is_class_member = false;
-            v->variable.modifier = JLT_UNDEFINED;
-            __init_type_name(&v->variable.type);
+            v->variable = (definition_variable*)malloc_assert(sizeof(definition_variable));
+            v->variable->is_class_member = false;
+            v->variable->modifier = JLT_UNDEFINED;
+            __init_type_name(&v->variable->type);
             break;
         case DEFINITION_METHOD:
-            v->method.modifier = JLT_UNDEFINED;
-            v->method.is_constructor = false;
-            v->method.parameter_count = 0;
-            v->method.parameters = NULL;
-            __init_type_name(&v->method.return_type);
-            init_definition_pool(&v->method.local_variables);
+            v->method = (definition_method*)malloc_assert(sizeof(definition_method));
+            v->method->modifier = JLT_UNDEFINED;
+            v->method->is_constructor = false;
+            v->method->parameter_count = 0;
+            v->method->parameters = NULL;
+            __init_type_name(&v->method->return_type);
+            init_definition_pool(&v->method->local_variables);
             // no code CFG initialization here as parser will do it
             break;
         case DEFINITION_NUMBER:
         case DEFINITION_BOOLEAN:
         case DEFINITION_CHARACTER:
-            v->li_number.type = IRPV_MAX;
-            v->li_number.imm = 0;
+            v->li_number = (definition_number*)malloc_assert(sizeof(definition_number));
+            v->li_number->type = IRPV_MAX;
+            v->li_number->imm = 0;
             break;
         case DEFINITION_STRING:
-            v->li_string.stream = NULL;
-            v->li_string.length = 0;
-            v->li_string.wide_char = false;
+            v->li_string = (definition_string*)malloc_assert(sizeof(definition_string));
+            v->li_string->stream = NULL;
+            v->li_string->length = 0;
+            v->li_string->wide_char = false;
             break;
         case DEFINITION_NULL:
         default:
@@ -234,20 +236,25 @@ void definition_delete(definition* v)
     switch (v->type)
     {
         case DEFINITION_VARIABLE:
-            free(v->variable.type.reference);
+            free(v->variable->type.reference);
+            free(v->variable);
             break;
         case DEFINITION_METHOD:
-            free(v->method.return_type.reference);
-            free(v->method.parameters);
-            release_definition_pool(&v->method.local_variables);
-            release_cfg(&v->method.code);
+            free(v->method->return_type.reference);
+            free(v->method->parameters);
+            release_definition_pool(&v->method->local_variables);
+            release_cfg(&v->method->code);
+            free(v->method);
             break;
         case DEFINITION_STRING:
-            free(v->li_string.stream);
+            free(v->li_string->stream);
+            free(v->li_string);
             break;
         case DEFINITION_NUMBER:
         case DEFINITION_BOOLEAN:
         case DEFINITION_CHARACTER:
+            free(v->li_number);
+            break;
         case DEFINITION_NULL:
         default:
             // no-op
@@ -271,7 +278,7 @@ definition* definition_copy(definition* v)
     switch (v->type)
     {
         case DEFINITION_VARIABLE:
-            w->variable.type.reference = strmcpy_assert(v->variable.type.reference);
+            w->variable->type.reference = strmcpy_assert(v->variable->type.reference);
             break;
         case DEFINITION_METHOD:
             /**
@@ -279,8 +286,8 @@ definition* definition_copy(definition* v)
              * so we leave it empty
             */
             fprintf(stderr, "TODO ERROR: internal error: method copy detected, but it is not implemented yet.\n");
-            w->method.return_type.reference = strmcpy_assert(v->method.return_type.reference);
-            memset(&w->method.code, 0, sizeof(cfg));
+            w->method->return_type.reference = strmcpy_assert(v->method->return_type.reference);
+            memset(&w->method->code, 0, sizeof(cfg));
             break;
         default:
             // no-op
