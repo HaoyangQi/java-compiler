@@ -11,9 +11,6 @@
 /**
  * Aux Data: ID
  *
- * nodes only require an identification
- *
- * NOTE: control the size of this union carefully
 */
 typedef union
 {
@@ -22,75 +19,106 @@ typedef union
 } node_data_id;
 
 /**
+ * Aux Data: Import
+ *
+*/
+typedef struct
+{
+    bool on_demand;
+} node_data_import;
+
+/**
+ * Aux Data: Top Level Declaration
+ *
+*/
+typedef struct
+{
+    lbit_flag modifier;
+} node_data_top_level;
+
+/**
+ * Aux Data: Declarators
+ *
+ * 1. type header
+ * 2. formal parameter
+ * 3. method header
+ * 4. variable declarator
+ * 5. array creation
+ *
+*/
+typedef struct
+{
+    node_data_id id;
+    /* array dimension */
+    size_t dimension;
+} node_data_declarator;
+
+/**
+ * Aux Data: Operator
+ *
+*/
+typedef struct
+{
+    // operator id
+    operator_id id;
+    /**
+     * IR-use only, type: instruction*
+     *
+     * internal-only: this field does not contribute
+     * meaning to final IR, it is only useful during
+     * expression tree walk; therefore type here
+     * does not have to be precise
+    */
+    void* instruction;
+} node_data_operator;
+
+/**
+ * Aux Data: Contructor Invocation
+ *
+*/
+typedef struct
+{
+    // true if calling from super class, this class otherwise
+    bool is_super;
+} node_data_contructor_invoke;
+
+/**
+ * Aux Data: Switch Label
+ *
+*/
+typedef struct
+{
+    // true if default label, case label otherwise
+    bool is_default;
+} node_data_switch_label;
+
+/**
+ * Aux Data: Ambiguity Node
+ *
+*/
+typedef struct
+{
+    // pointer to JAVA_E_AMBIGUITY_START
+    java_error_entry* error;
+} node_data_ambiguity;
+
+/**
  * Aux Data
  *
- * NOTE: control the size of this union carefully
+ * This is a layer for typing
+ *
+ * NOTE: pointer-only here
 */
 typedef union
 {
-    // nodes only require an identification
-    node_data_id id;
-
-    // import-specific
-    struct
-    {
-        bool on_demand;
-    } import;
-
-    // top-level (declaration) modifier
-    struct
-    {
-        lbit_flag modifier;
-    } top_level_declaration;
-
-    /**
-     * declarator form
-     *
-     * 1. type header
-     * 2. formal parameter
-     * 3. method header
-     * 4. variable declarator
-     * 5. array creation
-    */
-    struct
-    {
-        node_data_id id;
-        /* array dimension */
-        size_t dimension;
-    } declarator;
-
-    // operator
-    struct
-    {
-        // let's decouple external definitions here
-        // and use simple type for enum member
-
-        // operator id, type: operator_id
-        int id;
-        // IR-use only, type: instruction*
-        void* instruction;
-    } operator;
-
-    // constructor invocation
-    struct
-    {
-        /* true if calling from super class, this class otherwise */
-        bool is_super;
-    } constructor_invoke;
-
-    // switch-case label
-    struct
-    {
-        /* true if default label, case label otherwise */
-        bool is_default;
-    } switch_label;
-
-    // ambiguity data
-    struct
-    {
-        // pointer to JAVA_E_AMBIGUITY_START
-        java_error_entry* error;
-    } ambiguity;
+    node_data_id* id;
+    node_data_import * import;
+    node_data_top_level* top_level;
+    node_data_declarator* declarator;
+    node_data_operator* operator;
+    node_data_contructor_invoke* constructor_invoke;
+    node_data_switch_label* switch_label;
+    node_data_ambiguity* ambiguity;
 } tree_node_data;
 
 /**
@@ -123,7 +151,7 @@ typedef struct _tree_node
     /* false if production uniquely determines input */
     bool ambiguous;
     /* aux data */
-    tree_node_data* data;
+    tree_node_data data;
     /* binary way to represent multi-way tree */
     struct _tree_node* first_child;
     struct _tree_node* next_sibling;
@@ -133,8 +161,9 @@ typedef struct _tree_node
 } tree_node;
 
 void init_tree_node(tree_node* node);
-void tree_node_mutate(tree_node* node, java_node_query type);
 void tree_node_add_child(tree_node* node, tree_node* child);
 void tree_node_delete(tree_node* node);
+
+tree_node* ast_node_new(java_node_query type);
 
 #endif

@@ -214,7 +214,7 @@ static tree_node* parse_binary_ambiguity(
     if (n1_valid && n2_valid)
     {
         // keep both: mutate using n1
-        node = ast_node_ambiguous();
+        node = ast_node_new(JNT_AMBIGUOUS);
         tree_node_add_child(node, n1);
         tree_node_add_child(node, n2);
 
@@ -236,7 +236,7 @@ static tree_node* parse_binary_ambiguity(
 
         // first pathway
         parser_error(parser, JAVA_E_AMBIGUITY_START);
-        node->data->ambiguity.error = error_stack_top(parser->error);
+        node->data.ambiguity->error = error_stack_top(parser->error);
         mutate_parser(parser, parser_1);
 
         // second pathway
@@ -355,7 +355,7 @@ static tree_node* parse_expression(java_parser* parser);
 void parse(java_parser* parser)
 {
     bool loop_continue;
-    parser->ast_root = ast_node_compilation_unit();
+    parser->ast_root = ast_node_new(JNT_UNIT);
 
     // [package declaration]
     if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_RWD_PACKAGE))
@@ -413,10 +413,10 @@ void parse(java_parser* parser)
 */
 static tree_node* __parse_name_unit(java_parser* parser)
 {
-    tree_node* node = ast_node_name_unit();
+    tree_node* node = ast_node_new(JNT_NAME_UNIT);
 
     // ID
-    consume_token(parser, node->data->id.complex);
+    consume_token(parser, node->data.id->complex);
 
     return node;
 }
@@ -434,7 +434,7 @@ static tree_node* __parse_name_unit(java_parser* parser)
 */
 static tree_node* parse_name(java_parser* parser)
 {
-    tree_node* node = ast_node_name();
+    tree_node* node = ast_node_new(JNT_NAME);
 
     // Unit
     tree_node_add_child(node, __parse_name_unit(parser));
@@ -459,10 +459,10 @@ static tree_node* parse_name(java_parser* parser)
 */
 static tree_node* __parse_class_type_unit(java_parser* parser)
 {
-    tree_node* node = ast_node_class_type_unit();
+    tree_node* node = ast_node_new(JNT_CLASS_TYPE_UNIT);
 
     // ID
-    consume_token(parser, node->data->id.complex);
+    consume_token(parser, node->data.id->complex);
 
     return node;
 }
@@ -481,7 +481,7 @@ static tree_node* __parse_class_type_unit(java_parser* parser)
 */
 static tree_node* parse_class_type(java_parser* parser)
 {
-    tree_node* node = ast_node_class_type();
+    tree_node* node = ast_node_new(JNT_CLASS_TYPE);
 
     // Unit
     tree_node_add_child(node, __parse_class_type_unit(parser));
@@ -506,10 +506,10 @@ static tree_node* parse_class_type(java_parser* parser)
 */
 static tree_node* __parse_interface_type_unit(java_parser* parser)
 {
-    tree_node* node = ast_node_interface_type_unit();
+    tree_node* node = ast_node_new(JNT_INTERFACE_TYPE_UNIT);
 
     // ID
-    consume_token(parser, node->data->id.complex);
+    consume_token(parser, node->data.id->complex);
 
     return node;
 }
@@ -528,7 +528,7 @@ static tree_node* __parse_interface_type_unit(java_parser* parser)
 */
 static tree_node* parse_interface_type(java_parser* parser)
 {
-    tree_node* node = ast_node_interface_type();
+    tree_node* node = ast_node_new(JNT_INTERFACE_TYPE);
 
     // Unit
     tree_node_add_child(node, __parse_interface_type_unit(parser));
@@ -551,7 +551,7 @@ static tree_node* parse_interface_type(java_parser* parser)
 */
 static tree_node* parse_interface_type_list(java_parser* parser)
 {
-    tree_node* node = ast_node_interface_type_list();
+    tree_node* node = ast_node_new(JNT_INTERFACE_TYPE_LIST);
 
     // interface type
     tree_node_add_child(node, parse_interface_type(parser));
@@ -573,7 +573,7 @@ static tree_node* parse_interface_type_list(java_parser* parser)
 */
 static tree_node* parse_package_declaration(java_parser* parser)
 {
-    tree_node* node = ast_node_package_declaration();
+    tree_node* node = ast_node_new(JNT_PKG_DECL);
 
     // package
     consume_token(parser, NULL);
@@ -614,7 +614,7 @@ static tree_node* parse_package_declaration(java_parser* parser)
 */
 static tree_node* parse_import_declaration(java_parser* parser)
 {
-    tree_node* node = ast_node_import_declaration();
+    tree_node* node = ast_node_new(JNT_IMPORT_DECL);
 
     // import
     consume_token(parser, NULL);
@@ -636,7 +636,7 @@ static tree_node* parse_import_declaration(java_parser* parser)
     {
         consume_token(parser, NULL);
         consume_token(parser, NULL);
-        node->data->import.on_demand = true;
+        node->data.import->on_demand = true;
     }
 
     if (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_SEMICOLON))
@@ -663,7 +663,7 @@ static tree_node* parse_import_declaration(java_parser* parser)
 */
 static tree_node* parse_top_level(java_parser* parser)
 {
-    tree_node* node = ast_node_top_level();
+    tree_node* node = ast_node_new(JNT_TOP_LEVEL);
     java_lexeme_type type;
 
     // {Modifier}
@@ -678,7 +678,7 @@ static tree_node* parse_top_level(java_parser* parser)
         }
 
         consume_token(parser, NULL);
-        node->data->top_level_declaration.modifier |= ((lbit_flag)1 << type);
+        node->data.top_level->modifier |= ((lbit_flag)1 << type);
     }
 
     type = peek_token_type(parser, TOKEN_PEEK_1st);
@@ -714,7 +714,7 @@ static tree_node* parse_top_level(java_parser* parser)
 */
 static tree_node* parse_class_declaration(java_parser* parser)
 {
-    tree_node* node = ast_node_class_declaration();
+    tree_node* node = ast_node_new(JNT_CLASS_DECL);
 
     // class
     consume_token(parser, NULL);
@@ -722,7 +722,7 @@ static tree_node* parse_class_declaration(java_parser* parser)
     // ID, skip if incomplete
     if (peek_token_class_is(parser, TOKEN_PEEK_1st, JT_IDENTIFIER))
     {
-        consume_token(parser, node->data->id.complex);
+        consume_token(parser, node->data.id->complex);
     }
     else
     {
@@ -760,7 +760,7 @@ static tree_node* parse_class_declaration(java_parser* parser)
 */
 static tree_node* parse_interface_declaration(java_parser* parser)
 {
-    tree_node* node = ast_node_interface_declaration();
+    tree_node* node = ast_node_new(JNT_INTERFACE_DECL);
 
     // interface
     consume_token(parser, NULL);
@@ -768,7 +768,7 @@ static tree_node* parse_interface_declaration(java_parser* parser)
     // ID, terminate if incomplete
     if (peek_token_class_is(parser, TOKEN_PEEK_1st, JT_IDENTIFIER))
     {
-        consume_token(parser, node->data->id.complex);
+        consume_token(parser, node->data.id->complex);
     }
     else
     {
@@ -801,7 +801,7 @@ static tree_node* parse_interface_declaration(java_parser* parser)
 */
 static tree_node* parse_class_extends(java_parser* parser)
 {
-    tree_node* node = ast_node_class_extends();
+    tree_node* node = ast_node_new(JNT_CLASS_EXTENDS);
 
     // extends
     consume_token(parser, NULL);
@@ -825,7 +825,7 @@ static tree_node* parse_class_extends(java_parser* parser)
 */
 static tree_node* parse_class_implements(java_parser* parser)
 {
-    tree_node* node = ast_node_class_implements();
+    tree_node* node = ast_node_new(JNT_CLASS_IMPLEMENTS);
 
     // implements
     consume_token(parser, NULL);
@@ -854,7 +854,7 @@ static tree_node* parse_class_implements(java_parser* parser)
 */
 static tree_node* parse_class_body(java_parser* parser)
 {
-    tree_node* node = ast_node_class_body();
+    tree_node* node = ast_node_new(JNT_CLASS_BODY);
     java_token* peek;
 
     // {
@@ -892,7 +892,7 @@ static tree_node* parse_class_body(java_parser* parser)
 */
 static tree_node* parse_interface_extends(java_parser* parser)
 {
-    tree_node* node = ast_node_interface_extends();
+    tree_node* node = ast_node_new(JNT_INTERFACE_EXTENDS);
 
     // extends
     consume_token(parser, NULL);
@@ -917,7 +917,7 @@ static tree_node* parse_interface_extends(java_parser* parser)
 */
 static tree_node* parse_interface_body(java_parser* parser)
 {
-    tree_node* node = ast_node_interface_body();
+    tree_node* node = ast_node_new(JNT_INTERFACE_BODY);
     java_token* peek;
 
     // {
@@ -974,7 +974,7 @@ static tree_node* parse_interface_body(java_parser* parser)
 */
 static tree_node* parse_interface_body_declaration(java_parser* parser)
 {
-    tree_node* node = ast_node_interface_body_declaration();
+    tree_node* node = ast_node_new(JNT_INTERFACE_BODY_DECL);
     java_lexeme_type type;
 
     // {Modifier}, still ambiguous
@@ -989,7 +989,7 @@ static tree_node* parse_interface_body_declaration(java_parser* parser)
         }
 
         consume_token(parser, NULL);
-        node->data->top_level_declaration.modifier |= ((lbit_flag)1 << type);
+        node->data.top_level->modifier |= ((lbit_flag)1 << type);
     }
 
     // Type, still ambiguous
@@ -1087,7 +1087,7 @@ static tree_node* parse_interface_body_declaration(java_parser* parser)
 */
 static tree_node* parse_class_body_declaration(java_parser* parser)
 {
-    tree_node* node = ast_node_class_body_declaration();
+    tree_node* node = ast_node_new(JNT_CLASS_BODY_DECL);
     java_lexeme_type type;
 
     // StaticInitializer
@@ -1113,7 +1113,7 @@ static tree_node* parse_class_body_declaration(java_parser* parser)
         }
 
         consume_token(parser, NULL);
-        node->data->top_level_declaration.modifier |= ((lbit_flag)1 << type);
+        node->data.top_level->modifier |= ((lbit_flag)1 << type);
     }
 
     // ConstructorDeclaration: {Modifier} ID (
@@ -1184,7 +1184,7 @@ static tree_node* parse_class_body_declaration(java_parser* parser)
 */
 static tree_node* parse_static_initializer(java_parser* parser)
 {
-    tree_node* node = ast_node_static_initializer();
+    tree_node* node = ast_node_new(JNT_STATIC_INIT);
 
     // static
     consume_token(parser, NULL);
@@ -1210,7 +1210,7 @@ static tree_node* parse_static_initializer(java_parser* parser)
 */
 static tree_node* parse_block(java_parser* parser)
 {
-    tree_node* node = ast_node_block();
+    tree_node* node = ast_node_new(JNT_BLOCK);
     tree_node* statement = NULL;
 
     // {
@@ -1305,8 +1305,7 @@ static tree_node* parse_statement(java_parser* parser)
     switch (peek_token_type(parser, TOKEN_PEEK_1st))
     {
         case JLT_SYM_SEMICOLON:
-            node = ast_node_statement(false);
-            tree_node_mutate(node, JNT_STATEMENT_EMPTY);
+            node = ast_node_new(JNT_STATEMENT_EMPTY);
             consume_token(parser, NULL); // ;
             return node;
         case JLT_SYM_BRACE_OPEN:
@@ -1391,7 +1390,7 @@ static tree_node* parse_statement(java_parser* parser)
         fprintf(stderr, "TODO error: expected statment.\n");
 
         // by default we return an ill-formed node
-        return ast_node_statement(false);
+        return ast_node_new(JNT_STATEMENT);
     }
 }
 
@@ -1408,10 +1407,9 @@ static tree_node* parse_statement(java_parser* parser)
 */
 static tree_node* parse_expression_statement(java_parser* parser)
 {
-    tree_node* node = ast_node_statement(false);
+    tree_node* node = ast_node_new(JNT_STATEMENT_EXPRESSION);
 
     // Expression
-    tree_node_mutate(node, JNT_STATEMENT_EXPRESSION);
     tree_node_add_child(node, parse_expression(parser));
 
     // ;
@@ -1433,10 +1431,9 @@ static tree_node* parse_expression_statement(java_parser* parser)
 */
 static tree_node* parse_local_variable_declaration(java_parser* parser)
 {
-    tree_node* node = ast_node_statement(false);
+    tree_node* node = ast_node_new(JNT_LOCAL_VAR_DECL);
 
     // Type
-    tree_node_mutate(node, JNT_LOCAL_VAR_DECL);
     tree_node_add_child(node, parse_type(parser));
 
     // VariableDeclarators
@@ -1458,10 +1455,9 @@ static tree_node* parse_local_variable_declaration(java_parser* parser)
 */
 static tree_node* parse_local_variable_declaration_statement(java_parser* parser)
 {
-    tree_node* node = ast_node_statement(false);
+    tree_node* node = ast_node_new(JNT_STATEMENT_VAR_DECL);
 
     // LocalVariableDeclaration
-    tree_node_mutate(node, JNT_STATEMENT_VAR_DECL);
     tree_node_add_child(node, parse_local_variable_declaration(parser));
 
     // ;
@@ -1523,11 +1519,10 @@ static tree_node* parse_local_variable_declaration_statement(java_parser* parser
 */
 static tree_node* parse_switch_statement(java_parser* parser)
 {
-    tree_node* node = ast_node_statement(false);
+    tree_node* node = ast_node_new(JNT_STATEMENT_SWITCH);
     java_lexeme_type peek;
 
     // switch
-    tree_node_mutate(node, JNT_STATEMENT_SWITCH);
     consume_token(parser, NULL);
 
     // (
@@ -1627,10 +1622,9 @@ static tree_node* parse_switch_statement(java_parser* parser)
 */
 static tree_node* parse_do_statement(java_parser* parser)
 {
-    tree_node* node = ast_node_statement(false);
+    tree_node* node = ast_node_new(JNT_STATEMENT_DO);
 
     // do
-    tree_node_mutate(node, JNT_STATEMENT_DO);
     consume_token(parser, NULL);
 
     // Statement
@@ -1707,16 +1701,15 @@ static tree_node* parse_do_statement(java_parser* parser)
 */
 static tree_node* parse_break_statement(java_parser* parser)
 {
-    tree_node* node = ast_node_statement(true);
+    tree_node* node = ast_node_new(JNT_STATEMENT_BREAK);
 
     // break
-    tree_node_mutate(node, JNT_STATEMENT_BREAK);
     consume_token(parser, NULL);
 
     // [ID]
     if (peek_token_class_is(parser, TOKEN_PEEK_1st, JT_IDENTIFIER))
     {
-        consume_token(parser, node->data->id.complex);
+        consume_token(parser, node->data.id->complex);
     }
 
     // ;
@@ -1738,16 +1731,15 @@ static tree_node* parse_break_statement(java_parser* parser)
 */
 static tree_node* parse_continue_statement(java_parser* parser)
 {
-    tree_node* node = ast_node_statement(true);
+    tree_node* node = ast_node_new(JNT_STATEMENT_CONTINUE);
 
     // continue
-    tree_node_mutate(node, JNT_STATEMENT_CONTINUE);
     consume_token(parser, NULL);
 
     // [ID]
     if (peek_token_class_is(parser, TOKEN_PEEK_1st, JT_IDENTIFIER))
     {
-        consume_token(parser, node->data->id.complex);
+        consume_token(parser, node->data.id->complex);
     }
 
     // ;
@@ -1769,10 +1761,9 @@ static tree_node* parse_continue_statement(java_parser* parser)
 */
 static tree_node* parse_return_statement(java_parser* parser)
 {
-    tree_node* node = ast_node_statement(false);
+    tree_node* node = ast_node_new(JNT_STATEMENT_RETURN);
 
     // return
-    tree_node_mutate(node, JNT_STATEMENT_RETURN);
     consume_token(parser, NULL);
 
     // [Expression]
@@ -1800,10 +1791,9 @@ static tree_node* parse_return_statement(java_parser* parser)
 */
 static tree_node* parse_synchronized_statement(java_parser* parser)
 {
-    tree_node* node = ast_node_statement(false);
+    tree_node* node = ast_node_new(JNT_STATEMENT_THROW);
 
     // throw
-    tree_node_mutate(node, JNT_STATEMENT_THROW);
     consume_token(parser, NULL);
 
     // (
@@ -1859,10 +1849,9 @@ static tree_node* parse_synchronized_statement(java_parser* parser)
 */
 static tree_node* parse_throw_statement(java_parser* parser)
 {
-    tree_node* node = ast_node_statement(false);
+    tree_node* node = ast_node_new(JNT_STATEMENT_THROW);
 
     // throw
-    tree_node_mutate(node, JNT_STATEMENT_THROW);
     consume_token(parser, NULL);
 
     // Expression
@@ -1900,10 +1889,9 @@ static tree_node* parse_throw_statement(java_parser* parser)
 */
 static tree_node* parse_try_statement(java_parser* parser)
 {
-    tree_node* node = ast_node_statement(false);
+    tree_node* node = ast_node_new(JNT_STATEMENT_TRY);
 
     // try
-    tree_node_mutate(node, JNT_STATEMENT_TRY);
     consume_token(parser, NULL);
 
     // Block
@@ -1950,10 +1938,9 @@ static tree_node* parse_try_statement(java_parser* parser)
 */
 static tree_node* parse_if_statement(java_parser* parser)
 {
-    tree_node* node = ast_node_statement(false);
+    tree_node* node = ast_node_new(JNT_STATEMENT_IF);
 
     // if
-    tree_node_mutate(node, JNT_STATEMENT_IF);
     consume_token(parser, NULL);
 
     // (
@@ -2029,10 +2016,9 @@ static tree_node* parse_if_statement(java_parser* parser)
 */
 static tree_node* parse_while_statement(java_parser* parser)
 {
-    tree_node* node = ast_node_statement(false);
+    tree_node* node = ast_node_new(JNT_STATEMENT_WHILE);
 
     // while
-    tree_node_mutate(node, JNT_STATEMENT_WHILE);
     consume_token(parser, NULL);
 
     // (
@@ -2088,10 +2074,9 @@ static tree_node* parse_while_statement(java_parser* parser)
 */
 static tree_node* parse_for_statement(java_parser* parser)
 {
-    tree_node* node = ast_node_statement(false);
+    tree_node* node = ast_node_new(JNT_STATEMENT_FOR);
 
     // for
-    tree_node_mutate(node, JNT_STATEMENT_FOR);
     consume_token(parser, NULL);
 
     // (
@@ -2176,11 +2161,10 @@ static tree_node* parse_for_statement(java_parser* parser)
 */
 static tree_node* parse_label_statement(java_parser* parser)
 {
-    tree_node* node = ast_node_statement(true);
+    tree_node* node = ast_node_new(JNT_STATEMENT_LABEL);
 
     // ID :
-    tree_node_mutate(node, JNT_STATEMENT_LABEL);
-    consume_token(parser, node->data->id.complex);
+    consume_token(parser, node->data.id->complex);
     consume_token(parser, NULL);
 
     // Statement
@@ -2202,10 +2186,9 @@ static tree_node* parse_label_statement(java_parser* parser)
 */
 static tree_node* parse_catch_statement(java_parser* parser)
 {
-    tree_node* node = ast_node_statement(false);
+    tree_node* node = ast_node_new(JNT_STATEMENT_CATCH);
 
     // catch
-    tree_node_mutate(node, JNT_STATEMENT_CATCH);
     consume_token(parser, NULL);
 
     // (
@@ -2261,10 +2244,9 @@ static tree_node* parse_catch_statement(java_parser* parser)
 */
 static tree_node* parse_finally_statement(java_parser* parser)
 {
-    tree_node* node = ast_node_statement(false);
+    tree_node* node = ast_node_new(JNT_STATEMENT_FINALLY);
 
     // finally
-    tree_node_mutate(node, JNT_STATEMENT_FINALLY);
     consume_token(parser, NULL);
 
     // Block
@@ -2294,14 +2276,14 @@ static tree_node* parse_finally_statement(java_parser* parser)
 */
 static tree_node* parse_switch_label(java_parser* parser)
 {
-    tree_node* node = ast_node_switch_label();
+    tree_node* node = ast_node_new(JNT_SWITCH_LABEL);
 
     // case/default
-    node->data->switch_label.is_default = peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_RWD_DEFAULT);
+    node->data.switch_label->is_default = peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_RWD_DEFAULT);
     consume_token(parser, NULL);
 
     // case label requires an Expression
-    if (!node->data->switch_label.is_default)
+    if (!node->data.switch_label->is_default)
     {
         // Expression
         if (parser_trigger_expression(parser, TOKEN_PEEK_1st))
@@ -2334,7 +2316,7 @@ static tree_node* parse_switch_label(java_parser* parser)
 */
 static tree_node* parse_expression_list(java_parser* parser)
 {
-    tree_node* node = ast_node_expression_list();
+    tree_node* node = ast_node_new(JNT_EXPRESSION_LIST);
 
     // Expression
     tree_node_add_child(node, parse_expression(parser));
@@ -2370,7 +2352,7 @@ static tree_node* parse_expression_list(java_parser* parser)
 */
 static tree_node* parse_for_init(java_parser* parser)
 {
-    tree_node* node = ast_node_for_init();
+    tree_node* node = ast_node_new(JNT_FOR_INIT);
 
     // optimization: for some cases, trigger will not cause ambiguity
     if (peek_token_is_primitive_type(parser, TOKEN_PEEK_1st))
@@ -2394,7 +2376,7 @@ static tree_node* parse_for_init(java_parser* parser)
 */
 static tree_node* parse_for_update(java_parser* parser)
 {
-    tree_node* node = ast_node_for_update();
+    tree_node* node = ast_node_new(JNT_FOR_UPDATE);
 
     // StatementExpressionList
     tree_node_add_child(node, parse_expression_list(parser));
@@ -2408,10 +2390,10 @@ static tree_node* parse_for_update(java_parser* parser)
 */
 static tree_node* parse_constructor_declaration(java_parser* parser)
 {
-    tree_node* node = ast_node_constructor_declaration();
+    tree_node* node = ast_node_new(JNT_CTOR_DECL);
 
     // ID (
-    consume_token(parser, node->data->declarator.id.complex);
+    consume_token(parser, node->data.declarator->id.complex);
     consume_token(parser, NULL);
 
     // [FormalParameterList]
@@ -2471,7 +2453,7 @@ static tree_node* parse_constructor_declaration(java_parser* parser)
 */
 static tree_node* parse_type(java_parser* parser)
 {
-    tree_node* node = ast_node_type();
+    tree_node* node = ast_node_new(JNT_TYPE);
 
     /**
      * We need to directly accept without checking at the
@@ -2487,7 +2469,7 @@ static tree_node* parse_type(java_parser* parser)
     {
         // primitive type word makes a Type uniquely produced
         node->ambiguous = false;
-        node->data->declarator.id.simple = peek_token_type(parser, TOKEN_PEEK_1st);
+        node->data.declarator->id.simple = peek_token_type(parser, TOKEN_PEEK_1st);
         consume_token(parser, NULL);
     }
     else if (parser_trigger_class_type(parser, TOKEN_PEEK_1st))
@@ -2517,11 +2499,11 @@ static tree_node* parse_type(java_parser* parser)
         }
 
         // track dimensions
-        node->data->declarator.dimension++;
+        node->data.declarator->dimension++;
     }
 
     // array dimension makes a Type uniquely produced
-    node->ambiguous = node->ambiguous && node->data->declarator.dimension == 0;
+    node->ambiguous = node->ambiguous && node->data.declarator->dimension == 0;
 
     return node;
 }
@@ -2536,10 +2518,10 @@ static tree_node* parse_type(java_parser* parser)
 */
 static tree_node* parse_method_header(java_parser* parser)
 {
-    tree_node* node = ast_node_method_header();
+    tree_node* node = ast_node_new(JNT_METHOD_HEADER);
 
     // ID (
-    consume_token(parser, node->data->declarator.id.complex);
+    consume_token(parser, node->data.declarator->id.complex);
     consume_token(parser, NULL);
 
     // [FormalParameterList]
@@ -2577,7 +2559,7 @@ static tree_node* parse_method_header(java_parser* parser)
         }
 
         // track dimensions
-        node->data->declarator.dimension++;
+        node->data.declarator->dimension++;
     }
 
     // [Throws]
@@ -2595,7 +2577,7 @@ static tree_node* parse_method_header(java_parser* parser)
 */
 static tree_node* parse_method_declaration(java_parser* parser)
 {
-    tree_node* node = ast_node_method_declaration();
+    tree_node* node = ast_node_new(JNT_METHOD_DECL);
 
     // MethodHeader
     tree_node_add_child(node, parse_method_header(parser));
@@ -2619,7 +2601,7 @@ static tree_node* parse_method_declaration(java_parser* parser)
 */
 static tree_node* parse_variable_declarators(java_parser* parser)
 {
-    tree_node* node = ast_node_variable_declarators();
+    tree_node* node = ast_node_new(JNT_VAR_DECLARATORS);
 
     // VariableDeclarator
     tree_node_add_child(node, parse_variable_declarator(parser));
@@ -2648,7 +2630,7 @@ static tree_node* parse_variable_declarators(java_parser* parser)
 */
 static tree_node* parse_formal_parameter_list(java_parser* parser)
 {
-    tree_node* node = ast_node_formal_parameter_list();
+    tree_node* node = ast_node_new(JNT_FORMAL_PARAM_LIST);
 
     // FormalParameter
     tree_node_add_child(node, parse_formal_parameter(parser));
@@ -2678,7 +2660,7 @@ static tree_node* parse_formal_parameter_list(java_parser* parser)
 */
 static tree_node* parse_formal_parameter(java_parser* parser)
 {
-    tree_node* node = ast_node_formal_parameter();
+    tree_node* node = ast_node_new(JNT_FORMAL_PARAM);
 
     // Type
     tree_node_add_child(node, parse_type(parser));
@@ -2686,7 +2668,7 @@ static tree_node* parse_formal_parameter(java_parser* parser)
     // VariableDeclaratorId => ID {[ ]}
     if (peek_token_class_is(parser, TOKEN_PEEK_1st, JT_IDENTIFIER))
     {
-        consume_token(parser, node->data->declarator.id.complex);
+        consume_token(parser, node->data.declarator->id.complex);
 
         // {[ ]}
         while (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_BRACKET_OPEN))
@@ -2706,7 +2688,7 @@ static tree_node* parse_formal_parameter(java_parser* parser)
             }
 
             // track dimensions
-            node->data->declarator.dimension++;
+            node->data.declarator->dimension++;
         }
     }
     else
@@ -2730,7 +2712,7 @@ static tree_node* parse_formal_parameter(java_parser* parser)
 */
 static tree_node* parse_throws(java_parser* parser)
 {
-    tree_node* node = ast_node_throws();
+    tree_node* node = ast_node_new(JNT_THROWS);
 
     // throws
     consume_token(parser, NULL);
@@ -2765,7 +2747,7 @@ static tree_node* parse_throws(java_parser* parser)
 */
 static tree_node* parse_argument_list(java_parser* parser)
 {
-    tree_node* node = ast_node_argument_list();
+    tree_node* node = ast_node_new(JNT_ARGUMENT_LIST);
 
     // Expression
     tree_node_add_child(node, parse_expression(parser));
@@ -2797,7 +2779,7 @@ static tree_node* parse_argument_list(java_parser* parser)
 */
 static tree_node* parse_constructor_body(java_parser* parser)
 {
-    tree_node* node = ast_node_constructor_body();
+    tree_node* node = ast_node_new(JNT_CTOR_BODY);
 
     // {
     consume_token(parser, NULL);
@@ -2845,10 +2827,10 @@ static tree_node* parse_constructor_body(java_parser* parser)
 */
 static tree_node* parse_explicit_constructor_invocation(java_parser* parser)
 {
-    tree_node* node = ast_node_constructor_invocation();
+    tree_node* node = ast_node_new(JNT_CTOR_INVOCATION);
 
     // this/super (
-    node->data->constructor_invoke.is_super = peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_RWD_SUPER);
+    node->data.constructor_invoke->is_super = peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_RWD_SUPER);
     consume_token(parser, NULL);
     consume_token(parser, NULL);
 
@@ -2878,7 +2860,7 @@ static tree_node* parse_explicit_constructor_invocation(java_parser* parser)
 */
 static tree_node* parse_method_body(java_parser* parser)
 {
-    tree_node* node = ast_node_method_body();
+    tree_node* node = ast_node_new(JNT_METHOD_BODY);
 
     // Block
     switch (peek_token_type(parser, TOKEN_PEEK_1st))
@@ -2912,10 +2894,10 @@ static tree_node* parse_method_body(java_parser* parser)
 */
 static tree_node* parse_variable_declarator(java_parser* parser)
 {
-    tree_node* node = ast_node_variable_declarator();
+    tree_node* node = ast_node_new(JNT_VAR_DECL);
 
     // VariableDeclaratorId => ID {[ ]}
-    consume_token(parser, node->data->declarator.id.complex);
+    consume_token(parser, node->data.declarator->id.complex);
 
     // {[ ]}
     while (peek_token_type_is(parser, TOKEN_PEEK_1st, JLT_SYM_BRACKET_OPEN))
@@ -2935,7 +2917,7 @@ static tree_node* parse_variable_declarator(java_parser* parser)
         }
 
         // track dimensions
-        node->data->declarator.dimension++;
+        node->data.declarator->dimension++;
     }
 
     // [= VariableInitializer] => [= Expression|ArrayInitializer]
@@ -2983,7 +2965,7 @@ static tree_node* parse_variable_declarator(java_parser* parser)
 */
 static tree_node* parse_array_initializer(java_parser* parser)
 {
-    tree_node* node = ast_node_array_initializer();
+    tree_node* node = ast_node_new(JNT_ARRAY_INIT);
 
     // {
     consume_token(parser, NULL);
@@ -3042,9 +3024,9 @@ static tree_node* parse_array_initializer(java_parser* parser)
 */
 static tree_node* parse_primary_simple(java_parser* parser)
 {
-    tree_node* node = ast_node_primary_simple();
+    tree_node* node = ast_node_new(JNT_PRIMARY_SIMPLE);
 
-    node->data->id.simple = peek_token_type(parser, TOKEN_PEEK_1st);
+    node->data.id->simple = peek_token_type(parser, TOKEN_PEEK_1st);
     consume_token(parser, NULL);
 
     return node;
@@ -3055,10 +3037,10 @@ static tree_node* parse_primary_simple(java_parser* parser)
 */
 static tree_node* parse_primary_complex(java_parser* parser)
 {
-    tree_node* node = ast_node_primary_complex();
+    tree_node* node = ast_node_new(JNT_PRIMARY_COMPLEX);
 
     // ID
-    consume_token(parser, node->data->id.complex);
+    consume_token(parser, node->data.id->complex);
 
     return node;
 }
@@ -3070,7 +3052,7 @@ static tree_node* parse_primary_complex(java_parser* parser)
 */
 static tree_node* parse_primary_creation(java_parser* parser)
 {
-    tree_node* node = ast_node_primary_creation();
+    tree_node* node = ast_node_new(JNT_PRIMARY_CREATION);
 
     // new
     consume_token(parser, NULL);
@@ -3110,7 +3092,7 @@ static tree_node* parse_primary_creation(java_parser* parser)
 */
 static tree_node* parse_primary_array_creation(java_parser* parser)
 {
-    tree_node* node = ast_node_primary_array_creation();
+    tree_node* node = ast_node_new(JNT_PRIMARY_ARR_CREATION);
     bool first_variadic = true;
     bool accepting_variadic;
 
@@ -3132,7 +3114,7 @@ static tree_node* parse_primary_array_creation(java_parser* parser)
     {
         // ]
         consume_token(parser, NULL);
-        node->data->declarator.dimension++;
+        node->data.declarator->dimension++;
     }
     else
     {
@@ -3170,7 +3152,7 @@ static tree_node* parse_primary_array_creation(java_parser* parser)
             break;
         }
 
-        node->data->declarator.dimension++;
+        node->data.declarator->dimension++;
     }
 
     // ArrayInitializer
@@ -3198,7 +3180,7 @@ static tree_node* parse_primary_array_creation(java_parser* parser)
 */
 static tree_node* parse_primary_class_instance_creation(java_parser* parser)
 {
-    tree_node* node = ast_node_primary_class_instance_creation();
+    tree_node* node = ast_node_new(JNT_PRIMARY_CLS_CREATION);
 
     // (
     consume_token(parser, NULL);
@@ -3238,7 +3220,7 @@ static tree_node* parse_primary_class_instance_creation(java_parser* parser)
 */
 static tree_node* parse_primary_method_invocation(java_parser* parser)
 {
-    tree_node* node = ast_node_primary_method_invocation();
+    tree_node* node = ast_node_new(JNT_PRIMARY_METHOD_INVOKE);
 
     // (
     consume_token(parser, NULL);
@@ -3269,7 +3251,7 @@ static tree_node* parse_primary_method_invocation(java_parser* parser)
 */
 static tree_node* parse_primary_array_access(java_parser* parser)
 {
-    tree_node* node = ast_node_primary_array_access();
+    tree_node* node = ast_node_new(JNT_PRIMARY_ARR_ACCESS);
 
     // based on our design rule:
     // this loop is guaranteed to have at least 1 iteration
@@ -3312,7 +3294,7 @@ static tree_node* parse_primary_array_access(java_parser* parser)
 */
 static tree_node* parse_primary_class_literal(java_parser* parser)
 {
-    tree_node* node = ast_node_primary_class_literal();
+    tree_node* node = ast_node_new(JNT_PRIMARY_CLS_LITERAL);
 
     consume_token(parser, NULL);
     consume_token(parser, NULL);
@@ -3360,7 +3342,7 @@ static tree_node* parse_primary_class_literal(java_parser* parser)
 */
 static tree_node* parse_primary(java_parser* parser)
 {
-    tree_node* node = ast_node_primary();
+    tree_node* node = ast_node_new(JNT_PRIMARY);
     java_lexeme_type peek;
     bool accepting = true;
     bool last_separator = false;
@@ -3529,7 +3511,7 @@ static tree_node* parse_primary(java_parser* parser)
 */
 static tree_node* parse_expression(java_parser* parser)
 {
-    tree_node* node = ast_node_expression();
+    tree_node* node = ast_node_new(JNT_EXPRESSION);
     java_expression_worker worker;
     java_lexeme_type token_type;
     operator_id op_type;

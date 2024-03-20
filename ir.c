@@ -110,7 +110,7 @@ char* name_unit_concat(tree_node* from, tree_node* stop_before)
     init_string_list(&sl);
     while (from != stop_before)
     {
-        string_list_append(&sl, t2s(from->data->id.complex), false);
+        string_list_append(&sl, t2s(from->data.id->complex), false);
         from = from->next_sibling;
     }
 

@@ -31,6 +31,7 @@
 
 #define ASSERT_ALLOCATION(ptr) assert((ptr) != NULL)
 #define ARRAY_SIZE(arr) (sizeof (arr) / sizeof ((arr)[0]))
+#define ALLOCATE(type, name) type* name = (type*)malloc_assert(sizeof(type))
 
 typedef unsigned char byte;
 typedef unsigned char bbit_flag;

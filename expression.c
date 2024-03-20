@@ -1,6 +1,5 @@
 #include "expression.h"
 #include "node.h"
-#include "ast.h"
 
 /**
  * Expression Worker Initialization
@@ -393,9 +392,9 @@ tree_node* expression_stack_parse_top(java_expression_worker* worker)
         return NULL;
     }
 
-    tree_node* node = ast_node_operator();
+    tree_node* node = ast_node_new(JNT_OPERATOR);
 
-    node->data->operator.id = worker->operator_stack->op;
+    node->data.operator->id = worker->operator_stack->op;
     expression_stack_pop(worker);
 
     return node;

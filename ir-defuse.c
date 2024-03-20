@@ -303,8 +303,8 @@ definition* type2def(
         case DEFINITION_VARIABLE:
             desc->variable->is_class_member = is_member;
             desc->variable->modifier = modifier;
-            desc->variable->type.primitive = node->data->declarator.id.simple;
-            desc->variable->type.dim = node->data->declarator.dimension;
+            desc->variable->type.primitive = node->data.declarator->id.simple;
+            desc->variable->type.dim = node->data.declarator->dimension;
 
             // if not primitive type, then it must be a reference type
             if (desc->variable->type.primitive == JLT_MAX)
@@ -315,8 +315,8 @@ definition* type2def(
             break;
         case DEFINITION_METHOD:
             desc->method->modifier = modifier;
-            desc->method->return_type.primitive = node->data->declarator.id.simple;
-            desc->method->return_type.dim = node->data->declarator.dimension;
+            desc->method->return_type.primitive = node->data.declarator->id.simple;
+            desc->method->return_type.dim = node->data.declarator->dimension;
 
             // if not primitive type, then it must be a reference type
             if (desc->method->return_type.primitive == JLT_MAX)
@@ -383,13 +383,13 @@ static char* get_param_list_type_name(java_ir* ir, tree_node* node, size_t* coun
     while (node)
     {
         // parse dimensions
-        for (size_t i = node->first_child->data->declarator.dimension; i > 0; i--)
+        for (size_t i = node->first_child->data.declarator->dimension; i > 0; i--)
         {
             string_list_append_char(&sl, JIL_TYPE_ARRAY_DIM);
         }
 
         // parse primitive type
-        c = primitive_type_to_jil_type(node->first_child->data->declarator.id.simple);
+        c = primitive_type_to_jil_type(node->first_child->data.declarator->id.simple);
 
         if (c)
         {
@@ -448,7 +448,7 @@ static char* get_full_method_name(java_ir* ir, tree_node* node, size_t* param_co
      * for constructor, so no further adjustment
      * needs to be done here
     */
-    char* name = t2s(node->data->declarator.id.complex);
+    char* name = t2s(node->data.declarator->id.complex);
     char* param_name = get_param_list_type_name(ir, node->first_child, param_count);
     size_t len_n, len_p;
 
@@ -535,11 +535,11 @@ definition* def_var(java_ir* ir, tree_node* node, definition** type, def_use_con
      * |
      * +--- JNT_EXPRESSION   <--- root_code_walk if is_member=true
     */
-    char* name = t2s(node->data->declarator.id.complex);
+    char* name = t2s(node->data.declarator->id.complex);
 
     definition* data = def(
         ir, &name, type,
-        node->data->declarator.dimension,
+        node->data.declarator->dimension,
         duc | DU_CTL_LOOKUP_TOP_LEVEL,
         is_member ? JAVA_E_MEMBER_VAR_DUPLICATE : JAVA_E_LOCAL_VAR_DUPLICATE,
         is_member ? JAVA_E_MEMBER_VAR_DIM_AMBIGUOUS : JAVA_E_LOCAL_VAR_DIM_AMBIGUOUS,
@@ -638,7 +638,7 @@ void def_params(java_ir* ir, tree_node* node, definition** ordered_list)
     while (node)
     {
         desc = type2def(node->first_child, DEFINITION_VARIABLE, JLT_UNDEFINED, false);
-        name = t2s(node->data->declarator.id.complex);
+        name = t2s(node->data.declarator->id.complex);
 
         /**
          * 1. move name and desc
@@ -647,7 +647,7 @@ void def_params(java_ir* ir, tree_node* node, definition** ordered_list)
         */
         param = def(
             ir, &name, &desc,
-            node->data->declarator.dimension,
+            node->data.declarator->dimension,
             DU_CTL_DEFAULT,
             JAVA_E_PARAM_DUPLICATE,
             JAVA_E_PARAM_DIM_AMBIGUOUS,
@@ -704,7 +704,7 @@ static void def_method(java_ir* ir, tree_node* node, lbit_flag modifier)
     // register
     method = def(
         ir, &name, &desc,
-        node->data->declarator.dimension,
+        node->data.declarator->dimension,
         DU_CTL_LOOKUP_TOP_LEVEL | DU_CTL_METHOD_NAME,
         JAVA_E_METHOD_DUPLICATE,
         JAVA_E_METHOD_DIM_AMBIGUOUS,
@@ -757,11 +757,11 @@ static void def_import(java_ir* ir, tree_node* node)
      *      |
      *      +--- ...
     */
-    if (!node->data->import.on_demand)
+    if (!node->data.import->on_demand)
     {
         // last name unit is the import target
         last_unit = name->last_child;
-        registered_name = t2s(last_unit->data->id.complex);
+        registered_name = t2s(last_unit->data.id->complex);
     }
 
     // construct package name list
@@ -860,11 +860,11 @@ static void def_class(java_ir* ir, tree_node* node)
     tree_node* probe;
 
     global_top_level* desc = new_global_top_level(TOP_LEVEL_CLASS);
-    char* registered_name = t2s(part->data->id.complex);
+    char* registered_name = t2s(part->data.id->complex);
     string_list sl;
 
     // definition data
-    desc->modifier = node->data->top_level_declaration.modifier;
+    desc->modifier = node->data.top_level->modifier;
 
     // [extends, implements, body]
     part = part->first_child;
@@ -935,7 +935,7 @@ static void def_class(java_ir* ir, tree_node* node)
 
         if (probe->type == JNT_CTOR_DECL)
         {
-            def_constructor(ir, probe, part->data->top_level_declaration.modifier);
+            def_constructor(ir, probe, part->data.top_level->modifier);
         }
         else if (probe->type == JNT_TYPE)
         {
@@ -945,10 +945,10 @@ static void def_class(java_ir* ir, tree_node* node)
             switch (probe->next_sibling->type)
             {
                 case JNT_VAR_DECLARATORS:
-                    def_vars(ir, probe, part->data->top_level_declaration.modifier, true);
+                    def_vars(ir, probe, part->data.top_level->modifier, true);
                     break;
                 case JNT_METHOD_DECL:
-                    def_method(ir, probe, part->data->top_level_declaration.modifier);
+                    def_method(ir, probe, part->data.top_level->modifier);
                     break;
                 default:
                     break;
