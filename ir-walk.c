@@ -40,7 +40,7 @@ static reference* __interpret_operand(java_ir* ir, tree_node* base)
          * TODO: should we include JNT_EXPRESSION here for ( Expression ) ?
         */
         ref->type = IR_ASN_REF_INSTRUCTION;
-        ref->doi = base->data->operator.instruction;
+        ref->doi = base->data.operator->instruction;
 
         return ref;
     }
@@ -55,7 +55,7 @@ static reference* __interpret_operand(java_ir* ir, tree_node* base)
     */
     if (primary->type == JNT_PRIMARY_COMPLEX)
     {
-        token = primary->data->id.complex;
+        token = primary->data.id->complex;
         content = t2s(token);
 
         // try get literal definition
@@ -119,7 +119,7 @@ static void __execute_instruction(
     reference* operand_2
 )
 {
-    operator_id id = op->data->operator.id;
+    operator_id id = op->data.operator->id;
     reference* lvalue = NULL;
     bool validate_lvalue = false;
 
@@ -203,13 +203,13 @@ static void __execute_instruction(
              * if directly references to the def, just use the newest one,
              * which is the default behavior
              *
-             * so op->data->operator.instruction references to STORE instruction
+             * so op->data.operator->instruction references to STORE instruction
             */
 
             // first, prepare STORE instruction, and override instruction
             // attached to this operator
             lvalue = copy_reference(operand_2);
-            op->data->operator.instruction = cfg_worker_execute(
+            op->data.operator->instruction = cfg_worker_execute(
                 ir, worker, IROP_STORE, NULL, &lvalue, NULL);
             delete_reference(lvalue);
 
@@ -235,13 +235,13 @@ static void __execute_instruction(
 
     // link the instruction to this op
     // if there was an override occurred, do not override here
-    if (op->data->operator.instruction)
+    if (op->data.operator->instruction)
     {
         cfg_worker_execute(ir, worker, expr_opid2irop(ir->expression, id), &lvalue, &operand_1, &operand_2);
     }
     else
     {
-        op->data->operator.instruction = cfg_worker_execute(
+        op->data.operator->instruction = cfg_worker_execute(
             ir, worker, expr_opid2irop(ir->expression, id), &lvalue, &operand_1, &operand_2);
     }
 
@@ -359,7 +359,7 @@ static void walk_expression(java_ir* ir, tree_node* expression)
         // first operand is always the immediate previous one
         base1 = top->prev_sibling;
         base2 = NULL;
-        opid = top->data->operator.id;
+        opid = top->data.operator->id;
 
         // base1 must be available
         if (!base1)
@@ -1026,7 +1026,7 @@ static void __execute_statement_return(java_ir* ir, tree_node* stmt)
 /**
  * walk break statement
  *
- * node->data->id.complex->class = JT_IDENTIFIER will contain the optional ID
+ * node->data.id->complex->class = JT_IDENTIFIER will contain the optional ID
  *
  * node: JNT_STATEMENT_BREAK
 */
@@ -1043,7 +1043,7 @@ static void __execute_statement_break(java_ir* ir, tree_node* stmt)
         return;
     }
 
-    if (stmt->data->id.complex->class == JT_IDENTIFIER)
+    if (stmt->data.id->complex->class == JT_IDENTIFIER)
     {
         /**
          * TODO: branch to label (additional lookup)
@@ -1080,7 +1080,7 @@ static void __execute_statement_break(java_ir* ir, tree_node* stmt)
 /**
  * walk continue statement
  *
- * node->data->id.complex->class = JT_IDENTIFIER will contain the optional ID
+ * node->data.id->complex->class = JT_IDENTIFIER will contain the optional ID
  *
  * node: JNT_STATEMENT_BREAK
 */
@@ -1097,7 +1097,7 @@ static void __execute_statement_continue(java_ir* ir, tree_node* stmt)
         return;
     }
 
-    if (stmt->data->id.complex->class == JT_IDENTIFIER)
+    if (stmt->data.id->complex->class == JT_IDENTIFIER)
     {
         /**
          * TODO: branch to label (additional lookup)

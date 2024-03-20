@@ -7,7 +7,6 @@
 #include "token.h"
 #include "file.h"
 #include "symtbl.h"
-#include "ast.h"
 #include "expression.h"
 #include "error.h"
 

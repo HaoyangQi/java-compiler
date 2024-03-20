@@ -1100,7 +1100,7 @@ void get_next_token(java_token* token, file_buffer* buffer, hash_table* rw)
 /**
  * delete token memory and release all allocated content within
 */
-void free_token(java_token* token)
+void delete_token(java_token* token)
 {
     free(token);
 }

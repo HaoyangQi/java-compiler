@@ -860,7 +860,7 @@ void debug_tokenize(file_buffer* buffer, hash_table* table)
         printf("\n");
     }
 
-    free_token(token);
+    delete_token(token);
 }
 
 static void debug_print_modifier_bit_flag(lbit_flag modifiers)
@@ -937,21 +937,21 @@ static void debug_print_ast_node(java_parser* parser, tree_node* node)
             break;
         case JNT_NAME_UNIT:
             printf("Unit: ");
-            debug_print_token_content(node->data->id.complex);
+            debug_print_token_content(node->data.id->complex);
             break;
         case JNT_CLASS_TYPE:
             printf("Class Type");
             break;
         case JNT_CLASS_TYPE_UNIT:
             printf("Unit: ");
-            debug_print_token_content(node->data->id.complex);
+            debug_print_token_content(node->data.id->complex);
             break;
         case JNT_INTERFACE_TYPE:
             printf("Interface Type");
             break;
         case JNT_INTERFACE_TYPE_UNIT:
             printf("Unit: ");
-            debug_print_token_content(node->data->id.complex);
+            debug_print_token_content(node->data.id->complex);
             break;
         case JNT_INTERFACE_TYPE_LIST:
             printf("Interface Type List");
@@ -961,19 +961,19 @@ static void debug_print_ast_node(java_parser* parser, tree_node* node)
             break;
         case JNT_IMPORT_DECL:
             printf("Import Declaration (On-demand: %s)",
-                (node->data->import.on_demand ? "true" : "false"));
+                (node->data.import->on_demand ? "true" : "false"));
             break;
         case JNT_TOP_LEVEL:
             printf("Top Level: ");
-            debug_print_modifier_bit_flag(node->data->top_level_declaration.modifier);
+            debug_print_modifier_bit_flag(node->data.top_level->modifier);
             break;
         case JNT_CLASS_DECL:
             printf("Class Declaration: ");
-            debug_print_token_content(node->data->id.complex);
+            debug_print_token_content(node->data.id->complex);
             break;
         case JNT_INTERFACE_DECL:
             printf("Interface Declaration: ");
-            debug_print_token_content(node->data->id.complex);
+            debug_print_token_content(node->data.id->complex);
             break;
         case JNT_CLASS_EXTENDS:
             printf("Class Extends");
@@ -986,11 +986,11 @@ static void debug_print_ast_node(java_parser* parser, tree_node* node)
             break;
         case JNT_INTERFACE_BODY_DECL:
             printf("Interface Body Declaration: ");
-            debug_print_modifier_bit_flag(node->data->top_level_declaration.modifier);
+            debug_print_modifier_bit_flag(node->data.top_level->modifier);
             break;
         case JNT_CLASS_BODY_DECL:
             printf("Class Body Declaration: ");
-            debug_print_modifier_bit_flag(node->data->top_level_declaration.modifier);
+            debug_print_modifier_bit_flag(node->data.top_level->modifier);
             break;
         case JNT_INTERFACE_EXTENDS:
             printf("Interface Extends");
@@ -1006,33 +1006,33 @@ static void debug_print_ast_node(java_parser* parser, tree_node* node)
             break;
         case JNT_CTOR_DECL:
             printf("Constructor Declaration: ");
-            debug_print_token_content(node->data->declarator.id.complex);
+            debug_print_token_content(node->data.declarator->id.complex);
             break;
         case JNT_TYPE:
             printf("Type: ");
 
-            if (node->data->declarator.id.simple == JLT_MAX)
+            if (node->data.declarator->id.simple == JLT_MAX)
             {
                 printf("(Complex Type Shown In Sub-Tree)");
             }
             else
             {
-                debug_print_lexeme_type(node->data->declarator.id.simple);
+                debug_print_lexeme_type(node->data.declarator->id.simple);
             }
 
-            if (node->data->declarator.dimension > 0)
+            if (node->data.declarator->dimension > 0)
             {
-                printf(" Array (dim: %zd)", node->data->declarator.dimension);
+                printf(" Array (dim: %zd)", node->data.declarator->dimension);
             }
 
             break;
         case JNT_METHOD_HEADER:
             printf("Method Header: ");
-            debug_print_token_content(node->data->declarator.id.complex);
+            debug_print_token_content(node->data.declarator->id.complex);
 
-            if (node->data->declarator.dimension > 0)
+            if (node->data.declarator->dimension > 0)
             {
-                printf(" (return array dim: %zd)", node->data->declarator.dimension);
+                printf(" (return array dim: %zd)", node->data.declarator->dimension);
             }
 
             break;
@@ -1054,10 +1054,10 @@ static void debug_print_ast_node(java_parser* parser, tree_node* node)
         case JNT_FORMAL_PARAM:
             printf("Formal Parameter: ");
 
-            debug_print_token_content(node->data->declarator.id.complex);
-            if (node->data->declarator.dimension > 0)
+            debug_print_token_content(node->data.declarator->id.complex);
+            if (node->data.declarator->dimension > 0)
             {
-                printf(" Array (dim: %zd)", node->data->declarator.dimension);
+                printf(" Array (dim: %zd)", node->data.declarator->dimension);
             }
 
             break;
@@ -1067,7 +1067,7 @@ static void debug_print_ast_node(java_parser* parser, tree_node* node)
         case JNT_CTOR_INVOCATION:
             printf("Constructor Invocation: ");
 
-            if (node->data->constructor_invoke.is_super)
+            if (node->data.constructor_invoke->is_super)
             {
                 printf("super");
             }
@@ -1083,10 +1083,10 @@ static void debug_print_ast_node(java_parser* parser, tree_node* node)
         case JNT_VAR_DECL:
             printf("Variable Declarator: ");
 
-            debug_print_token_content(node->data->declarator.id.complex);
-            if (node->data->declarator.dimension)
+            debug_print_token_content(node->data.declarator->id.complex);
+            if (node->data.declarator->dimension)
             {
-                printf(" (dim: %zd)", node->data->declarator.dimension);
+                printf(" (dim: %zd)", node->data.declarator->dimension);
             }
 
             break;
@@ -1097,17 +1097,17 @@ static void debug_print_ast_node(java_parser* parser, tree_node* node)
             printf("Primary");
             break;
         case JNT_PRIMARY_SIMPLE:
-            debug_print_lexeme_type(node->data->id.simple);
+            debug_print_lexeme_type(node->data.id->simple);
             break;
         case JNT_PRIMARY_COMPLEX:
-            debug_print_token_content(node->data->id.complex);
+            debug_print_token_content(node->data.id->complex);
             break;
         case JNT_PRIMARY_CREATION:
             printf("Object Creation");
             break;
         case JNT_PRIMARY_ARR_CREATION:
             printf("Array Creation:");
-            printf(" (dim: %zd)", node->data->declarator.dimension);
+            printf(" (dim: %zd)", node->data.declarator->dimension);
             break;
         case JNT_PRIMARY_CLS_CREATION:
             printf("Class Creation");
@@ -1125,8 +1125,8 @@ static void debug_print_ast_node(java_parser* parser, tree_node* node)
             printf("Expression");
             break;
         case JNT_OPERATOR:
-            printf("OP[%d]: ", node->data->operator.id);
-            debug_print_operator(parser, node->data->operator.id);
+            printf("OP[%d]: ", node->data.operator->id);
+            debug_print_operator(parser, node->data.operator->id);
             break;
         case JNT_STATEMENT:
             printf("Statement (Invalid)");
@@ -1142,11 +1142,11 @@ static void debug_print_ast_node(java_parser* parser, tree_node* node)
             break;
         case JNT_STATEMENT_BREAK:
             printf("Break Statement: ");
-            debug_print_token_content(node->data->id.complex);
+            debug_print_token_content(node->data.id->complex);
             break;
         case JNT_STATEMENT_CONTINUE:
             printf("Continue Statement: ");
-            debug_print_token_content(node->data->id.complex);
+            debug_print_token_content(node->data.id->complex);
             break;
         case JNT_STATEMENT_RETURN:
             printf("Return Statement");
@@ -1171,7 +1171,7 @@ static void debug_print_ast_node(java_parser* parser, tree_node* node)
             break;
         case JNT_STATEMENT_LABEL:
             printf("Label Statement: ");
-            debug_print_token_content(node->data->id.complex);
+            debug_print_token_content(node->data.id->complex);
             break;
         case JNT_STATEMENT_EXPRESSION:
             printf("Expression Statement");
@@ -1188,7 +1188,7 @@ static void debug_print_ast_node(java_parser* parser, tree_node* node)
         case JNT_SWITCH_LABEL:
             printf("Switch Label: ");
 
-            if (node->data->switch_label.is_default)
+            if (node->data.switch_label->is_default)
             {
                 printf("default");
             }
