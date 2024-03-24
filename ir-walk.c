@@ -19,87 +19,6 @@ static tree_node* __previous_available_operand(tree_node* from)
 }
 
 /**
- * parse an operand and fill the provided reference object
-*/
-static reference* __interpret_operand(java_ir* ir, tree_node* base)
-{
-    // this is not a guard: an operand can be marked as not-needed (thus NULL)
-    // if so, the function is no-op
-    if (!base)
-    {
-        return NULL;
-    }
-
-    reference* ref = new_reference(IR_ASN_REF_UNDEFINED, NULL);
-
-    // if an operand is refernecing an old OP, it means
-    // it referes to that instruction
-    if (base->type == JNT_OPERATOR)
-    {
-        /**
-         * TODO: should we include JNT_EXPRESSION here for ( Expression ) ?
-        */
-        ref->type = IR_ASN_REF_INSTRUCTION;
-        ref->doi = base->data.operator->instruction;
-
-        return ref;
-    }
-
-    tree_node* primary = base->first_child;
-    java_token* token;
-    char* content;
-    definition* __def = NULL;
-
-    /**
-     * TODO: other primary types
-    */
-    if (primary->type == JNT_PRIMARY_COMPLEX)
-    {
-        token = primary->data.id->complex;
-        content = t2s(token);
-
-        // try get literal definition
-        // if token is not literal, funtion is no-op and NULL is returned
-        __def = def_li(ir, &content, token->type, token->number.type, token->number.bits);
-
-        /**
-         * TODO: interpret all token types
-         * TODO: this includes sequence of JT_IDENTIFIER
-         *       as field access
-        */
-        if (__def)
-        {
-            ref->type = IR_ASN_REF_LITERAL;
-            ref->doi = __def;
-        }
-        else if (token->class == JT_IDENTIFIER)
-        {
-            __def = use(ir, content, DU_CTL_LOOKUP_TOP_LEVEL, JAVA_E_REF_UNDEFINED);
-
-            ref->type = IR_ASN_REF_DEFINITION;
-            ref->doi = __def;
-            ref->ver = __def ? __def->def_count : 0;
-
-            /**
-             * TODO: how to handle field access?
-            */
-        }
-        else
-        {
-            printf("TODO ");
-        }
-
-        free(content);
-    }
-    else
-    {
-        printf("TODO ");
-    }
-
-    return ref;
-}
-
-/**
  * finalize instruction
  *
  * lvalue <- operand_1 op operand_2
@@ -286,6 +205,267 @@ static void __start_statement_in_new_block(java_ir* ir, java_node_query stmt_typ
 }
 
 /**
+ * BIG RECURSION AHEAD
+ *
+ * walk_expression and walk_operand are recursively correlated
+ * to handle parenthesis
+*/
+
+/**
+ * Operand Bound State
+ *
+ * It flags the context of next primary node
+ *
+ * OPERAND_WALK_FIRST:   first node
+ * OPERAND_BOUND_LAST:   no node is acceptable
+ * OPERAND_WALK_THIS:    next name should be from current top-level scope only
+ * OPERAND_WALK_SUPER:   next name should be from parent's top-level scope only
+ * OPERAND_BOUND_FIELD:  next is a member (field/method) access of previous one's scope
+ * OPERAND_BOUND_METHOD: next name is a method reference of previous one's scope
+*/
+typedef enum
+{
+    OPERAND_BOUND_FIRST,
+    OPERAND_BOUND_LAST,
+    OPERAND_BOUND_THIS,
+    OPERAND_BOUND_SUPER,
+    OPERAND_BOUND_FIELD,
+    OPERAND_BOUND_METHOD,
+} operand_bound_state;
+
+static void walk_expression(java_ir* ir, tree_node* expression);
+
+/**
+ * Walk An Operand
+ *
+ * TODO: we need a way to control current lookup scope for this function
+ * so field access operator (.) can be interpreted as a sequence of
+ * "load-field" instruction
+ * basically: we need to control a global_top_level* reference to track
+ * which scope we are looking at right now
+ *
+ * this is a state machine so that the context becomes the constraint on
+ * top of syntax and interprets entire operand
+ *
+ * if failed or no-op, it returns NULL
+ *
+ * node: JNT_PRIMARY | JNT_OPERATOR
+*/
+static reference* walk_operand(java_ir* ir, tree_node* base)
+{
+    // this is not a guard: an operand can be marked as not-needed (thus NULL)
+    // if so, the function is no-op
+    if (!base)
+    {
+        return NULL;
+    }
+
+    reference* ref = new_reference(IR_ASN_REF_UNDEFINED, NULL);
+
+    // if an operand is refernecing an old OP, it means
+    // it referes to that instruction
+    if (base->type == JNT_OPERATOR)
+    {
+        /**
+         * TODO: should we include JNT_EXPRESSION here for ( Expression ) ?
+        */
+        ref->type = IR_ASN_REF_INSTRUCTION;
+        ref->doi = base->data.operator->instruction;
+
+        return ref;
+    }
+
+    java_token* token;
+    char* content;
+    definition* __def = NULL;
+    operand_bound_state bound_state = OPERAND_BOUND_FIRST;
+
+    // locate first primary item
+    base = base->first_child;
+
+    /**
+     * TODO: other primary types
+     * TODO: validate primary sequence
+    */
+    while (base)
+    {
+        if (bound_state == OPERAND_BOUND_LAST)
+        {
+            /**
+             * TODO: error and break and return NULL
+            */
+        }
+
+        switch (base->type)
+        {
+            case JNT_PRIMARY_COMPLEX:
+                token = base->data.id->complex;
+                content = t2s(token);
+
+                // try get literal definition
+                // if token is not literal, funtion is no-op and NULL is returned
+                __def = def_li(ir, &content, token->type, token->number.type, token->number.bits);
+
+                /**
+                 * TODO: interpret all token types
+                 * TODO: this includes sequence of JT_IDENTIFIER
+                 *       as field access
+                */
+                if (__def)
+                {
+                    ref->type = IR_ASN_REF_LITERAL;
+                    ref->doi = __def;
+                }
+                else if (token->class == JT_IDENTIFIER)
+                {
+                    /**
+                     * TODO: now we need to way to enforce lookup-from scope
+                     * to be top-level
+                     *
+                     * TODO: the use scope here needs to be the scope of previous
+                     * field access point, if ther is none, it has to be current
+                     * top-level scope (only)
+                    */
+                    __def = use(ir, content, DU_CTL_LOOKUP_TOP_LEVEL, JAVA_E_REF_UNDEFINED);
+
+                    ref->type = IR_ASN_REF_DEFINITION;
+                    ref->doi = __def;
+                    ref->ver = __def ? __def->def_count : 0;
+
+                    /**
+                     * TODO: how to handle field access?
+                    */
+                }
+
+                free(content);
+                break;
+            case JNT_PRIMARY_SIMPLE:
+                /**
+                 * TODO:
+                 * JLT_SYM_METHOD_REFERENCE
+                 * JLT_RWD_TRUE
+                 * JLT_RWD_FALSE
+                 * JLT_RWD_NULL
+                 * JLT_RWD_THIS
+                 * JLT_RWD_SUPER
+                 *
+                 * this and super MUST start at
+                 * the beginning, and cannot
+                 * repeat
+                 *
+                 * "this" directs next ID lookup
+                 * scope to be top-level, instead of
+                 * current local scope
+                 * "super" is parent class
+                */
+                switch (base->data.id->simple)
+                {
+                    case JLT_RWD_TRUE:
+                        def_li_raw(ir, "true", JLT_RWD_TRUE, JT_NUM_MAX, JT_NUM_BIT_LENGTH_NORMAL);
+                        break;
+                    case JLT_RWD_FALSE:
+                        def_li_raw(ir, "false", JLT_RWD_FALSE, JT_NUM_MAX, JT_NUM_BIT_LENGTH_NORMAL);
+                        break;
+                    case JLT_RWD_NULL:
+                        def_li_raw(ir, "null", JLT_RWD_NULL, JT_NUM_MAX, JT_NUM_BIT_LENGTH_NORMAL);
+                        break;
+                    case JLT_RWD_THIS:
+                        if (bound_state != OPERAND_BOUND_FIRST)
+                        {
+                            /**
+                             * TODO: error and return
+                            */
+                        }
+                        /**
+                         * TODO: this cannot repeat
+                        */
+                        bound_state = OPERAND_BOUND_THIS;
+                        break;
+                    case JLT_RWD_SUPER:
+                        if (bound_state != OPERAND_BOUND_FIRST)
+                        {
+                            /**
+                             * TODO: error and return
+                            */
+                        }
+                        /**
+                         * TODO: validate if there is any extends, if not then it is an error
+                         *
+                         * this cannot repeate
+                        */
+                        break;
+                    case JLT_SYM_METHOD_REFERENCE:
+                        /**
+                         * TODO: validate: must be static
+                        */
+                        break;
+                    default:
+                        break;
+                }
+                break;
+            case JNT_PRIMARY_CREATION:
+                /**
+                 * TODO: Object creation ("new")
+                */
+                break;
+            case JNT_PRIMARY_CLS_LITERAL:
+                /**
+                 * TODO: Class literal
+                */
+                bound_state = OPERAND_BOUND_LAST;
+                break;
+            case JNT_PRIMARY_METHOD_INVOKE:
+                /**
+                 * TODO: Method Invocation
+                 *
+                 * previous walked node must be ID
+                 *
+                 * must walk expression list and generate name
+                 * like how the method name is registered in
+                 * lookup table
+                 *
+                 * for parameters, needs new instruction: PUSH
+                */
+                break;
+            case JNT_PRIMARY_ARR_ACCESS:
+                /**
+                 * TODO: Array access
+                 * previous walked node must be ID
+                */
+                break;
+            case JNT_TYPE:
+                /**
+                 * TODO: Type Case
+                */
+                break;
+            case JNT_EXPRESSION:
+                /**
+                 * TODO: parenthesized expression
+                */
+                walk_expression(ir, base);
+                break;
+            case JNT_AMBIGUOUS:
+                /**
+                 * TODO: ambiguous JNT_TYPE and JNT_EXPRESSION
+                 *
+                 * now we need to resolve this by using context information
+                */
+                break;
+            default:
+                /**
+                 * TODO: error
+                */
+                // if reached here, must be an error
+                break;
+        }
+
+        base = base->next_sibling;
+    }
+
+    return ref;
+}
+
+/**
  * Expression AST Walk
  *
  * This method generate a single block of code without any logical expansion
@@ -312,7 +492,7 @@ static void walk_expression(java_ir* ir, tree_node* expression)
     if (!top->next_sibling)
     {
         // minimum case: constant expression (only one operand)
-        reference* constant = __interpret_operand(ir, top);
+        reference* constant = walk_operand(ir, top);
         cfg_worker_execute(ir, TSW(ir), IROP_STORE, NULL, &constant, NULL);
         delete_reference(constant);
 
@@ -412,8 +592,8 @@ static void walk_expression(java_ir* ir, tree_node* expression)
         */
         __execute_instruction(
             ir, TSW(ir), top,
-            __interpret_operand(ir, base2),
-            __interpret_operand(ir, base1)
+            walk_operand(ir, base2),
+            walk_operand(ir, base1)
         );
 
         switch (opid)
