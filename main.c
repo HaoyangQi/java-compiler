@@ -66,7 +66,9 @@ int main(int argc, char* argv[])
     {
         printf("\nFile %d: %s\n", i + 1, test_paths[i]);
 
-        if (compile(&compiler, &arch, test_paths[i]))
+        if (compile(
+            &compiler, &arch, test_paths[i],
+            COMPILER_STAGE_PARSE | COMPILER_STAGE_CONTEXT | COMPILER_STAGE_EMIT))
         {
             debug_ast(&compiler.context);
             debug_print_global_import(&compiler.ir);

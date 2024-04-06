@@ -197,6 +197,11 @@ void init_expression(java_expression* expression)
      *
      * this info can definitely be merged into ir_map using bit mask,
      * but to maintain faster access, let's just waste some memory
+     *
+     * for ternary operators: see expression_worker_push, the value
+     * is chosen carefully here because in AST, ':' does not appear;
+     * while '?' will contain all 3 parts of the conditional expression;
+     * values are configured this way to make expression_worker_push work
     */
 
     expression->opid_operand_count[0] = 0;
@@ -228,8 +233,8 @@ void init_expression(java_expression* expression)
     expression->opid_operand_count[OPID_BIT_OR] = 2;
     expression->opid_operand_count[OPID_LOGIC_AND] = 2;
     expression->opid_operand_count[OPID_LOGIC_OR] = 2;
-    expression->opid_operand_count[OPID_TERNARY_1] = 2;
-    expression->opid_operand_count[OPID_TERNARY_2] = 2;
+    expression->opid_operand_count[OPID_TERNARY_1] = 3; // special: control entire conditional expression
+    expression->opid_operand_count[OPID_TERNARY_2] = 0; // special: not appear in AST
     expression->opid_operand_count[OPID_ASN] = 2;
     expression->opid_operand_count[OPID_ADD_ASN] = 2;
     expression->opid_operand_count[OPID_SUB_ASN] = 2;
@@ -254,6 +259,17 @@ void release_expression(java_expression* expression)
     free(expression->definition);
     free(expression->ir_map);
     free(expression->opid_operand_count);
+}
+
+/**
+ * map OPID to AST node
+*/
+tree_node* expr_opid2node(const operator_id opid)
+{
+    tree_node* node = ast_node_new(JNT_EXPRESSION);
+    node->data.expression->op = opid;
+
+    return node;
 }
 
 /**
@@ -288,114 +304,382 @@ size_t expr_opid_operand_count(const java_expression* expression, operator_id op
     return expression->opid_operand_count[opid];
 }
 
-/**
- * Expression Worker Initialization
- *
- * use heap to save stack space
-*/
-void init_expression_worker(java_expression_worker* worker)
+static void expression_worker_push_operator(java_expression_worker* worker, tree_node* element)
 {
-    worker->operator_stack = NULL;
-    worker->last_push_operand = false;
+    expression_element* new_stack_top = (expression_element*)malloc_assert(sizeof(expression_element));
+    new_stack_top->node = element;
+    new_stack_top->next = worker->operator_stack;
+
+    worker->num_operator++;
+    worker->operator_stack = new_stack_top;
 }
 
-/**
- * Release Expression Worker
-*/
-void release_expression_worker(java_expression_worker* worker)
-{
-    while (expression_stack_pop(worker));
-}
-
-/**
- * push operator to stack
- *
- * if push OPID_UNDEFINED, then it means it pushes an operand
- * on stack it is no-op, but state flag will change accordingly
-*/
-void expression_stack_push(java_expression_worker* worker, operator_id op)
-{
-    if (op == OPID_UNDEFINED)
-    {
-        worker->last_push_operand = true;
-        return;
-    }
-
-    expr_operator* top = (expr_operator*)malloc_assert(sizeof(expr_operator));
-
-    top->op = op;
-    top->next = worker->operator_stack;
-    worker->last_push_operand = true;
-    worker->operator_stack = top;
-}
-
-/**
- * pop operator from top of stack
-*/
-bool expression_stack_pop(java_expression_worker* worker)
-{
-    if (!worker->operator_stack)
-    {
-        return false;
-    }
-
-    expr_operator* top = worker->operator_stack;
-    worker->operator_stack = top->next;
-
-    free(top);
-    return true;
-}
-
-/**
- * peek the top operator
-*/
-operator_id expression_stack_top(java_expression_worker* worker)
-{
-    return worker->operator_stack ? worker->operator_stack->op : OPID_UNDEFINED;
-}
-
-/**
- * check if stack empty
-*/
-bool expression_stack_empty(java_expression_worker* worker)
-{
-    return worker->operator_stack == NULL;
-}
-
-/**
- * check if stack requires pop before pushing the op
- *
- * if we keep op consistent, for every op before allowing the push,
- * there are 3 conditions we need to pop before push
-*/
-bool expression_stack_pop_required(java_expression* expression, java_expression_worker* worker, operator_id opid)
-{
-    if (!worker->operator_stack)
-    {
-        return false;
-    }
-
-    java_operator op_top = expr_opid2def(expression, worker->operator_stack->op);
-    java_operator op = expr_opid2def(expression, opid);
-
-    return OP_PRECD(op) < OP_PRECD(op_top) ||
-        (OP_PRECD(op) == OP_PRECD(op_top) && OP_ASSOC(op) == OP_ASSOC_LR);
-}
-
-/**
- * use top operator to generate an operator node
-*/
-tree_node* expression_stack_parse_top(java_expression_worker* worker)
+static tree_node* expression_worker_pop_operator(java_expression_worker* worker)
 {
     if (!worker->operator_stack)
     {
         return NULL;
     }
 
-    tree_node* node = ast_node_new(JNT_OPERATOR);
+    tree_node* n = worker->operator_stack->node;
+    expression_element* e = worker->operator_stack;
 
-    node->data.operator->id = worker->operator_stack->op;
-    expression_stack_pop(worker);
+    worker->operator_stack = e->next;
+    worker->num_operator--;
+    free(e);
 
-    return node;
+    return n;
+}
+
+static void expression_worker_push_operand(java_expression_worker* worker, tree_node* element)
+{
+    expression_element* new_stack_top = (expression_element*)malloc_assert(sizeof(expression_element));
+    new_stack_top->node = element;
+    new_stack_top->next = worker->operand_stack;
+
+    worker->num_operand++;
+    worker->operand_stack = new_stack_top;
+}
+
+static tree_node* expression_worker_pop_operand(java_expression_worker* worker)
+{
+    if (!worker->operand_stack)
+    {
+        return NULL;
+    }
+
+    tree_node* n = worker->operand_stack->node;
+    expression_element* e = worker->operand_stack;
+
+    worker->operand_stack = e->next;
+    worker->num_operand--;
+    free(e);
+
+    return n;
+}
+
+static operator_id expression_worker_top_operator(java_expression_worker* worker)
+{
+    return worker->operator_stack ? worker->operator_stack->node->data.expression->op : OPID_UNDEFINED;
+}
+
+/**
+ * check if operator on stack pop needs to be popped before pushing the new one
+ *
+ * if operator=NULL, means there is no more incoming operator, as if the incoming
+ * operator have infinitely low precedence, hence enforces any operator on stack
+ * top to pop
+*/
+static bool expression_worker_should_pop_top_operator(const java_expression_worker* worker, const tree_node* operator)
+{
+    if (!worker->operator_stack)
+    {
+        return false;
+    }
+
+    // this semantic is useful in expression_worker_complete
+    if (!operator)
+    {
+        return true;
+    }
+
+    operator_id opid_top = worker->operator_stack->node->data.expression->op;
+    operator_id opid_in = operator->data.expression->op;
+    java_operator op_top = expr_opid2def(worker->definition, opid_top);
+    java_operator op_in = expr_opid2def(worker->definition, opid_in);
+
+    /**
+     * Precedence Check
+     *
+     * regular logic:
+     *
+     * 1. stack-top operator has higher precedence than incoming one, OR
+     * 2. same precedence, but associativity is from left to right
+     *
+     * now if the new top operator and incoming operator are both ':',
+     * it means the follwing condition occurs:
+     *
+     * a ? b ? c : d : e
+     *           ~~~~~
+     *
+     * and since we what above to be evaluated as:
+     *
+     * a ? (b ? c : d) : e
+     *
+     * so when both are ':', the one on stack top still needs to be popped
+    */
+    return OP_PRECD(op_in) < OP_PRECD(op_top) ||
+        (OP_PRECD(op_in) == OP_PRECD(op_top) && OP_ASSOC(op_in) == OP_ASSOC_LR) ||
+        (opid_in == OPID_TERNARY_2 && opid_top == OPID_TERNARY_2);
+}
+
+/**
+ * Operator Stack Pre-Push Evaluation
+ *
+ * it evaluates incoming operator, to see if stack is ready for pushing,
+ * by enforcing precedence of operators
+ *
+ * if not ready, it starts popping operator off of stack, and for each,
+ * it will finalize this operation, and transform it into an "operand"
+ *
+ * if incoming operator is not provided, the function collapses entire
+ * operator stack at its best efforts
+ * (see expression_worker_should_pop_top_operator)
+ *
+ * it returns false if stack evaluation finishes with error(s)
+*/
+static bool expression_worker_evaluate(java_expression_worker* worker, tree_node* incoming_op)
+{
+    tree_node* top_op;
+    operator_id top_opid;
+    size_t operand_count;
+    bool collapse_ternary;
+    bool ret = true;
+
+    // Precedence Check
+    while (expression_worker_should_pop_top_operator(worker, incoming_op))
+    {
+        collapse_ternary = false;
+        top_op = expression_worker_pop_operator(worker);
+        top_opid = top_op->data.expression->op;
+        operand_count = expr_opid_operand_count(worker->definition, top_opid);
+
+        /**
+         * Skip Condition (Ternary Operator)
+         *
+         * For ternary operator ":", it is transparent to AST and contribute
+         * no meaning but only allows next pop to be, AND MUST BE, the "?"
+         * operator
+         *
+         * re-fetch will come later because stack needs to be validated first;
+         * but we do need other info of stack top during halt condition check
+        */
+        if (top_opid == OPID_TERNARY_2)
+        {
+            // discard this operator, and read stack top info without pop
+            collapse_ternary = true;
+            top_opid = expression_worker_top_operator(worker);
+            operand_count = expr_opid_operand_count(worker->definition, top_opid);
+            tree_node_delete(top_op);
+        }
+
+        /**
+         * Halt Condition & Recovery
+         *
+         * if expression is reduced at an inappropriate state, the expression
+         * has syntax error and error flag will be set, and recovery strategy
+         * is chosen so that the routine can continue at its best efforts
+         *
+         * multiple errors might occur, but only the last one will be logged,
+         * as it is unecessary to log every step of error during one stack
+         * evaluation
+         *
+         * 1. incorrectly pop '?': as a ternary operator, '?' is NOT the bound
+         *    of the operation, ':' is. trying to pop '?' means the operation
+         *    is incomplete
+         * 2. try to pop '?' but not reached: when ':' is popped, '?' needs to
+         *    be the actual one to be popped; if it is not there, then it is an
+         *    error
+         * 3. insufficient operand on stack (range check)
+         *
+         * Order Matters Here, sort of... and it is not mandatory:
+         *
+         * insufficient operand check has lowest priority for better error
+         * message: e.g. if ternary-related has error, then operand count
+         * is not trustworthy, error message needs to fall under condition
+         * 1 or 2 (especially for 1: where count can be any operator, but
+         * the range check should be ignored in this case as it is not
+         * meaningful)
+         *
+        */
+        if (collapse_ternary && top_opid != OPID_TERNARY_1)
+        {
+            /**
+             * if collapsing ":" but cannot find "?" on stack top
+             *
+             * do nothing: this will result in incorrect expression,
+             * but at least there is an error
+            */
+            worker->last_error = JAVA_E_EXPRESSION_INCOMPLETE_TERNARY;
+            ret = false;
+            continue;
+        }
+        else if (!collapse_ternary && top_opid == OPID_TERNARY_1)
+        {
+            /**
+             * if not collapsing but popping "?"
+             *
+             * means there is one operand missing, so only pop:
+             * (total required by "?") - 1
+             *
+             * extra guard against operand stack length is applied
+             * just to be safe
+            */
+            worker->last_error = JAVA_E_EXPRESSION_INCOMPLETE_TERNARY;
+            operand_count = min(worker->num_operand, operand_count - 1);
+            ret = false;
+        }
+        else if (worker->num_operand < operand_count)
+        {
+            worker->last_error = JAVA_E_EXPRESSION_NO_OPERAND;
+            operand_count = worker->num_operand;
+            ret = false;
+        }
+
+        /**
+         * Ternary Re-Fetch
+         *
+         * collapse_ternary is not used in condition, because 2 cases are covered here:
+         *
+         * 1. successful collapsing: need to collapse a ternary, and top is "?"
+         * 2. halt condition: not collapsing ternary but stack top is "?", see above
+         *
+         * both conditions have stack top OPID_TERNARY_1
+        */
+        if (top_opid == OPID_TERNARY_1)
+        {
+            top_op = expression_worker_pop_operator(worker);
+        }
+
+        // pop operands to complete this operator
+        for (size_t i = 0; i < operand_count; i++)
+        {
+            tree_node_add_first_child(top_op, expression_worker_pop_operand(worker));
+        }
+
+        // now the operator is complete, it becomes a "value" of other operators
+        // hence: an operand
+        expression_worker_push_operand(worker, top_op);
+    }
+
+    return ret;
+}
+
+/**
+ * Expression Worker Initialization
+ *
+ * use heap to save stack space
+*/
+void init_expression_worker(java_expression_worker* worker, java_expression* definition)
+{
+    worker->definition = definition;
+    worker->last_error = JAVA_E_MAX;
+    worker->operator_stack = NULL;
+    worker->operand_stack = NULL;
+    worker->num_operator = 0;
+    worker->num_operand = 0;
+    worker->last_push_operand = false;
+}
+
+/**
+ * Release Expression Worker
+ *
+*/
+void release_expression_worker(java_expression_worker* worker)
+{
+    tree_node* n;
+
+    // release operator stack
+    while (true)
+    {
+        n = expression_worker_pop_operator(worker);
+
+        if (!n) { break; }
+
+        tree_node_delete(n);
+    }
+
+    // release operand stack
+    while (true)
+    {
+        n = expression_worker_pop_operand(worker);
+
+        if (!n) { break; }
+
+        tree_node_delete(n);
+    }
+
+    // worker->definition is a reference so no need to free
+}
+
+/**
+ * Feed new expression element to expression worker
+ *
+ * expression element can be:
+ * JNT_PRIMARY: operand
+ * JNT_EXPRESSION: operator
+ *
+ * when JNT_EXPRESSION has children attached, it is an operand
+ * instead of operator
+ *
+ * for any tree_node that is not any type mentioned above,
+ * function is no-op
+ *
+ * NOTE: this functions clears last error information
+*/
+void expression_worker_push(java_expression_worker* worker, tree_node* element)
+{
+    // clear error
+    worker->last_error = JAVA_E_MAX;
+
+    // guard: invalid node will not be processed
+    if (element->type != JNT_EXPRESSION && element->type != JNT_PRIMARY)
+    {
+        return;
+    }
+
+    /**
+     * incoming element is strictly classified
+     *
+     * for parenthesized expression, it is already evaluated by parse_primary
+     * so JNT_EXPRESSION is considered as an operator only when it has no
+     * children attached;
+     *
+     * otherwise it is an operand: this is consistent with semantics used in
+     * expression_worker_evaluate
+    */
+    if (element->type == JNT_EXPRESSION && !element->first_child)
+    {
+        /**
+         * TODO: should we return after expression_worker_evaluate?
+         * if so, need to delete element node here to make memory safe
+        */
+        expression_worker_evaluate(worker, element);
+        expression_worker_push_operator(worker, element);
+        worker->last_push_operand = false;
+    }
+    else // JNT_PRIMARY or JNT_EXPRESSION with children
+    {
+        expression_worker_push_operand(worker, element);
+        worker->last_push_operand = true;
+    }
+}
+
+/**
+ * Try collapsing current operator stack
+ *
+*/
+bool expression_worker_complete(java_expression_worker* worker)
+{
+    return expression_worker_evaluate(worker, NULL);
+}
+
+/**
+ * Get the completed expression
+ *
+ * after expression_worker_complete, the final expression will locate at top
+ * of operand stack
+*/
+tree_node* expression_worker_export(java_expression_worker* worker)
+{
+    return expression_worker_pop_operand(worker);
+}
+
+/**
+ * Check if expression worker is in complete state after flush
+*/
+bool expression_worker_is_complete(java_expression_worker* worker)
+{
+    // no expression, or no dangling operands/operators left
+    return !worker->operator_stack && (!worker->operand_stack || !worker->operand_stack->next);
 }

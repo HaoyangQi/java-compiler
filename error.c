@@ -43,6 +43,9 @@ void init_error_definition(java_error_definition* err_def)
     err_def->descriptor[JAVA_E_MEMBER_NO_NAME] = DEFINE_SYNTAX_ERROR;
     err_def->descriptor[JAVA_E_MEMBER_AMBIGUOUS] = DEFINE_SYNTAX_ERROR;
     err_def->descriptor[JAVA_E_EXPRESSION_NO_OPERAND] = DEFINE_SYNTAX_ERROR;
+    err_def->descriptor[JAVA_E_EXPRESSION_TOO_MANY_OPERAND] = DEFINE_ERROR(JEL_ERROR, JES_INTERNAL);
+    err_def->descriptor[JAVA_E_EXPRESSION_INCOMPLETE_TERNARY] = DEFINE_SYNTAX_ERROR;
+    err_def->descriptor[JAVA_E_EXPRESSION_UNHANDLED_BLOCK_CONTEXT] = DEFINE_ERROR(JEL_ERROR, JES_INTERNAL);
     err_def->descriptor[JAVA_E_EXPRESSION_NO_OPERATOR] = DEFINE_SYNTAX_ERROR;
     err_def->descriptor[JAVA_E_EXPRESSION_NO_LVALUE] = DEFINE_SYNTAX_ERROR;
     err_def->descriptor[JAVA_E_EXPRESSION_LITERAL_LVALUE] = DEFINE_SYNTAX_ERROR;
@@ -109,6 +112,9 @@ void init_error_definition(java_error_definition* err_def)
     err_def->message[JAVA_E_MEMBER_NO_NAME] = "Expected 'name' in member declaration.";
     err_def->message[JAVA_E_MEMBER_AMBIGUOUS] = "Incomplete member declaration.";
     err_def->message[JAVA_E_EXPRESSION_NO_OPERAND] = "Invalid expression: expected operand.";
+    err_def->message[JAVA_E_EXPRESSION_TOO_MANY_OPERAND] = "Internal expression error: too many operands, they will be ignored.";
+    err_def->message[JAVA_E_EXPRESSION_INCOMPLETE_TERNARY] = "Invalid expression: incomplete conditional expression.";
+    err_def->message[JAVA_E_EXPRESSION_UNHANDLED_BLOCK_CONTEXT] = "Internal expression error: block context is not handled.";
     err_def->message[JAVA_E_EXPRESSION_NO_OPERATOR] = "Invalid expression: expected operator.";
     err_def->message[JAVA_E_EXPRESSION_NO_LVALUE] = "Invalid expression: expected lvalue.";
     err_def->message[JAVA_E_EXPRESSION_LITERAL_LVALUE] = "Invalid expression: literal cannot be used as lvalue.";

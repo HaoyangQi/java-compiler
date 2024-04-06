@@ -42,6 +42,9 @@ typedef unsigned char def_use_control;
 #define DU_CTL_LOOKUP_TOP_LEVEL (0x02)
 #define DU_CTL_METHOD_NAME (0x04)
 
+// see struct instruction: lvalue <- v1 op v2
+#define MAX_INSTRUCTION_OPERAND_COUNT 2
+
 /**
  * Symbol Lookup Hierarchy
  *
@@ -715,7 +718,6 @@ basic_block* cfg_worker_current_block_split(
     edge_type to_remainder,
     bool split_before
 );
-void cfg_worker_expand_logical_precedence(java_ir* ir, cfg_worker* worker);
 
 void cfg_worker_ssa_release(cfg_worker* worker);
 void cfg_worker_ssa_build(cfg_worker* worker);

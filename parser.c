@@ -3343,6 +3343,7 @@ static tree_node* parse_primary_class_literal(java_parser* parser)
 static tree_node* parse_primary(java_parser* parser)
 {
     tree_node* node = ast_node_new(JNT_PRIMARY);
+    tree_node* amb;
     java_lexeme_type peek;
     bool accepting = true;
     bool last_separator = false;
@@ -3392,13 +3393,24 @@ static tree_node* parse_primary(java_parser* parser)
                 }
                 else if (is_lexeme_literal(peek))
                 {
-                    // Expression
-                    tree_node_add_child(node, parse_expression(parser));
+                    // Expression: collapse the JNT_PRIMARY layer as it is unecessary
+                    tree_node_delete(node);
+                    node = parse_expression(parser);
                 }
                 else
                 {
-                    tree_node_add_child(node,
-                        parse_binary_ambiguity(parser, &parse_expression, &parse_type, JLT_SYM_PARENTHESIS_CLOSE));
+                    amb = parse_binary_ambiguity(parser, &parse_expression, &parse_type, JLT_SYM_PARENTHESIS_CLOSE);
+
+                    if (amb->type = JNT_EXPRESSION)
+                    {
+                        // collapse the JNT_PRIMARY layer as it is unecessary
+                        tree_node_delete(node);
+                        node = amb;
+                    }
+                    else
+                    {
+                        tree_node_add_child(node, amb);
+                    }
                 }
 
                 // )
@@ -3511,7 +3523,7 @@ static tree_node* parse_primary(java_parser* parser)
 */
 static tree_node* parse_expression(java_parser* parser)
 {
-    tree_node* node = ast_node_new(JNT_EXPRESSION);
+    tree_node* node;
     java_expression_worker worker;
     java_lexeme_type token_type;
     operator_id op_type;
@@ -3520,7 +3532,7 @@ static tree_node* parse_expression(java_parser* parser)
     bool allow_primary = true; // allow in 1st iteration
 
     // get worker ready
-    init_expression_worker(&worker);
+    init_expression_worker(&worker, parser->expression);
 
     while (true)
     {
@@ -3620,38 +3632,29 @@ static tree_node* parse_expression(java_parser* parser)
         // acceptance
         if (next_is_operator)
         {
-            // now we need to consume the token for sure
-            consume_token(parser, NULL);
-
-            // precedence validation
-            while (expression_stack_pop_required(parser->expression, &worker, op_type))
-            {
-                tree_node_add_child(node, expression_stack_parse_top(&worker));
-            }
-
-            expression_stack_push(&worker, op_type);
+            consume_token(parser, NULL); // consume the token
+            expression_worker_push(&worker, expr_opid2node(op_type));
             allow_primary = true;
         }
         else if (allow_primary && parser_trigger_primary(parser, TOKEN_PEEK_1st))
         {
-            tree_node_add_child(node, parse_primary(parser));
-            expression_stack_push(&worker, OPID_UNDEFINED);
-
-            // 2 primary cannot stay consecutively
-            allow_primary = false;
+            expression_worker_push(&worker, parse_primary(parser));
+            allow_primary = false; // 2 primary cannot stay consecutively
         }
         else
         {
             // terminator
             break;
         }
+
+        // register error
+        parser_error(parser, worker.last_error);
     }
 
-    // pop all operators and push them in sequence
-    while (!expression_stack_empty(&worker))
-    {
-        tree_node_add_child(node, expression_stack_parse_top(&worker));
-    }
+    // collapse everything, log error is applicable, and export expression tree
+    expression_worker_complete(&worker);
+    parser_error(parser, worker.last_error);
+    node = expression_worker_export(&worker);
 
     // cleanup
     release_expression_worker(&worker);

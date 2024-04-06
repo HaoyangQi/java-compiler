@@ -54,23 +54,18 @@ typedef struct
 } node_data_declarator;
 
 /**
- * Aux Data: Operator
+ * Aux Data: Expression
+ *
+ * Expression node holds a step of operation,
+ * so it contains an operator, and operands
+ * are stored on child level
  *
 */
 typedef struct
 {
     // operator id
-    operator_id id;
-    /**
-     * IR-use only, type: instruction*
-     *
-     * internal-only: this field does not contribute
-     * meaning to final IR, it is only useful during
-     * expression tree walk; therefore type here
-     * does not have to be precise
-    */
-    void* instruction;
-} node_data_operator;
+    operator_id op;
+} node_data_expression;
 
 /**
  * Aux Data: Contructor Invocation
@@ -115,7 +110,7 @@ typedef union
     node_data_import * import;
     node_data_top_level* top_level;
     node_data_declarator* declarator;
-    node_data_operator* operator;
+    node_data_expression* expression;
     node_data_contructor_invoke* constructor_invoke;
     node_data_switch_label* switch_label;
     node_data_ambiguity* ambiguity;
@@ -162,6 +157,7 @@ typedef struct _tree_node
 
 void init_tree_node(tree_node* node);
 void tree_node_add_child(tree_node* node, tree_node* child);
+void tree_node_add_first_child(tree_node* node, tree_node* child);
 void tree_node_delete(tree_node* node);
 
 tree_node* ast_node_new(java_node_query type);

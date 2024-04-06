@@ -109,11 +109,15 @@ bool retask_compiler(compiler* compiler, char* source_path)
 /**
  * Compiler Entry Point
 */
-bool compile(compiler* compiler, architecture* arch, char* source_path)
+bool compile(compiler* compiler, architecture* arch, char* source_path, compiler_stage stages)
 {
     if (!retask_compiler(compiler, source_path))
     {
         return false;
+    }
+    else if (stages < COMPILER_STAGE_PARSE)
+    {
+        return true;
     }
 
     parse(&compiler->context);
@@ -123,6 +127,10 @@ bool compile(compiler* compiler, architecture* arch, char* source_path)
     {
         return false;
     }
+    else if (stages < COMPILER_STAGE_CONTEXT)
+    {
+        return true;
+    }
 
     contextualize(&compiler->ir, arch, compiler->context.ast_root);
 
@@ -130,6 +138,10 @@ bool compile(compiler* compiler, architecture* arch, char* source_path)
     if (error_count(&compiler->error, JEL_ERROR) > 0)
     {
         return false;
+    }
+    else if (stages < COMPILER_STAGE_EMIT)
+    {
+        return true;
     }
 
     // emit IR
