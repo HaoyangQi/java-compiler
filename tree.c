@@ -54,11 +54,10 @@ static inline node_data_declarator* __new_node_data_declarator_complex()
     return d;
 }
 
-static inline node_data_operator* __new_node_data_operator()
+static inline node_data_expression* __new_node_data_expression()
 {
-    ALLOCATE(node_data_operator, d);
-    d->id = OPID_UNDEFINED;
-    d->instruction = NULL;
+    ALLOCATE(node_data_expression, d);
+    d->op = OPID_UNDEFINED;
     return d;
 }
 
@@ -123,8 +122,8 @@ static void init_node_data(tree_node* node)
         case JNT_PRIMARY_SIMPLE:
             node->data.id = __new_node_data_id_simple();
             break;
-        case JNT_OPERATOR:
-            node->data.operator = __new_node_data_operator();
+        case JNT_EXPRESSION:
+            node->data.expression = __new_node_data_expression();
             break;
         case JNT_CTOR_INVOCATION:
             node->data.constructor_invoke = __new_node_data_contructor_invoke();
@@ -182,8 +181,8 @@ static void release_node_data(tree_node* node)
         case JNT_PRIMARY_SIMPLE:
             free(node->data.id);
             break;
-        case JNT_OPERATOR:
-            free(node->data.operator);
+        case JNT_EXPRESSION:
+            free(node->data.expression);
             break;
         case JNT_CTOR_INVOCATION:
             free(node->data.constructor_invoke);
@@ -212,10 +211,23 @@ void init_tree_node(tree_node* node)
 
 /**
  * add a child node to the target node
+ *
+ * NOTE: if node=NULL, child will be deleted completely
 */
 void tree_node_add_child(tree_node* node, tree_node* child)
 {
+    // if child is NULL, tree will be broken, so it is disallowed
+    if (!child) { return; }
+
+    // if node is NULL, free child
+    if (!node)
+    {
+        tree_node_delete(child);
+        return;
+    }
+
     child->prev_sibling = node->last_child;
+    child->next_sibling = NULL;
 
     if (node->last_child)
     {
@@ -227,6 +239,39 @@ void tree_node_add_child(tree_node* node, tree_node* child)
     }
 
     node->last_child = child;
+    node->ambiguous = node->ambiguous || child->ambiguous;
+}
+
+/**
+ * add a child node as first child to the target node
+ *
+ * NOTE: if node=NULL, child will be deleted completely
+*/
+void tree_node_add_first_child(tree_node* node, tree_node* child)
+{
+    // if child is NULL, tree will be broken, so it is disallowed
+    if (!child) { return; }
+
+    // if node is NULL, free child
+    if (!node)
+    {
+        tree_node_delete(child);
+        return;
+    }
+
+    child->prev_sibling = NULL;
+    child->next_sibling = node->first_child;
+
+    if (node->first_child)
+    {
+        node->first_child->prev_sibling = child;
+    }
+    else
+    {
+        node->last_child = child;
+    }
+
+    node->first_child = child;
     node->ambiguous = node->ambiguous || child->ambiguous;
 }
 

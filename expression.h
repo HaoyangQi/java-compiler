@@ -1,5 +1,5 @@
 /**
- * Java Expression Parer
+ * Expression Worker
  *
  * Expression is parsed using Shunting Yard Algorithm,
  * definitions here are aids for parser to apply the algorithm
@@ -83,10 +83,10 @@ typedef unsigned short java_operator;
  * The following operator id is modelled but not allowed in final code:
  * 1. operator "? :", because it is an syntatic sugar which should be
  *    expanded in "if-else" form in code graph
- *    (TODO: see cfg_worker_expand_logical_precedence)
+ *    (see walk_expression)
  * 2. logical connectors "||" and "&&": they will be transformed into logical
  *    control flow during post-processing in walk_expression
- *    (see cfg_worker_expand_logical_precedence)
+ *    (see walk_expression)
  * 2. increment/decrement operator "++" and "--": they will be transformed into
  *    IROP_ADD and IROP_SUB during post-processing in walk_expression
  *
@@ -228,21 +228,23 @@ typedef struct
 void init_expression(java_expression* expression);
 void release_expression(java_expression* expression);
 
+tree_node* expr_opid2node(const operator_id opid);
 java_operator expr_opid2def(const java_expression* expression, operator_id opid);
 operator_id expr_tid2opid(const java_expression* expression, java_lexeme_type tid);
 operation expr_opid2irop(const java_expression* expression, operator_id opid);
 size_t expr_opid_operand_count(const java_expression* expression, operator_id opid);
 
 /**
- * Operator Stack
+ * Expression Element
  *
- * this stack serves parser, so we need the token reference here
+ * operator: JNT_EXPRESSION
+ * operand: JNT_PRIMARY
 */
-typedef struct _expr_operator
+typedef struct _expression_element
 {
-    operator_id op;
-    struct _expr_operator* next;
-} expr_operator;
+    tree_node* node;
+    struct _expression_element* next;
+} expression_element;
 
 /**
  * Expression Worker
@@ -251,20 +253,32 @@ typedef struct _expr_operator
 */
 typedef struct
 {
-    /* operator stack used during parsing */
-    expr_operator* operator_stack;
-    /* operand push state: true if last push is operand */
+    // expression static data reference
+    java_expression* definition;
+
+    // last error
+    java_error_id last_error;
+
+    // operator stack used during parsing
+    expression_element* operator_stack;
+    // operand stack used during parsing
+    expression_element* operand_stack;
+
+    // operator stack length
+    size_t num_operator;
+    // operand stack length
+    size_t num_operand;
+
+    // operand push state: true if last push is operand
     bool last_push_operand;
 } java_expression_worker;
 
-void init_expression_worker(java_expression_worker* worker);
+void init_expression_worker(java_expression_worker* worker, java_expression* definition);
 void release_expression_worker(java_expression_worker* worker);
 
-void expression_stack_push(java_expression_worker* worker, operator_id op);
-bool expression_stack_pop(java_expression_worker* worker);
-operator_id expression_stack_top(java_expression_worker* worker);
-bool expression_stack_empty(java_expression_worker* worker);
-bool expression_stack_pop_required(java_expression* expression, java_expression_worker* worker, operator_id opid);
-tree_node* expression_stack_parse_top(java_expression_worker* worker);
+void expression_worker_push(java_expression_worker* worker, tree_node* element);
+bool expression_worker_complete(java_expression_worker* worker);
+tree_node* expression_worker_export(java_expression_worker* worker);
+bool expression_worker_is_complete(java_expression_worker* worker);
 
 #endif

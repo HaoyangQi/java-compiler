@@ -8,38 +8,90 @@
 
 #include "ir.h"
 
-static tree_node* __previous_available_operand(tree_node* from)
+/**
+ * Execute IROP instruction
+ *
+ * NOTE: it will generate reference for this instruction,
+ * use cfg_worker_execute to execute without reference creation
+ * NOTE: unlike cfg_worker_execute, it will enforce detachment of all reference data
+*/
+static reference* execute_irop_instruction(
+    java_ir* ir,
+    cfg_worker* worker,
+    operation irop,
+    reference** ref_lvalue,
+    reference** ref_operand_1,
+    reference** ref_operand_2
+)
 {
-    while (from && from->type != JNT_OPERATOR)
-    {
-        from = from->prev_sibling;
-    }
+    instruction* inst = cfg_worker_execute(ir, worker, irop, ref_lvalue, ref_operand_1, ref_operand_2);
 
-    return from;
+    // cleanup
+    if (ref_lvalue) { delete_reference(*ref_lvalue); *ref_lvalue = NULL; }
+    if (ref_operand_1) { delete_reference(*ref_operand_1); *ref_operand_1 = NULL; }
+    if (ref_operand_2) { delete_reference(*ref_operand_2); *ref_operand_2 = NULL; }
+
+    return new_reference(IR_ASN_REF_INSTRUCTION, inst);
 }
 
 /**
- * finalize instruction
+ * Execute IROP instruction Without Reference Creation
+ *
+ * NOTE: unlike cfg_worker_execute, it will enforce detachment of all reference data
+*/
+static void execute_irop_instruction_clean(
+    java_ir* ir,
+    cfg_worker* worker,
+    operation irop,
+    reference** ref_lvalue,
+    reference** ref_operand_1,
+    reference** ref_operand_2
+)
+{
+    cfg_worker_execute(ir, worker, irop, ref_lvalue, ref_operand_1, ref_operand_2);
+
+    // cleanup
+    if (ref_lvalue) { delete_reference(*ref_lvalue); *ref_lvalue = NULL; }
+    if (ref_operand_1) { delete_reference(*ref_operand_1); *ref_operand_1 = NULL; }
+    if (ref_operand_2) { delete_reference(*ref_operand_2); *ref_operand_2 = NULL; }
+}
+
+/**
+ * Execute IROP instruction Without Value References
+ *
+ * NOTE: it will NOT validate correctness of instruction format
+*/
+inline static void execute_irop_instruction_simple(java_ir* ir, cfg_worker* worker, operation irop)
+{
+    cfg_worker_execute(ir, worker, irop, NULL, NULL, NULL);
+}
+
+/**
+ * Execute OPID operator
  *
  * lvalue <- operand_1 op operand_2
  *
- * it returns if the code requires logical precedence expansion
- *
- * NOTE: lvalue reference must be copied from an operand!
- * because the version number will be different
+ * NOTE: lvalue reference will be copied from an operand_1 if necessary
+ * NOTE: it will generate reference for this instruction,
+ * use cfg_worker_execute to execute without reference creation
+ * NOTE: unlike cfg_worker_execute, it will enforce detachment of all reference data
  *
  * op: JNT_OPERATOR
 */
-static void __execute_instruction(
+static reference* execute_opid_instruction(
     java_ir* ir,
     cfg_worker* worker,
-    tree_node* op,
-    reference* operand_1,
-    reference* operand_2
+    operator_id opid,
+    reference** ref_operand_1,
+    reference** ref_operand_2
 )
 {
-    operator_id id = op->data.operator->id;
     reference* lvalue = NULL;
+    reference* operand_1 = ref_operand_1 ? *ref_operand_1 : NULL;
+    reference* operand_2 = ref_operand_2 ? *ref_operand_2 : NULL;
+    reference* ret;
+    reference* ret_override = NULL;
+    operation irop;
     bool validate_lvalue = false;
 
     /**
@@ -47,7 +99,7 @@ static void __execute_instruction(
      *
      * for composite assignment operators, lvalue needs to be set
     */
-    switch (id)
+    switch (opid)
     {
         case OPID_ASN:
             // simply move
@@ -122,15 +174,13 @@ static void __execute_instruction(
              * if directly references to the def, just use the newest one,
              * which is the default behavior
              *
-             * so op->data.operator->instruction references to STORE instruction
+             * so instruction reference to this op is the STORE instruction
             */
 
             // first, prepare STORE instruction, and override instruction
             // attached to this operator
             lvalue = copy_reference(operand_2);
-            op->data.operator->instruction = cfg_worker_execute(
-                ir, worker, IROP_STORE, NULL, &lvalue, NULL);
-            delete_reference(lvalue);
+            ret_override = execute_irop_instruction(ir, worker, IROP_STORE, NULL, &lvalue, NULL);
 
             // then, prepare what happens in fall-through
             lvalue = copy_reference(operand_2);
@@ -152,23 +202,138 @@ static void __execute_instruction(
         ir_error(ir, JAVA_E_EXPRESSION_NO_LVALUE);
     }
 
-    // link the instruction to this op
-    // if there was an override occurred, do not override here
-    if (op->data.operator->instruction)
+    // get IROP
+    irop = expr_opid2irop(ir->expression, opid);
+
+    // fix IROP
+    switch (irop)
     {
-        cfg_worker_execute(ir, worker, expr_opid2irop(ir->expression, id), &lvalue, &operand_1, &operand_2);
-    }
-    else
-    {
-        op->data.operator->instruction = cfg_worker_execute(
-            ir, worker, expr_opid2irop(ir->expression, id), &lvalue, &operand_1, &operand_2);
+        case IROP_AINC:
+        case IROP_BINC:
+            irop = IROP_ADD;
+            break;
+        case IROP_ADEC:
+        case IROP_BDEC:
+            irop = IROP_SUB;
+            break;
+        default:
+            break;
     }
 
+    // detach
+    if (ref_operand_1) { *ref_operand_1 = NULL; }
+    if (ref_operand_2) { *ref_operand_2 = NULL; }
 
-    // cleanup
-    delete_reference(lvalue);
-    delete_reference(operand_1);
-    delete_reference(operand_2);
+    // execute instruction: cannot use parameter directly here
+    // because above algorithm may alter their values
+    ret = execute_irop_instruction(ir, worker, irop, &lvalue, &operand_1, &operand_2);
+
+    // if instruction ref has an override, use it
+    if (ret_override)
+    {
+        delete_reference(ret);
+        ret = ret_override;
+    }
+
+    return ret;
+}
+
+typedef enum
+{
+    EXPRESSION_BLOCK_DEFAULT,
+    EXPRESSION_BLOCK_TERNARY_CONDITION,
+    EXPRESSION_BLOCK_TERNARY_BRANCH_TRUE,
+    EXPRESSION_BLOCK_TERNARY_BRANCH_FALSE,
+} expression_walk_basic_block_context;
+
+/**
+ * information used during expression walk
+ *
+ * it is a FIFO queue
+*/
+typedef struct _expression_walk_stack_frame
+{
+    // basic: the operator node
+    tree_node* operator;
+    // basic: the child to be processed
+    tree_node* operator_next_child;
+    // basic: number of operand required
+    size_t num_required_operand;
+    // basic: number of walked child nodes
+    size_t num_walked_children;
+
+    // instruction: data required by operator execution
+    reference* operands[MAX_INSTRUCTION_OPERAND_COUNT];
+
+    // basic block: entry block for this instruction
+    basic_block* entry;
+    // basic block: exit block for this instruction
+    basic_block* exit;
+    // basic block: current block type as an aid for the operator
+    expression_walk_basic_block_context block_context;
+
+    struct _expression_walk_stack_frame* next;
+} expression_walk_stack;
+
+static void expression_walk_stack_push(java_ir* ir, expression_walk_stack** stack, tree_node* operator)
+{
+    if (!stack || operator->type != JNT_EXPRESSION) { return; }
+
+    expression_walk_stack* s = (expression_walk_stack*)malloc_assert(sizeof(expression_walk_stack));
+
+    // initialize basics
+    s->operator = operator;
+    s->operator_next_child = operator->first_child;
+    s->num_required_operand = expr_opid_operand_count(ir->expression, operator->data.expression->op);
+    s->num_walked_children = 0;
+    s->next = *stack;
+
+    // initialize instruction data
+    memset(s->operands, 0, sizeof(reference*) * MAX_INSTRUCTION_OPERAND_COUNT);
+
+    /**
+     * initialize basic block control
+     *
+     * WARNING:
+     * cfg_worker_current_block is prohibited here because the expression
+     * could be the very first thing in block; and in this case, there will
+     * be no block to begin with
+     *
+     * meaning... there is no generic solution for these data, just use
+     * and detect them case by case
+    */
+    s->entry = NULL;
+    s->exit = NULL;
+
+    // initialize current basic block context
+    switch (operator->data.expression->op)
+    {
+        case OPID_TERNARY_1:
+            s->block_context = EXPRESSION_BLOCK_TERNARY_CONDITION;
+            break;
+        default:
+            s->block_context = EXPRESSION_BLOCK_DEFAULT;
+            break;
+    }
+
+    // push it onto stack
+    *stack = s;
+}
+
+static void expression_walk_stack_pop(expression_walk_stack** stack)
+{
+    if (!stack || *stack == NULL) { return; }
+
+    expression_walk_stack* s = *stack;
+    *stack = s->next;
+
+    // cleanup operands
+    for (size_t i = 0; i < MAX_INSTRUCTION_OPERAND_COUNT; i++)
+    {
+        delete_reference(s->operands[i]);
+    }
+
+    free(s);
 }
 
 /**
@@ -216,12 +381,12 @@ static void __start_statement_in_new_block(java_ir* ir, java_node_query stmt_typ
  *
  * It flags the context of next primary node
  *
- * OPERAND_WALK_FIRST:   first node
- * OPERAND_BOUND_LAST:   no node is acceptable
- * OPERAND_WALK_THIS:    next name should be from current top-level scope only
- * OPERAND_WALK_SUPER:   next name should be from parent's top-level scope only
- * OPERAND_BOUND_FIELD:  next is a member (field/method) access of previous one's scope
- * OPERAND_BOUND_METHOD: next name is a method reference of previous one's scope
+ * OPERAND_BOUND_FIRST:   first node
+ * OPERAND_BOUND_LAST:    no node is acceptable
+ * OPERAND_BOUND_THIS:    next name should be from current top-level scope only
+ * OPERAND_BOUND_SUPER:   next name should be from parent's top-level scope only
+ * OPERAND_BOUND_FIELD:   next is a member (field/method) access of previous one's scope
+ * OPERAND_BOUND_METHOD:  next name is a method reference of previous one's scope
 */
 typedef enum
 {
@@ -249,7 +414,7 @@ static void walk_expression(java_ir* ir, tree_node* expression);
  *
  * if failed or no-op, it returns NULL
  *
- * node: JNT_PRIMARY | JNT_OPERATOR
+ * node: JNT_PRIMARY
 */
 static reference* walk_operand(java_ir* ir, tree_node* base)
 {
@@ -261,20 +426,6 @@ static reference* walk_operand(java_ir* ir, tree_node* base)
     }
 
     reference* ref = new_reference(IR_ASN_REF_UNDEFINED, NULL);
-
-    // if an operand is refernecing an old OP, it means
-    // it referes to that instruction
-    if (base->type == JNT_OPERATOR)
-    {
-        /**
-         * TODO: should we include JNT_EXPRESSION here for ( Expression ) ?
-        */
-        ref->type = IR_ASN_REF_INSTRUCTION;
-        ref->doi = base->data.operator->instruction;
-
-        return ref;
-    }
-
     java_token* token;
     char* content;
     definition* __def = NULL;
@@ -438,12 +589,6 @@ static reference* walk_operand(java_ir* ir, tree_node* base)
                  * TODO: Type Case
                 */
                 break;
-            case JNT_EXPRESSION:
-                /**
-                 * TODO: parenthesized expression
-                */
-                walk_expression(ir, base);
-                break;
             case JNT_AMBIGUOUS:
                 /**
                  * TODO: ambiguous JNT_TYPE and JNT_EXPRESSION
@@ -470,186 +615,235 @@ static reference* walk_operand(java_ir* ir, tree_node* base)
  *
  * This method generate a single block of code without any logical expansion
  *
- * node: JNT_EXPRESSION
+ * node (root of expression): JNT_EXPRESSION | JNT_PRIMARY
 */
-static void walk_expression(java_ir* ir, tree_node* expression)
+static void walk_expression(java_ir* ir, tree_node* root)
 {
-    // if start is OP or end with non-OP, expression is invalid
-    if (!expression->first_child || expression->first_child->type == JNT_OPERATOR)
+    expression_walk_stack* execution_stack = NULL;
+    reference* operand_value;
+
+    // minimum case: constant expression(only one operand)
+    if (root->type == JNT_PRIMARY)
     {
-        ir_error(ir, JAVA_E_EXPRESSION_NO_OPERAND);
+        operand_value = walk_operand(ir, root);
+        execute_irop_instruction_clean(ir, TSW(ir), IROP_STORE, NULL, &operand_value, NULL);
+        return;
+    }
+    else if (root->type != JNT_EXPRESSION)
+    {
+        // illegal, no-op
         return;
     }
 
-    // stack control
-    tree_node* base1;
-    tree_node* base2;
-    tree_node* top = expression->first_child;
-    instruction* first = TSW(ir)->cur_blk ? TSW(ir)->cur_blk->inst_last : NULL;
-    operator_id opid;
-    bool needs_logical_expansion = false;
+    // initialize stack by pushing root element
+    expression_walk_stack_push(ir, &execution_stack, root);
 
-    if (!top->next_sibling)
+    // walk main loop
+    while (true)
     {
-        // minimum case: constant expression (only one operand)
-        reference* constant = walk_operand(ir, top);
-        cfg_worker_execute(ir, TSW(ir), IROP_STORE, NULL, &constant, NULL);
-        delete_reference(constant);
+        operand_value = NULL;
 
-        return;
-    }
-    else if (expression->last_child->type != JNT_OPERATOR)
-    {
-        // if end with non-OP, expression is invalid
-        ir_error(ir, JAVA_E_EXPRESSION_NO_OPERATOR);
-        return;
-    }
-
-    /**
-     * expression traversal
-     *
-     * base case is: we find pattern PO or PPO
-     * where P is Primary and O is Operator
-     *
-     * reduce from left to right, until all are accepted
-     *
-     * if there are remainders, expression is invalid
-     *
-     * the in aft order, 3 nodes are:
-     * base2 base1 op
-     *
-    */
-    while (top)
-    {
-        // locate next operator
-        // do NOT set base1 here: because if top is already an OP
-        // loop will not run and base1 will not be set
-        while (top && top->type != JNT_OPERATOR)
+        // ORDER MATTERS HERE
+        if (!execution_stack->operator_next_child)
         {
-            top = top->next_sibling;
-        }
+            // log exit point, NULL by default (hence use current block in worker)
+            basic_block* exit = execution_stack->exit;
 
-        // if no op, break
-        if (!top)
-        {
-            break;
-        }
-
-        // initialize operand refernces
-        // first operand is always the immediate previous one
-        base1 = top->prev_sibling;
-        base2 = NULL;
-        opid = top->data.operator->id;
-
-        // base1 must be available
-        if (!base1)
-        {
-            ir_error(ir, JAVA_E_EXPRESSION_NO_OPERAND);
-            break;
-        }
-
-        // adjust base2 if needed
-        if (expr_opid_operand_count(ir->expression, opid) == 2)
-        {
-            // see the NOTE below for reasoning
-            base2 = base1->prev_sibling;
-
-            // operand must be available
-            if (!base2)
+            // finalize operator
+            switch (execution_stack->block_context)
             {
-                ir_error(ir, JAVA_E_EXPRESSION_NO_OPERAND);
-                break;
+                case EXPRESSION_BLOCK_DEFAULT:
+                    // execute this operator by default
+                    operand_value = execute_opid_instruction(
+                        ir, TSW(ir), execution_stack->operator->data.expression->op,
+                        &execution_stack->operands[0],
+                        &execution_stack->operands[1]
+                    );
+
+                    // if operand count does not match, issue an error message
+                    if (execution_stack->num_required_operand != execution_stack->num_walked_children)
+                    {
+                        ir_error(ir, JAVA_E_EXPRESSION_NO_OPERAND);
+                    }
+
+                    break;
+                case EXPRESSION_BLOCK_TERNARY_CONDITION:
+                    // execute PHI in exit node
+                    cfg_worker_jump(TSW(ir), exit, true, false);
+                    operand_value = execute_irop_instruction(ir, TSW(ir), IROP_PHI,
+                        NULL, &execution_stack->operands[0], &execution_stack->operands[1]);
+                    break;
+                default:
+                    // should never reach here, so it is an internal error
+                    ir_error(ir, JAVA_E_EXPRESSION_UNHANDLED_BLOCK_CONTEXT);
+                    break;
+            }
+
+            // pop current frame
+            expression_walk_stack_pop(&execution_stack);
+
+            // if stack is empty, reference is not needed
+            if (!execution_stack)
+            {
+                delete_reference(operand_value);
+            }
+
+            // if exit node is set, it has higher priority than default (current node)
+            if (exit)
+            {
+                // propagate this information to new top if applicable
+                if (execution_stack)
+                {
+                    // enforce new stack top to execute in exit block of the popped context
+                    execution_stack->exit = exit;
+
+                    // if first child changes exit, entry node of its parent will be updated as well
+                    // this is necessary for ternary operator
+                    if (!execution_stack->operator_next_child->prev_sibling)
+                    {
+                        execution_stack->entry = exit;
+                    }
+                }
+
+                // set execution context to be exit node
+                cfg_worker_jump(TSW(ir), exit, true, false);
             }
         }
-
-        /**
-         * NOTE: now this is interesting...
-         *
-         * algorithm depends on this.
-         *
-         * for every step, we adjust prev sibling to enclose it
-         * so next step will be able to jump over the entire
-         * instruction instead of single OP node
-         *
-         * when jumping backwards from an OP, it will jump to
-         * the Primary that is not parsed yet
-         *
-         * if there is none, it yields NULL
-         *
-         * WARNING: do NOT modify "next" pointer in AST as it is
-         * important to maintain integrity of the tree
-        */
-        top->prev_sibling = base2 ? base2->prev_sibling : base1->prev_sibling;
-
-        /**
-         * Code Generation
-         *
-         * order matters here!
-         * 1. operand order
-         * 2. flag OR order: __execute_instruction needs to stay at
-         * left to make sure it always executes, otherwise the
-         * short circuit might block it
-        */
-        __execute_instruction(
-            ir, TSW(ir), top,
-            walk_operand(ir, base2),
-            walk_operand(ir, base1)
-        );
-
-        switch (opid)
+        else if (execution_stack->num_walked_children >= MAX_INSTRUCTION_OPERAND_COUNT)
         {
-            case OPID_LOGIC_AND:
-            case OPID_LOGIC_OR:
-            case OPID_TERNARY_1:
-            case OPID_TERNARY_2:
-                needs_logical_expansion = true;
+            // too many operands and no handling logic: it is an internal error
+            // skip the rest and trigger execution of operator
+            delete_reference(operand_value);
+            ir_error(ir, JAVA_E_EXPRESSION_TOO_MANY_OPERAND);
+            execution_stack->operator_next_child = NULL;
+            continue;
+        }
+        else if (execution_stack->operator_next_child->type == JNT_EXPRESSION)
+        {
+            // if reach another operator, mutate execution context and start again
+            expression_walk_stack_push(ir, &execution_stack, execution_stack->operator_next_child);
+            continue;
+        }
+        else
+        {
+            // if reach a leaf (JNT_PRIMARY) just generate the value
+            operand_value = walk_operand(ir, execution_stack->operator_next_child);
+        }
+
+        // if stack is empty, the work is done
+        if (!execution_stack)
+        {
+            break;
+        }
+
+        /**
+         * if reach here, an operand value needs to be registered to block_context
+         *
+         * but ternary operators needs to be handled differently
+         * TODO: also for logical operator, similar idea here
+        */
+        switch (execution_stack->block_context)
+        {
+            case EXPRESSION_BLOCK_TERNARY_CONDITION:
+                /**
+                 * ternary operator needs logical expansion and has no instruction for it
+                 *
+                 * do not buffer operand, instead, operand will enforce execution
+                 *
+                 * EXPRESSION_BLOCK_TERNARY_CONDITION:
+                 * 1. do NOT buffer the operand, just execute
+                 * 2. a TEST code will be added for the operand;
+                 * 3. branched into TRUE block for next child
+                 *
+                 * EXPRESSION_BLOCK_TERNARY_BRANCH_TRUE:
+                 * 1. generate an exit node (Phi node)
+                 * 2. go back to entry node (condition node)
+                 * 3. branched into FALSE block for next child
+                 *
+                 * EXPRESSION_BLOCK_TERNARY_BRANCH_FALSE:
+                 * 1. connect from FALSE block to exit node
+                 * 2. mutate context accordingly to trigger stack pop
+                 *
+                 * do not update num_walked_children, to disable boundary check
+                */
+
+                // get current block as entry block
+                execution_stack->entry = cfg_worker_current_block(TSW(ir));
+
+                // enforce condition block
+                cfg_worker_jump(TSW(ir), execution_stack->entry, true, false);
+
+                // enforce execution
+                if (operand_value->type != IR_ASN_REF_INSTRUCTION)
+                {
+                    execute_irop_instruction_clean(ir, TSW(ir), IROP_STORE, NULL, &operand_value, NULL);
+                }
+
+                // add TEST code
+                execute_irop_instruction_simple(ir, TSW(ir), IROP_TEST);
+
+                // jump along TRUE branch into new block
+                cfg_worker_next_outbound_strategy(TSW(ir), EDGE_TRUE);
+                __start_statement_in_new_block(ir, JNT_STATEMENT_IF);
+
+                // mutate stack block context
+                execution_stack->block_context = EXPRESSION_BLOCK_TERNARY_BRANCH_TRUE;
+                execution_stack->operator_next_child = execution_stack->operator_next_child->next_sibling;
+                break;
+            case EXPRESSION_BLOCK_TERNARY_BRANCH_TRUE:
+                // true branch is done, enforce execution
+                if (operand_value->type != IR_ASN_REF_INSTRUCTION)
+                {
+                    operand_value = execute_irop_instruction(ir, TSW(ir), IROP_STORE, NULL, &operand_value, NULL);
+                }
+
+                // buffer this operand
+                execution_stack->operands[0] = operand_value;
+
+                // grow a new node for exit (Phi node)
+                execution_stack->exit = cfg_worker_grow(TSW(ir));
+
+                // back to condition block
+                cfg_worker_jump(TSW(ir), execution_stack->entry, true, false);
+
+                // jump along FALSE branch into new block
+                cfg_worker_next_outbound_strategy(TSW(ir), EDGE_FALSE);
+                __start_statement_in_new_block(ir, JNT_STATEMENT_IF);
+
+                // mutate stack block context
+                execution_stack->block_context = EXPRESSION_BLOCK_TERNARY_BRANCH_FALSE;
+                execution_stack->operator_next_child = execution_stack->operator_next_child->next_sibling;
+                break;
+            case EXPRESSION_BLOCK_TERNARY_BRANCH_FALSE:
+                // false branch is done, enforce execution
+                if (operand_value->type != IR_ASN_REF_INSTRUCTION)
+                {
+                    operand_value = execute_irop_instruction(ir, TSW(ir), IROP_STORE, NULL, &operand_value, NULL);
+                }
+
+                // buffer this operand
+                execution_stack->operands[1] = operand_value;
+
+                // connect from false block to phi
+                cfg_worker_jump(TSW(ir), execution_stack->exit, false, true);
+
+                // validate tree
+                if (execution_stack->operator_next_child->next_sibling)
+                {
+                    ir_error(ir, JAVA_E_EXPRESSION_TOO_MANY_OPERAND);
+                }
+
+                // mutate for final work
+                execution_stack->block_context = EXPRESSION_BLOCK_TERNARY_CONDITION;
+                execution_stack->operator_next_child = NULL;
                 break;
             default:
+                // by default, buffer the operand and move on to next
+                execution_stack->operands[execution_stack->num_walked_children] = operand_value;
+                execution_stack->num_walked_children++;
+                execution_stack->operator_next_child = execution_stack->operator_next_child->next_sibling;
                 break;
         }
-
-        // reduction of current operator completed, move on
-        top = top->next_sibling;
-    }
-
-    /**
-     * post-processing: transform pre-/post- inc/dec op code
-     *
-     * code itself is transformed in __execute_instruction, this routine
-     * simply changes opcode
-    */
-    for (instruction* probe = first ? first : TSW(ir)->cur_blk->inst_first;
-        probe != NULL;
-        probe = probe->next)
-    {
-        switch (probe->op)
-        {
-            case IROP_AINC:
-            case IROP_BINC:
-                probe->op = IROP_ADD;
-                break;
-            case IROP_ADEC:
-            case IROP_BDEC:
-                probe->op = IROP_SUB;
-                break;
-            default:
-                break;
-        }
-    }
-
-    // logical precedence
-    if (needs_logical_expansion)
-    {
-        /**
-         * if the block needs logical precedence expansion,
-         * start expression code in new block
-        */
-        if (first)
-        {
-            cfg_worker_current_block_split(ir, TSW(ir), first, EDGE_ANY, false);
-        }
-
-        cfg_worker_expand_logical_precedence(ir, TSW(ir));
     }
 }
 
@@ -733,10 +927,7 @@ static void __execute_variable_declaration(java_ir* ir, tree_node* stmt)
             // assignment code
             operand = new_reference(IR_ASN_REF_INSTRUCTION, TSW(ir)->cur_blk->inst_last);
             cfg_worker_next_asn_strategy(TSW(ir), true);
-            cfg_worker_execute(ir, TSW(ir), IROP_ASN, &lvalue, &operand, NULL);
-
-            // cleanup
-            delete_reference(operand);
+            execute_irop_instruction_clean(ir, TSW(ir), IROP_ASN, &lvalue, &operand, NULL);
         }
         else
         {
@@ -744,11 +935,8 @@ static void __execute_variable_declaration(java_ir* ir, tree_node* stmt)
              * otherwise we insert a dummy code, indicate that
              * the variable is defined here and some initialization required
             */
-            cfg_worker_execute(ir, TSW(ir), IROP_INIT, &lvalue, NULL, NULL);
+            execute_irop_instruction_clean(ir, TSW(ir), IROP_INIT, &lvalue, NULL, NULL);
         }
-
-        // cleanup
-        delete_reference(lvalue);
     }
 
     // cleanup
@@ -808,7 +996,7 @@ static void __execute_statement_if(java_ir* ir, tree_node* stmt)
     walk_expression(ir, stmt);
 
     // mark block as a test block
-    cfg_worker_execute(ir, TSW(ir), IROP_TEST, NULL, NULL, NULL);
+    execute_irop_instruction_simple(ir, TSW(ir), IROP_TEST);
 
     // mark test node
     test = cfg_worker_current_block(TSW(ir));
@@ -906,7 +1094,7 @@ static void __execute_statement_while(java_ir* ir, tree_node* stmt)
     sc->_test = cfg_worker_current_block(TSW(ir));
 
     // mark test block
-    cfg_worker_execute(ir, TSW(ir), IROP_TEST, NULL, NULL, NULL);
+    execute_irop_instruction_simple(ir, TSW(ir), IROP_TEST);
 
     /**
      * prepare break point first
@@ -1032,7 +1220,7 @@ static void __execute_statement_do(java_ir* ir, tree_node* stmt)
 
     // parse condition
     walk_expression(ir, stmt->next_sibling);
-    cfg_worker_execute(ir, TSW(ir), IROP_TEST, NULL, NULL, NULL);
+    execute_irop_instruction_simple(ir, TSW(ir), IROP_TEST);
 
     // connect end of expression to break point then stop there
     cfg_worker_next_outbound_strategy(TSW(ir), EDGE_FALSE);
@@ -1095,7 +1283,7 @@ static void __execute_statement_for(java_ir* ir, tree_node* stmt)
     test_expr_start = cfg_worker_current_block(TSW(ir));
 
     // for condition
-    if (stmt->type == JNT_EXPRESSION)
+    if (stmt->type == JNT_EXPRESSION || stmt->type == JNT_PRIMARY)
     {
         walk_expression(ir, stmt);
         stmt = stmt->next_sibling;
@@ -1103,7 +1291,7 @@ static void __execute_statement_for(java_ir* ir, tree_node* stmt)
 
     // mark, also makes sure that this node is not empty
     // so that body can stays isolated
-    cfg_worker_execute(ir, TSW(ir), IROP_TEST, NULL, NULL, NULL);
+    execute_irop_instruction_simple(ir, TSW(ir), IROP_TEST);
 
     // must get this after condition because 
     // expression may be expanded
@@ -1188,10 +1376,7 @@ static void __execute_statement_return(java_ir* ir, tree_node* stmt)
     }
 
     // execute
-    cfg_worker_execute(ir, TSW(ir), IROP_RET, NULL, &ref, NULL);
-
-    // cleanup
-    delete_reference(ref);
+    execute_irop_instruction_clean(ir, TSW(ir), IROP_RET, NULL, &ref, NULL);
 
     /**
      * here we do NOT grow
@@ -1234,7 +1419,7 @@ static void __execute_statement_break(java_ir* ir, tree_node* stmt)
     else
     {
         // execute
-        cfg_worker_execute(ir, TSW(ir), IROP_JMP, NULL, NULL, NULL);
+        execute_irop_instruction_simple(ir, TSW(ir), IROP_JMP);
 
         /**
          * here sc->_break must be valid
@@ -1288,7 +1473,7 @@ static void __execute_statement_continue(java_ir* ir, tree_node* stmt)
     else
     {
         // execute
-        cfg_worker_execute(ir, TSW(ir), IROP_JMP, NULL, NULL, NULL);
+        execute_irop_instruction_simple(ir, TSW(ir), IROP_JMP);
 
         /**
          * here sc->_continue must be valid
@@ -1525,6 +1710,7 @@ static void walk_field(java_ir* ir, definition* field_def, cfg_worker* field_ini
         switch (declaration->type)
         {
             case JNT_EXPRESSION:
+            case JNT_PRIMARY:
                 // parse right side
                 push_scope_worker(ir);
                 walk_expression(ir, declaration);
@@ -1535,10 +1721,7 @@ static void walk_field(java_ir* ir, definition* field_def, cfg_worker* field_ini
 
                 // add assignment code
                 cfg_worker_next_asn_strategy(TSW(ir), true);
-                cfg_worker_execute(ir, worker, IROP_ASN, &lvalue, &operand, NULL);
-
-                // cleanup
-                delete_reference(operand);
+                execute_irop_instruction_clean(ir, worker, IROP_ASN, &lvalue, &operand, NULL);
 
                 // merge code
                 worker = pop_scope_worker(ir);
@@ -1559,11 +1742,8 @@ static void walk_field(java_ir* ir, definition* field_def, cfg_worker* field_ini
          * otherwise we insert a dummy code, indicate that
          * the variable is defined here and some initialization required
         */
-        cfg_worker_execute(ir, field_init_worker, IROP_INIT, &lvalue, NULL, NULL);
+        execute_irop_instruction_clean(ir, field_init_worker, IROP_INIT, &lvalue, NULL, NULL);
     }
-
-    // cleanup
-    delete_reference(lvalue);
 }
 
 /**
@@ -1640,6 +1820,10 @@ void walk_class(java_ir* ir, global_top_level* class)
      * fields and methods are already defined
      * so no need to walk trees from top-level
      * for them, simply walk the table
+     *
+     * TODO: but.. this will make field init code
+     * out of order, we need an algorithm to
+     * control it
     */
     for (size_t i = 0; i < class->tbl_member.bucket_size; i++)
     {

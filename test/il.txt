@@ -6,7 +6,7 @@ import java.util.Scanner;
 import somepackage.*;
 
 class MyPackageClass extends C1 implements C2, C3 {
-    int r2 = 1>2?3+4*5:6-7;
+    int r2 = 1>2 && 3<4 ? 5==6 ? 7 : 8 : 9;
     int r3 = 0;
     short r4;
     String s = "Hello, World!";
@@ -41,6 +41,6 @@ class MyPackageClass extends C1 implements C2, C3 {
     }
 }
 
-class SomeOtherClass {
-    int a = 1;
-}
+//class SomeOtherClass {
+//    int a = 1;
+//}

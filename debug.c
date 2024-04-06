@@ -1122,11 +1122,8 @@ static void debug_print_ast_node(java_parser* parser, tree_node* node)
             printf("Class Literal");
             break;
         case JNT_EXPRESSION:
-            printf("Expression");
-            break;
-        case JNT_OPERATOR:
-            printf("OP[%d]: ", node->data.operator->id);
-            debug_print_operator(parser, node->data.operator->id);
+            printf("Expression OP[%d]: ", node->data.expression->op);
+            debug_print_operator(parser, node->data.expression->op);
             break;
         case JNT_STATEMENT:
             printf("Statement (Invalid)");
@@ -1487,39 +1484,58 @@ static void debug_print_reference(reference* r)
             break;
         case IR_ASN_REF_LITERAL:
             d = r->doi;
-            n = d->li_number->imm;
-            switch (d->li_number->type)
+
+            switch (d->type)
             {
-                case IRPV_INTEGER_BIT_8:
-                    printf("(li: 0x%llx{%d})", n, (int8_t)n);
+                case DEFINITION_NULL:
+                    printf("(li: null object)");
                     break;
-                case IRPV_INTEGER_BIT_16:
-                    printf("(li: 0x%llx{%d})", n, (int16_t)n);
+                case DEFINITION_STRING:
+                    printf("(li: string [%p])", d);
                     break;
-                case IRPV_INTEGER_BIT_32:
-                    printf("(li: 0x%llx{%d})", n, (int32_t)n);
-                    break;
-                case IRPV_INTEGER_BIT_64:
-                    printf("(li: 0x%llx{%lld})", n, (int64_t)n);
-                    break;
-                case IRPV_INTEGER_BIT_U16:
-                    printf("(li: 0x%llx{%d})", n, (uint16_t)n);
-                    break;
-                case IRPV_PRECISION_SINGLE:
-                    memcpy(&nf, (byte*)(&n) + 4, sizeof(double));
-                    printf("(li: 0x%llx{%f})", n, nf);
-                    break;
-                case IRPV_PRECISION_DOUBLE:
-                    memcpy(&nd, &n, sizeof(double));
-                    printf("(li: 0x%llx{%lf})", n, nd);
-                    break;
-                case IRPV_BOOLEAN:
-                    printf("(li: 0x%llx{%08x}{%d})", n, (uint32_t)n, (bool)n);
+                case DEFINITION_NUMBER:
+                case DEFINITION_CHARACTER:
+                case DEFINITION_BOOLEAN:
+                    n = d->li_number->imm;
+
+                    switch (d->li_number->type)
+                    {
+                        case IRPV_INTEGER_BIT_8:
+                            printf("(li: 0x%llx{%d})", n, (int8_t)n);
+                            break;
+                        case IRPV_INTEGER_BIT_16:
+                            printf("(li: 0x%llx{%d})", n, (int16_t)n);
+                            break;
+                        case IRPV_INTEGER_BIT_32:
+                            printf("(li: 0x%llx{%d})", n, (int32_t)n);
+                            break;
+                        case IRPV_INTEGER_BIT_64:
+                            printf("(li: 0x%llx{%lld})", n, (int64_t)n);
+                            break;
+                        case IRPV_INTEGER_BIT_U16:
+                            printf("(li: 0x%llx{%d})", n, (uint16_t)n);
+                            break;
+                        case IRPV_PRECISION_SINGLE:
+                            memcpy(&nf, (byte*)(&n) + 4, sizeof(double));
+                            printf("(li: 0x%llx{%f})", n, nf);
+                            break;
+                        case IRPV_PRECISION_DOUBLE:
+                            memcpy(&nd, &n, sizeof(double));
+                            printf("(li: 0x%llx{%lf})", n, nd);
+                            break;
+                        case IRPV_BOOLEAN:
+                            printf("(li: 0x%llx{%08x}{%d})", n, (uint32_t)n, (bool)n);
+                            break;
+                        default:
+                            printf("(li unknown number def [%p])", d);
+                            break;
+                    }
                     break;
                 default:
-                    printf("(li unknown: 0x%llx)", n);
+                    printf("(li: undefined [%p])", d);
                     break;
             }
+
             break;
         default:
             printf("(undefined(%d): %p)", r->type, r->doi);
@@ -1572,7 +1588,7 @@ static void debug_print_cfg(cfg* g, size_t depth)
     size_t node_out_count = 0;
     size_t node_in_count = 0;
 
-    if (g->nodes.num == 0)
+    if (!g || g->nodes.num == 0)
     {
         __format_print_indentation(depth);
         printf("(empty)\n");
@@ -1777,7 +1793,7 @@ static void debug_print_name_definition_table(hash_table* table, size_t depth)
             __format_print_indentation(depth);
 
             // key
-            printf("%s: ", (char*)(p->key));
+            printf("[%p] %s: ", p->value, (char*)(p->key));
 
             // print all definitions of this name
             debug_print_definition(p->value, depth);
