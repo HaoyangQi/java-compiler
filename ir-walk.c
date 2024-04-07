@@ -241,9 +241,13 @@ static reference* execute_opid_instruction(
 typedef enum
 {
     EXPRESSION_BLOCK_DEFAULT,
-    EXPRESSION_BLOCK_TERNARY_CONDITION,
+    EXPRESSION_BLOCK_TERNARY,
     EXPRESSION_BLOCK_TERNARY_BRANCH_TRUE,
     EXPRESSION_BLOCK_TERNARY_BRANCH_FALSE,
+    EXPRESSION_BLOCK_LOGICAL_AND,
+    EXPRESSION_BLOCK_LOGICAL_AND_BRANCH,
+    EXPRESSION_BLOCK_LOGICAL_OR,
+    EXPRESSION_BLOCK_LOGICAL_OR_BRANCH,
 } expression_walk_basic_block_context;
 
 /**
@@ -295,12 +299,12 @@ static void expression_walk_stack_push(java_ir* ir, expression_walk_stack** stac
      * initialize basic block control
      *
      * WARNING:
-     * cfg_worker_current_block is prohibited here because the expression
+     * cfg_worker_current_block is unreliable here because the expression
      * could be the very first thing in block; and in this case, there will
      * be no block to begin with
      *
-     * meaning... there is no generic solution for these data, just use
-     * and detect them case by case
+     * meaning... there is no generic solution for these data, just set/get
+     * them case by case
     */
     s->entry = NULL;
     s->exit = NULL;
@@ -309,7 +313,33 @@ static void expression_walk_stack_push(java_ir* ir, expression_walk_stack** stac
     switch (operator->data.expression->op)
     {
         case OPID_TERNARY_1:
-            s->block_context = EXPRESSION_BLOCK_TERNARY_CONDITION;
+            s->block_context = EXPRESSION_BLOCK_TERNARY;
+            break;
+        case OPID_LOGIC_AND:
+            // optimize: if both are primary, 
+            // then logical "and" is equivalent to bit-wise "and"
+            if (operator->first_child->type == JNT_PRIMARY && operator->last_child->type == JNT_PRIMARY)
+            {
+                // by default, opid will be mapped to bit-wise irop
+                s->block_context = EXPRESSION_BLOCK_DEFAULT;
+            }
+            else
+            {
+                s->block_context = EXPRESSION_BLOCK_LOGICAL_AND;
+            }
+            break;
+        case OPID_LOGIC_OR:
+            // optimize: if both are primary, 
+            // then logical "or" is equivalent to bit-wise "or"
+            if (operator->first_child->type == JNT_PRIMARY && operator->last_child->type == JNT_PRIMARY)
+            {
+                // by default, opid will be mapped to bit-wise irop
+                s->block_context = EXPRESSION_BLOCK_DEFAULT;
+            }
+            else
+            {
+                s->block_context = EXPRESSION_BLOCK_LOGICAL_OR;
+            }
             break;
         default:
             s->block_context = EXPRESSION_BLOCK_DEFAULT;
@@ -621,6 +651,7 @@ static void walk_expression(java_ir* ir, tree_node* root)
 {
     expression_walk_stack* execution_stack = NULL;
     reference* operand_value;
+    expression_walk_basic_block_context blk_ctx;
 
     // minimum case: constant expression(only one operand)
     if (root->type == JNT_PRIMARY)
@@ -667,7 +698,9 @@ static void walk_expression(java_ir* ir, tree_node* root)
                     }
 
                     break;
-                case EXPRESSION_BLOCK_TERNARY_CONDITION:
+                case EXPRESSION_BLOCK_TERNARY:
+                case EXPRESSION_BLOCK_LOGICAL_AND:
+                case EXPRESSION_BLOCK_LOGICAL_OR:
                     // execute PHI in exit node
                     cfg_worker_jump(TSW(ir), exit, true, false);
                     operand_value = execute_irop_instruction(ir, TSW(ir), IROP_PHI,
@@ -736,21 +769,57 @@ static void walk_expression(java_ir* ir, tree_node* root)
             break;
         }
 
+        blk_ctx = execution_stack->block_context;
+
         /**
          * if reach here, an operand value needs to be registered to block_context
          *
-         * but ternary operators needs to be handled differently
-         * TODO: also for logical operator, similar idea here
+         * but ternary and logical operators needs to be handled differently,
+         * as they only have logical meaning and have no instruction mapping
         */
-        switch (execution_stack->block_context)
+
+        switch (blk_ctx)
         {
-            case EXPRESSION_BLOCK_TERNARY_CONDITION:
+            case EXPRESSION_BLOCK_LOGICAL_AND:
+            case EXPRESSION_BLOCK_LOGICAL_OR:
+                // get current block as entry block
+                execution_stack->entry = cfg_worker_current_block(TSW(ir));
+
+                // enforce execution
+                if (operand_value->type != IR_ASN_REF_INSTRUCTION)
+                {
+                    operand_value = execute_irop_instruction(ir, TSW(ir), IROP_STORE, NULL, &operand_value, NULL);
+                }
+
+                // buffer this operand, cast value to boolean
+                execution_stack->operands[0] = execute_irop_instruction(ir, TSW(ir), IROP_BOOL, NULL, &operand_value, NULL);
+
+                // add TEST code
+                execute_irop_instruction_simple(ir, TSW(ir), IROP_TEST);
+
+                // short-circuit: if first condition implies entire condition, it is done
+                cfg_worker_next_outbound_strategy(
+                    TSW(ir), blk_ctx == EXPRESSION_BLOCK_LOGICAL_AND ? EDGE_FALSE : EDGE_TRUE);
+                execution_stack->exit = cfg_worker_grow(TSW(ir));
+
+                // back to entry, and branch
+                cfg_worker_jump(TSW(ir), execution_stack->entry, true, false);
+                cfg_worker_next_outbound_strategy(
+                    TSW(ir), blk_ctx == EXPRESSION_BLOCK_LOGICAL_AND ? EDGE_TRUE : EDGE_FALSE);
+                cfg_worker_grow(TSW(ir));
+
+                // mutate stack block context
+                execution_stack->block_context = blk_ctx == EXPRESSION_BLOCK_LOGICAL_AND ?
+                    EXPRESSION_BLOCK_LOGICAL_AND_BRANCH : EXPRESSION_BLOCK_LOGICAL_OR_BRANCH;
+                execution_stack->operator_next_child = execution_stack->operator_next_child->next_sibling;
+                break;
+            case EXPRESSION_BLOCK_TERNARY:
                 /**
                  * ternary operator needs logical expansion and has no instruction for it
                  *
                  * do not buffer operand, instead, operand will enforce execution
                  *
-                 * EXPRESSION_BLOCK_TERNARY_CONDITION:
+                 * EXPRESSION_BLOCK_TERNARY:
                  * 1. do NOT buffer the operand, just execute
                  * 2. a TEST code will be added for the operand;
                  * 3. branched into TRUE block for next child
@@ -770,9 +839,6 @@ static void walk_expression(java_ir* ir, tree_node* root)
                 // get current block as entry block
                 execution_stack->entry = cfg_worker_current_block(TSW(ir));
 
-                // enforce condition block
-                cfg_worker_jump(TSW(ir), execution_stack->entry, true, false);
-
                 // enforce execution
                 if (operand_value->type != IR_ASN_REF_INSTRUCTION)
                 {
@@ -784,7 +850,7 @@ static void walk_expression(java_ir* ir, tree_node* root)
 
                 // jump along TRUE branch into new block
                 cfg_worker_next_outbound_strategy(TSW(ir), EDGE_TRUE);
-                __start_statement_in_new_block(ir, JNT_STATEMENT_IF);
+                cfg_worker_grow(TSW(ir));
 
                 // mutate stack block context
                 execution_stack->block_context = EXPRESSION_BLOCK_TERNARY_BRANCH_TRUE;
@@ -808,13 +874,15 @@ static void walk_expression(java_ir* ir, tree_node* root)
 
                 // jump along FALSE branch into new block
                 cfg_worker_next_outbound_strategy(TSW(ir), EDGE_FALSE);
-                __start_statement_in_new_block(ir, JNT_STATEMENT_IF);
+                cfg_worker_grow(TSW(ir));
 
                 // mutate stack block context
                 execution_stack->block_context = EXPRESSION_BLOCK_TERNARY_BRANCH_FALSE;
                 execution_stack->operator_next_child = execution_stack->operator_next_child->next_sibling;
                 break;
             case EXPRESSION_BLOCK_TERNARY_BRANCH_FALSE:
+            case EXPRESSION_BLOCK_LOGICAL_AND_BRANCH:
+            case EXPRESSION_BLOCK_LOGICAL_OR_BRANCH:
                 // false branch is done, enforce execution
                 if (operand_value->type != IR_ASN_REF_INSTRUCTION)
                 {
@@ -822,7 +890,17 @@ static void walk_expression(java_ir* ir, tree_node* root)
                 }
 
                 // buffer this operand
-                execution_stack->operands[1] = operand_value;
+                switch (blk_ctx)
+                {
+                    case EXPRESSION_BLOCK_LOGICAL_AND_BRANCH:
+                    case EXPRESSION_BLOCK_LOGICAL_OR_BRANCH:
+                        // need to cast it to boolean
+                        execution_stack->operands[1] = execute_irop_instruction(ir, TSW(ir), IROP_BOOL, NULL, &operand_value, NULL);
+                        break;
+                    default:
+                        execution_stack->operands[1] = operand_value;
+                        break;
+                }
 
                 // connect from false block to phi
                 cfg_worker_jump(TSW(ir), execution_stack->exit, false, true);
@@ -833,9 +911,24 @@ static void walk_expression(java_ir* ir, tree_node* root)
                     ir_error(ir, JAVA_E_EXPRESSION_TOO_MANY_OPERAND);
                 }
 
-                // mutate for final work
-                execution_stack->block_context = EXPRESSION_BLOCK_TERNARY_CONDITION;
+                // mutate for final work: stop child processing
                 execution_stack->operator_next_child = NULL;
+
+                // mutate for final work: context identifier set
+                switch (blk_ctx)
+                {
+                    case EXPRESSION_BLOCK_TERNARY_BRANCH_FALSE:
+                        execution_stack->block_context = EXPRESSION_BLOCK_TERNARY;
+                        break;
+                    case EXPRESSION_BLOCK_LOGICAL_AND_BRANCH:
+                        execution_stack->block_context = EXPRESSION_BLOCK_LOGICAL_AND;
+                        break;
+                    case EXPRESSION_BLOCK_LOGICAL_OR_BRANCH:
+                        execution_stack->block_context = EXPRESSION_BLOCK_LOGICAL_OR;
+                        break;
+                    default:
+                        break;
+                }
                 break;
             default:
                 // by default, buffer the operand and move on to next
