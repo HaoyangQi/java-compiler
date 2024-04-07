@@ -145,6 +145,11 @@ void init_expression(java_expression* expression)
      *
      * NOTE: composite assignment operators are reduced by stripping the
      * "assignment" part
+     *
+     * NOTE: logical AND and OR have no instruction mapping as they have
+     * short-circuit evaluation and hence will be expanded on logical level;
+     * by default: it will be bit-wise AND to cover optimized minimum case,
+     * where both operands are Primary
     */
 
     expression->ir_map[0] = IROP_UNDEFINED;
@@ -174,8 +179,8 @@ void init_expression(java_expression* expression)
     expression->ir_map[OPID_BIT_AND] = IROP_BAND;
     expression->ir_map[OPID_BIT_XOR] = IROP_XOR;
     expression->ir_map[OPID_BIT_OR] = IROP_BOR;
-    expression->ir_map[OPID_LOGIC_AND] = IROP_LAND;
-    expression->ir_map[OPID_LOGIC_OR] = IROP_LOR;
+    expression->ir_map[OPID_LOGIC_AND] = IROP_BAND;
+    expression->ir_map[OPID_LOGIC_OR] = IROP_BOR;
     expression->ir_map[OPID_TERNARY_1] = IROP_TC;
     expression->ir_map[OPID_TERNARY_2] = IROP_TB;
     expression->ir_map[OPID_ASN] = IROP_ASN;
@@ -184,9 +189,9 @@ void init_expression(java_expression* expression)
     expression->ir_map[OPID_MUL_ASN] = IROP_MUL;
     expression->ir_map[OPID_DIV_ASN] = IROP_DIV;
     expression->ir_map[OPID_MOD_ASN] = IROP_MOD;
-    expression->ir_map[OPID_AND_ASN] = IROP_LAND;
+    expression->ir_map[OPID_AND_ASN] = IROP_BAND;
     expression->ir_map[OPID_XOR_ASN] = IROP_XOR;
-    expression->ir_map[OPID_OR_ASN] = IROP_LOR;
+    expression->ir_map[OPID_OR_ASN] = IROP_BOR;
     expression->ir_map[OPID_SHIFT_L_ASN] = IROP_SLS;
     expression->ir_map[OPID_SHIFT_R_ASN] = IROP_SRS;
     expression->ir_map[OPID_SHIFT_UR_ASN] = IROP_URS;

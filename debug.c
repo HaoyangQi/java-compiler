@@ -1427,6 +1427,9 @@ static void debug_print_irop(operation irop)
         case IROP_NOOP:
             printf("IROP_NOOP");
             break;
+        case IROP_BOOL:
+            printf("IROP_BOOL");
+            break;
         case IROP_MAX:
             printf("(Invalid: IROP_MAX)");
             break;

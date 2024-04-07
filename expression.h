@@ -129,6 +129,7 @@ typedef unsigned short java_operator;
  * IROP_TEST    test-and-jump
  * IROP_PHI     branch convergence selector
  * IROP_NOOP    no-op, but occupies an instruction
+ * IROP_BOOL    cast a value to boolean data
 */
 typedef enum
 {
@@ -200,6 +201,7 @@ typedef enum
     IROP_TEST,
     IROP_PHI,
     IROP_NOOP,
+    IROP_BOOL,
 
     IROP_MAX,
 } operation;
