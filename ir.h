@@ -582,7 +582,7 @@ typedef struct
     // expression-related info
     java_expression* expression;
     // error data
-    java_error_stack* error;
+    java_error_logger* logger;
 } java_ir;
 
 char* t2s(java_token* token);
@@ -751,7 +751,7 @@ void walk_interface(java_ir* ir, global_top_level* interface);
 
 char primitive_type_to_jil_type(java_lexeme_type p);
 
-void init_ir(java_ir* ir, java_expression* expression, java_error_stack* error);
+void init_ir(java_ir* ir, java_expression* expression, java_error_logger* logger);
 void release_ir(java_ir* ir);
 void contextualize(java_ir* ir, architecture* arch, tree_node* compilation_unit);
 void ir_error(java_ir* ir, java_error_id id);

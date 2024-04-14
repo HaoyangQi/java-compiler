@@ -7,10 +7,12 @@
  *
  * the type will help node determine which type
  * the data is binded to the tree node
+ *
+ * the value also serves as index to access serialized parser function name
 */
 typedef enum
 {
-    JNT_UNIT,
+    JNT_UNIT = 0,
     JNT_NAME_UNIT,
     JNT_NAME,
     JNT_CLASS_TYPE_UNIT,

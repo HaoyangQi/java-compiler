@@ -17,10 +17,11 @@ void debug_report(compiler* compiler);
 void debug_print_reserved_words();
 void debug_file_buffer(file_buffer* reader);
 void debug_print_symbol_table(hash_table* table);
-void debug_tokenize(file_buffer* buffer, hash_table* table);
+void debug_tokenize(file_buffer* buffer, hash_table* table, java_error_logger* logger);
 void debug_ast(java_parser* parser);
 void debug_java_symbol_lookup_table_no_collision_test(bool use_prime_size);
 void debug_print_global_import(java_ir* ir);
 void debug_ir_global_names(java_ir* ir);
+void debug_print_error_logger(java_error_logger* logger);
 
 #endif

@@ -6,6 +6,15 @@
         "*.c": "c",
         "*.h": "c",
         "xstring": "c",
-        "xutility": "c"
+        "xutility": "c",
+        "initializer_list": "c",
+        "utility": "c",
+        "compare": "c",
+        "cstddef": "c",
+        "limits": "c",
+        "type_traits": "c",
+        "xmemory": "c",
+        "tuple": "c",
+        "xtr1common": "c"
     }
 }

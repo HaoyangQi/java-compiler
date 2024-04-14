@@ -93,7 +93,7 @@ typedef struct
 */
 typedef struct
 {
-    // pointer to JAVA_E_AMBIGUITY_START
+    // pointer to ERROR_ENTRY_AMBIGUITY
     java_error_entry* error;
 } node_data_ambiguity;
 

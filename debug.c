@@ -205,7 +205,7 @@ void debug_report(compiler* compiler)
     );
     printf("Error static data size: %zd bytes\n",
         sizeof(java_error_definition) +
-        sizeof(error_descriptor) * JAVA_E_MAX +
+        sizeof(error_type) * JAVA_E_MAX +
         sizeof(char*) * JAVA_E_MAX
     );
 
@@ -781,15 +781,18 @@ static void debug_print_token_content(java_token* token)
     free(content);
 }
 
-void debug_tokenize(file_buffer* buffer, hash_table* table)
+void debug_tokenize(file_buffer* buffer, hash_table* table, java_error_logger* logger)
 {
     printf("===== TOKENIZED BUFFER CONTENT =====\n");
 
     java_token* token = (java_token*)malloc_assert(sizeof(java_token));
+    java_lexer lexer;
+
+    init_lexer(&lexer, buffer, table, logger);
 
     while (true)
     {
-        get_next_token(token, buffer, table);
+        lexer_next_token(&lexer, token);
 
         if (token->class == JT_EOF)
         {
@@ -1226,11 +1229,7 @@ static void debug_print_ast(java_parser* parser, tree_node* node, int depth)
     // print current level first
     while (node)
     {
-        for (int i = 0; i < depth; i++)
-        {
-            printf("  ");
-        }
-
+        __format_print_indentation(depth);
         debug_print_ast_node(parser, node);
         printf("\n");
 
@@ -1806,6 +1805,48 @@ static void debug_print_name_definition_table(hash_table* table, size_t depth)
     }
 }
 
+static void debug_print_error_stack(java_error_stack* stack, size_t depth)
+{
+    if (!stack || !stack->first)
+    {
+        __format_print_indentation(depth);
+        printf("(null)\n");
+        return;
+    }
+
+    for (java_error_entry* entry = stack->first; entry != NULL; entry = entry->next)
+    {
+        __format_print_indentation(depth);
+
+        switch (entry->type)
+        {
+            case ERROR_ENTRY_NORMAL:
+                printf("[%d](%zd, %zd)-(%zd, %zd): %s\n",
+                    entry->id,
+                    entry->begin.ln,
+                    entry->begin.col,
+                    entry->end.ln,
+                    entry->end.col,
+                    entry->msg ? entry->msg : "(null)"
+                );
+                break;
+            case ERROR_ENTRY_AMBIGUITY:
+                printf("<AMBIGUOUS ENTRY>: %zd entry\n", entry->ambiguity.len);
+
+                for (size_t i = 0; i < entry->ambiguity.len; i++)
+                {
+                    __format_print_indentation(depth + 1);
+                    printf("Entry [%zd]:\n", i);
+                    debug_print_error_stack(&entry->ambiguity.arr[i], depth + 2);
+                }
+                break;
+            default:
+                printf("<UNDEFINED ENTRY TYPE: %d>\n", entry->type);
+                break;
+        }
+    }
+}
+
 void debug_print_global_import(java_ir* ir)
 {
     hash_table* table = &ir->tbl_import;
@@ -2063,4 +2104,16 @@ void debug_number_library()
     }
 
     printf("\n");
+}
+
+void debug_print_error_logger(java_error_logger* logger)
+{
+    printf("\n===== ERROR LOGGER (MAIN STREAM) =====\n");
+    debug_print_error_stack(&logger->main_stream, 0);
+
+    if (logger->current_stream != &logger->main_stream)
+    {
+        printf("\n===== ERROR LOGGER (CURRENT STREAM) =====\n");
+        debug_print_error_stack(logger->current_stream, 0);
+    }
 }

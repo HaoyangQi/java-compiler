@@ -6,6 +6,10 @@
 #include "langspec.h"
 #include "file.h"
 #include "symtbl.h"
+#include "error.h"
+
+#define lexer_error_missing_token(parser, token, id, token_name) \
+    lexer_error(lexer, token, id, token_name, error_logger_get_context_string(lexer->logger, id))
 
 /**
  * Token Classification
@@ -79,6 +83,11 @@ typedef struct _java_token
     /* lexeme type */
     java_lexeme_type type;
 
+    // line info
+
+    line ln_begin;
+    line ln_end;
+
     // aux info
 
     /* keyword info */
@@ -87,8 +96,52 @@ typedef struct _java_token
     java_number_info number;
 } java_token;
 
+/**
+ * Lexer Context
+*/
+typedef struct
+{
+    // copy mark
+    bool is_copy;
+    // file buffer
+    file_buffer* buffer;
+    // reserved words lookup table
+    hash_table* rw;
+    // error logger
+    java_error_logger* logger;
+
+    /**
+     * TODO: future work: additional aid for resolving lexical ambiguity
+     * if not JLT_UNDEFINED or JLT_MAX, it will check ambiguity as an
+     * complementary of longest-matching algorithm run by lexer
+     *
+     * e.g. >>> but expect=JLT_SYM_ANGLE_BRACKET_CLOSE(>), then
+     * lexer_next_token will get a ">" instead of ">>>" by default
+     *
+     * this is an transient flag, every lexer_next_token will set it
+     * back to JLT_MAX, successful or not
+     *
+     * whe this is setm an error will be issued if next one cannot be
+     * extracted as "expected"
+    */
+    java_lexeme_type expect;
+
+    // current line info
+    line ln_cur;
+    // last character location in previous line
+    line ln_prev;
+} java_lexer;
+
 void init_token(java_token* token);
-void get_next_token(java_token* token, file_buffer* buffer, hash_table* rw);
+void release_token(java_token* token);
 void delete_token(java_token* token);
+
+void init_lexer(java_lexer* lexer, file_buffer* buffer, hash_table* rw, java_error_logger* logger);
+java_lexer* copy_lexer(const java_lexer* lexer);
+void release_lexer(java_lexer* lexer);
+
+void lexer_error(java_lexer* lexer, java_token* token, java_error_id id, ...);
+void lexer_expect(java_lexer* lexer, java_lexeme_type token_type);
+void lexer_next_token(java_lexer* lexer, java_token* token);
 
 #endif

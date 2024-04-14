@@ -23,13 +23,13 @@ static void top_level_lookup_deleter(char* k, global_top_level* v)
 /**
  * initialize semantic analysis
 */
-void init_ir(java_ir* ir, java_expression* expression, java_error_stack* error)
+void init_ir(java_ir* ir, java_expression* expression, java_error_logger* logger)
 {
     ir->working_top_level = NULL;
     ir->scope_stack_top = NULL;
     ir->arch = NULL;
     ir->expression = expression;
-    ir->error = error;
+    ir->logger = logger;
     ir->scope_workers = NULL;
     ir->statement_contexts = NULL;
 
@@ -60,7 +60,7 @@ void release_ir(java_ir* ir)
 */
 void ir_error(java_ir* ir, java_error_id id)
 {
-    error_log(ir->error, id, 0, 0);
+    error_logger_log(ir->logger, 0, 0, id);
 }
 
 /**

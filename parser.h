@@ -10,6 +10,9 @@
 #include "expression.h"
 #include "error.h"
 
+#define parser_error_missing_token(parser, id, token_name) \
+    parser_error(parser, id, token_name, error_logger_get_context_string(parser->logger, id))
+
 /**
  * Token Peek Index
  *
@@ -29,12 +32,14 @@
 */
 typedef struct _java_parser
 {
+    /* copy flag */
+    bool is_copy;
     /* 4 look-ahead tokens */
     java_token tokens[4];
     /* num look-ahead available */
     size_t num_token_available;
-    /* file buffer */
-    file_buffer* buffer;
+    /* lexer */
+    java_lexer* lexer;
     /* language spec symbol table*/
     hash_table* reserved_words;
     /* AST */
@@ -42,19 +47,19 @@ typedef struct _java_parser
     /* expression definition */
     java_expression* expression;
     /* error data */
-    java_error_stack* error;
+    java_error_logger* logger;
 } java_parser;
 
 void init_parser(
     java_parser* parser,
-    file_buffer* buffer,
+    java_lexer* lexer,
     hash_table* rw,
     java_expression* expr,
-    java_error_stack* err
+    java_error_logger* logger
 );
 void copy_parser(java_parser* from, java_parser* to);
 void mutate_parser(java_parser* parser, java_parser* copy);
-void release_parser(java_parser* parser, bool is_copy);
+void release_parser(java_parser* parser);
 
 void parse(java_parser* parser);
 
@@ -78,7 +83,7 @@ bool parser_trigger_expression(java_parser* parser, size_t peek_from);
 bool parser_trigger_primary(java_parser* parser, size_t peek_from);
 bool parser_trigger_statement(java_parser* parser, size_t peek_from);
 
-void parser_error(java_parser* parser, java_error_id id);
+void parser_error(java_parser* parser, java_error_id id, ...);
 void parser_recovery_dispatch(java_parser* parser, java_error_id id);
 
 #endif

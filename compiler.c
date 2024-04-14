@@ -33,21 +33,26 @@ bool init_compiler(compiler* compiler)
     // static data: init only once
     init_symbol_table(&compiler->rw_lookup_table);
     init_expression(&compiler->expression);
-    init_error_definition(&compiler->err_def);
 
     // high-priority instance
-    init_error_stack(&compiler->error, &compiler->err_def);
+    init_error_logger(&compiler->logger);
 
     // compiler framework
-    init_file_buffer(&compiler->reader, &compiler->error);
-    init_parser(
-        &compiler->context,
+    init_file_buffer(&compiler->reader, &compiler->logger);
+    init_lexer(
+        &compiler->lexer,
         &compiler->reader,
         &compiler->rw_lookup_table,
-        &compiler->expression,
-        &compiler->error
+        &compiler->logger
     );
-    init_ir(&compiler->ir, &compiler->expression, &compiler->error);
+    init_parser(
+        &compiler->context,
+        &compiler->lexer,
+        &compiler->rw_lookup_table,
+        &compiler->expression,
+        &compiler->logger
+    );
+    init_ir(&compiler->ir, &compiler->expression, &compiler->logger);
 
     return true;
 }
@@ -60,9 +65,8 @@ void release_compiler(compiler* compiler)
     release_file_buffer(&compiler->reader);
     release_symbol_table(&compiler->rw_lookup_table);
     release_expression(&compiler->expression);
-    release_error_definition(&compiler->err_def);
-    release_error_stack(&compiler->error);
-    release_parser(&compiler->context, false);
+    release_error_logger(&compiler->logger);
+    release_parser(&compiler->context);
     release_ir(&compiler->ir);
 }
 
@@ -72,8 +76,9 @@ void release_compiler(compiler* compiler)
 void detask_compiler(compiler* compiler)
 {
     release_file_buffer(&compiler->reader);
-    clear_error_stack(&compiler->error);
-    release_parser(&compiler->context, false);
+    clear_error_logger(&compiler->logger);
+    release_lexer(&compiler->lexer);
+    release_parser(&compiler->context);
     release_ir(&compiler->ir);
 }
 
@@ -86,15 +91,21 @@ bool retask_compiler(compiler* compiler, char* source_path)
 
     // relink all references
     compiler->source_file_name = source_path;
-    init_file_buffer(&compiler->reader, &compiler->error);
-    init_parser(
-        &compiler->context,
+    init_file_buffer(&compiler->reader, &compiler->logger);
+    init_lexer(
+        &compiler->lexer,
         &compiler->reader,
         &compiler->rw_lookup_table,
-        &compiler->expression,
-        &compiler->error
+        &compiler->logger
     );
-    init_ir(&compiler->ir, &compiler->expression, &compiler->error);
+    init_parser(
+        &compiler->context,
+        &compiler->lexer,
+        &compiler->rw_lookup_table,
+        &compiler->expression,
+        &compiler->logger
+    );
+    init_ir(&compiler->ir, &compiler->expression, &compiler->logger);
 
     /**
      * load file last
@@ -123,7 +134,7 @@ bool compile(compiler* compiler, architecture* arch, char* source_path, compiler
     parse(&compiler->context);
 
     // check error from parser
-    if (error_count(&compiler->error, JEL_ERROR) > 0)
+    if (!error_logger_if_main_stack_no_error(&compiler->logger))
     {
         return false;
     }
@@ -134,8 +145,8 @@ bool compile(compiler* compiler, architecture* arch, char* source_path, compiler
 
     contextualize(&compiler->ir, arch, compiler->context.ast_root);
 
-    // check error from parser
-    if (error_count(&compiler->error, JEL_ERROR) > 0)
+    // check error from contextualizer
+    if (!error_logger_if_main_stack_no_error(&compiler->logger))
     {
         return false;
     }
@@ -173,13 +184,15 @@ void compiler_error_format_print(compiler* compiler)
     // <file name>:<ln>:<col>: <error level> <error code>: 
     static char* msg_header_full = "%s:%zd:%zd: %s %s%04d: ";
 
-    java_error_stack* error = &compiler->error;
-    java_error_entry* cur = error->data;
-    error_descriptor def, level, scope;
+    java_error_logger* logger = &compiler->logger;
+    java_error_entry* cur = logger->main_stream.first;
+    java_error_id id;
+    error_type def, level, scope;
 
     while (cur)
     {
-        def = error->def->descriptor[cur->id];
+        id = cur->id;
+        def = logger->def[id].descriptor;
         level = def & ERR_DEF_MASK_LEVEL;
         scope = def & ERR_DEF_MASK_SCOPE;
 
@@ -193,7 +206,7 @@ void compiler_error_format_print(compiler* compiler)
                 fprintf(stderr, msg_header_plain,
                     error_level_map[JEL_TO_INDEX(level)],
                     error_scope_map[scope],
-                    cur->id
+                    id
                 );
                 break;
             case JES_LEXICAL:
@@ -202,11 +215,11 @@ void compiler_error_format_print(compiler* compiler)
                 // only parsing phase requires line info
                 fprintf(stderr, msg_header_full,
                     compiler->source_file_name,
-                    cur->ln,
-                    cur->col,
+                    cur->begin.ln,
+                    cur->begin.col,
                     error_level_map[JEL_TO_INDEX(level)],
                     error_scope_map[scope],
-                    cur->id
+                    id
                 );
                 break;
             default:
@@ -215,23 +228,13 @@ void compiler_error_format_print(compiler* compiler)
                     compiler->source_file_name,
                     error_level_map[JEL_TO_INDEX(level)],
                     error_scope_map[scope],
-                    cur->id
+                    id
                 );
                 break;
         }
 
         // now print message
-        // some of them may need format print
-        switch (cur->id)
-        {
-            case JAVA_E_FILE_OPEN_FAILED:
-            case JAVA_E_FILE_SIZE_NOT_MATCH:
-                fprintf(stderr, error->def->message[cur->id], compiler->source_file_name);
-                break;
-            default:
-                fprintf(stderr, error->def->message[cur->id]);
-                break;
-        }
+        fprintf(stderr, cur->msg ? cur->msg : logger->def[id].message);
 
         /**
          * TODO: print snapshot content for parsing errors
