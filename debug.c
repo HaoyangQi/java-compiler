@@ -1,7 +1,7 @@
 #include "debug.h"
 
 #include "langspec.h"
-#include "token.h"
+#include "lexer.h"
 #include "node.h"
 #include "expression.h"
 #include "number.h"

@@ -1,4 +1,4 @@
-#include "token.h"
+#include "lexer.h"
 
 static bool consume_char_default(java_lexer* lexer)
 {

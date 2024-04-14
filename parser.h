@@ -4,7 +4,7 @@
 
 #include "types.h"
 #include "hash-table.h"
-#include "token.h"
+#include "lexer.h"
 #include "file.h"
 #include "symtbl.h"
 #include "expression.h"

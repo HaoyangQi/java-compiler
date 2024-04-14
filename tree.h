@@ -4,7 +4,7 @@
 
 #include "types.h"
 #include "langspec.h"
-#include "token.h"
+#include "lexer.h"
 #include "node.h"
 #include "error.h"
 

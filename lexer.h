@@ -1,6 +1,6 @@
 #pragma once
-#ifndef __COMPILER_TOKEN_H__
-#define __COMPILER_TOKEN_H__
+#ifndef __COMPILER_LEXER_H__
+#define __COMPILER_LEXER_H__
 
 #include "types.h"
 #include "langspec.h"

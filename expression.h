@@ -12,7 +12,7 @@
 #include "types.h"
 #include "langspec.h"
 #include "tree.h"
-#include "token.h"
+#include "lexer.h"
 
 /**
  * Operator Info
