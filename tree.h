@@ -4,7 +4,7 @@
 
 #include "types.h"
 #include "langspec.h"
-#include "token.h"
+#include "lexer.h"
 #include "node.h"
 #include "error.h"
 
@@ -93,7 +93,7 @@ typedef struct
 */
 typedef struct
 {
-    // pointer to JAVA_E_AMBIGUITY_START
+    // pointer to ERROR_ENTRY_AMBIGUITY
     java_error_entry* error;
 } node_data_ambiguity;
 

@@ -2,7 +2,7 @@
 #ifndef __COMPILER_NUMBER_H__
 #define __COMPILER_NUMBER_H__
 
-#include "token.h"
+#include "lexer.h"
 #include "types.h"
 
 /**

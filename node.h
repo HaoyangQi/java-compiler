@@ -10,7 +10,7 @@
 */
 typedef enum
 {
-    JNT_UNIT,
+    JNT_UNIT = 0,
     JNT_NAME_UNIT,
     JNT_NAME,
     JNT_CLASS_TYPE_UNIT,

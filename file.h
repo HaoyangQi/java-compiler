@@ -24,14 +24,15 @@ typedef struct _file_buffer
     /* buffer cursor of current read position */
     byte* cur;
     /* error logger */
-    java_error_stack* error;
+    java_error_logger* logger;
 } file_buffer;
 
-void init_file_buffer(file_buffer* buffer, java_error_stack* error_logger);
+void init_file_buffer(file_buffer* buffer, java_error_logger* error_logger);
 void release_file_buffer(file_buffer* buffer);
 bool load_source_file(file_buffer* buffer, const char* name);
 
 bool is_eof(file_buffer* buffer);
+void buffer_error(file_buffer* buffer, java_error_id id, ...);
 bool buffer_ptr_safe_move(file_buffer* buffer);
 byte buffer_peek(file_buffer* buffer, int offset);
 size_t buffer_count(const byte* from, const byte* to);

@@ -77,8 +77,9 @@ int main(int argc, char* argv[])
         }
 
         // debug_file_buffer(&compiler.reader);
-        // debug_tokenize(&compiler.reader, &compiler.rw_lookup_table);
+        // debug_tokenize(&compiler.reader, &compiler.rw_lookup_table, &compiler->logger);
         compiler_error_format_print(&compiler);
+        debug_print_error_logger(&compiler.logger);
     }
 
     release_compiler(&compiler);

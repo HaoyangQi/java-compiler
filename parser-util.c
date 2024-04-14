@@ -20,12 +20,12 @@ java_token* token_peek(java_parser* parser, size_t idx)
     // buffer it if not yet available
     for (size_t i = parser->num_token_available; i <= idx; i++)
     {
-        get_next_token(parser->tokens + i, parser->buffer, parser->reserved_words);
+        lexer_next_token(parser->lexer, parser->tokens + i);
 
         // discard comments
         while (parser->tokens[i].class == JT_COMMENT)
         {
-            get_next_token(parser->tokens + i, parser->buffer, parser->reserved_words);
+            lexer_next_token(parser->lexer, parser->tokens + i);
         }
     }
 
@@ -137,10 +137,16 @@ bool is_lexeme_literal(java_lexeme_type type)
 /**
  * Error Logger
  *
- * TODO: we need a clever way to get line info from java_parser instance
+ * TODO: what line info do we need here?
+ * TODO: need line_end info for future snapshot info creation
 */
-void parser_error(java_parser* parser, java_error_id id)
+void parser_error(java_parser* parser, java_error_id id, ...)
 {
-    error_log(parser->error, id, 0, 0);
+    va_list args;
+
+    va_start(args, id);
+    error_logger_vslog(parser->logger, &parser->lexer->ln_cur, NULL, id, &args);
+    va_end(args);
+
     parser_recovery_dispatch(parser, id);
 }

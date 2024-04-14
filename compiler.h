@@ -20,9 +20,10 @@ typedef struct
     hash_table rw_lookup_table;
     java_expression expression;
     java_error_definition err_def;
+    java_lexer lexer;
     java_parser context;
     java_ir ir;
-    java_error_stack error;
+    java_error_logger logger;
 } compiler;
 
 /**

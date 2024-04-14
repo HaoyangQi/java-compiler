@@ -1,6 +1,18 @@
 #include "types.h"
 
 /**
+ * copy line info data
+*/
+void line_copy(line* dest, line* src)
+{
+    ASSERT_ALLOCATION(dest);
+    ASSERT_ALLOCATION(src);
+
+    dest->ln = src->ln;
+    dest->col = src->col;
+}
+
+/**
  * a verbose wrapper of allocation
 */
 void* malloc_assert(size_t sz)

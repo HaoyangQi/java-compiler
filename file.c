@@ -1,12 +1,12 @@
 #include "file.h"
 
-void init_file_buffer(file_buffer* buffer, java_error_stack* error_logger)
+void init_file_buffer(file_buffer* buffer, java_error_logger* error_logger)
 {
     buffer->size = 0;
     buffer->base = NULL;
     buffer->cur = NULL;
     buffer->limit = NULL;
-    buffer->error = error_logger;
+    buffer->logger = error_logger;
 }
 
 void release_file_buffer(file_buffer* buffer)
@@ -19,7 +19,7 @@ bool load_source_file(file_buffer* buffer, const char* name)
     // rough test to see if path name is valid
     if (!name || name[0] == '\0')
     {
-        error_log(buffer->error, JAVA_E_FILE_NO_PATH, 0, 0);
+        buffer_error(buffer, JAVA_E_FILE_NO_PATH);
         return false;
     }
 
@@ -27,7 +27,7 @@ bool load_source_file(file_buffer* buffer, const char* name)
 
     if (!fp)
     {
-        error_log(buffer->error, JAVA_E_FILE_OPEN_FAILED, 0, 0);
+        buffer_error(buffer, JAVA_E_FILE_OPEN_FAILED, name);
         return false;
     }
 
@@ -46,7 +46,7 @@ bool load_source_file(file_buffer* buffer, const char* name)
         {
             free(buffer->base);
             buffer->base = NULL;
-            error_log(buffer->error, JAVA_E_FILE_SIZE_NOT_MATCH, 0, 0);
+            buffer_error(buffer, JAVA_E_FILE_SIZE_NOT_MATCH, name);
             return false;
         }
 
@@ -63,6 +63,15 @@ bool load_source_file(file_buffer* buffer, const char* name)
 inline bool is_eof(file_buffer* buffer)
 {
     return *buffer->cur == 0x00;
+}
+
+void buffer_error(file_buffer* buffer, java_error_id id, ...)
+{
+    va_list args;
+
+    va_start(args, id);
+    error_logger_vslog(buffer->logger, NULL, NULL, id, &args);
+    va_end(args);
 }
 
 /**

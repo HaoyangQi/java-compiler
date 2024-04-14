@@ -47,21 +47,23 @@
 */
 void init_parser(
     java_parser* parser,
-    file_buffer* buffer,
+    java_lexer* lexer,
     hash_table* rw,
     java_expression* expr,
-    java_error_stack* err
+    java_error_logger* logger
 )
 {
+    parser->is_copy = false; // MUST be false from this routine
+
     // tokens contains garbage data if not used
     // so the counter is important
     parser->num_token_available = 0;
 
-    parser->buffer = buffer;
+    parser->lexer = lexer;
     parser->reserved_words = rw;
     parser->ast_root = NULL;
     parser->expression = expr;
-    parser->error = err;
+    parser->logger = logger;
 }
 
 /**
@@ -69,10 +71,17 @@ void init_parser(
  *
  * a copy of parser instance has shallow copy of all static data,
  * and does not copy AST
+ *
+ * 1. copy parser instance MUST ALWAYS start from a new AST
+ * 2. error logger is a singleton so no copy is allowed
+ * 3. lexer needs a copy, while the file map in file buffer does not
 */
 void copy_parser(java_parser* from, java_parser* to)
 {
     memcpy(to, from, sizeof(java_parser));
+
+    // set copy flag
+    to->is_copy = true;
 
     /**
      * a copy of parser insatnce should never affect current AST
@@ -82,23 +91,8 @@ void copy_parser(java_parser* from, java_parser* to)
     */
     to->ast_root = NULL;
 
-    /**
-     * error stack needs to be isolated
-     *
-     * but error definitions are still shared
-    */
-    to->error = (java_error_stack*)malloc_assert(sizeof(java_error_stack));
-    init_error_stack(to->error, from->error->def);
-
-    /**
-     * file buffer state needs to be isolated
-     *
-     * the content buffer though does not need deep copy because
-     * it is static
-    */
-    to->buffer = (file_buffer*)malloc_assert(sizeof(file_buffer));
-    memcpy(to->buffer, from->buffer, sizeof(file_buffer));
-    to->buffer->error = to->error; // redirect error stack
+    // copy lexer
+    to->lexer = copy_lexer(from->lexer);
 }
 
 /**
@@ -112,6 +106,11 @@ void copy_parser(java_parser* from, java_parser* to)
  * WARNING: the parser instance has shallow reference of data
  * by definition, so during swap all pointer references must
  * stay the same and perform deep copy as needed
+ *
+ * 1. lookaheads requires copy
+ * 2. lexer needs to be (shallow) copied
+ * 3. error logger is a singleton, no copy
+ * 4. reserved words and expression data are static, no copy
 */
 void mutate_parser(java_parser* parser, java_parser* copy)
 {
@@ -119,19 +118,24 @@ void mutate_parser(java_parser* parser, java_parser* copy)
     memcpy(parser->tokens, copy->tokens, sizeof(java_token) * 4);
     parser->num_token_available = copy->num_token_available;
 
-    // file buffer deep copy
-    // only cur pointer is isolated, others are static so no copy
-    parser->buffer->cur = copy->buffer->cur;
-
-    // error stack should be merged
-    error_stack_concat(parser->error, copy->error);
-
-    // reserved words and expression data are static, so no copy
+    /**
+     * Override Lexer
+     *
+     * file buffer is a bit tricky because there are 2 instances but
+     * pointer cannot be directly override
+     *
+     * luckily... from file buffer "cur" is only thing needed so
+     * override can be hancked here
+    */
+    file_buffer* buf = parser->lexer->buffer;
+    buf->cur = copy->lexer->buffer->cur;
+    memcpy(parser->lexer, copy->lexer, sizeof(java_lexer));
+    parser->lexer->buffer = buf;
 
     // guard: copy instance should not have AST
-    if (copy->ast_root)
+    if (!copy->is_copy || copy->ast_root)
     {
-        fprintf(stderr, "TODO error: internal error: compiler is trying to swap an ill-formed parser instance.\n");
+        parser_error(parser, JAVA_E_PASER_SWAP_FAILED);
     }
 }
 
@@ -140,22 +144,18 @@ void mutate_parser(java_parser* parser, java_parser* copy)
  *
  * if deleting a copy of parser instance, the AST data must be NULL
 */
-void release_parser(java_parser* parser, bool is_copy)
+void release_parser(java_parser* parser)
 {
-    if (is_copy)
+    if (parser->is_copy)
     {
         if (parser->ast_root)
         {
-            fprintf(stderr, "TODO error: internal error: compiler is trying to delete an ill-formed parser instance.\n");
+            parser_error(parser, JAVA_E_PASER_DELETE_FAILED);
         }
 
-        // a copy of instance has isolated file buffer
-        // no need to release, because only the struct is the copy
-        free(parser->buffer);
-
-        // delete error stack
-        release_error_stack(parser->error);
-        free(parser->error);
+        // delete lexer instance
+        release_lexer(parser->lexer);
+        free(parser->lexer);
     }
     else
     {
@@ -191,6 +191,9 @@ static tree_node* parse_binary_ambiguity(
     bool n1_valid = false;
     bool n2_valid = false;
 
+    // error logger follows singleton design
+    java_error_logger* logger = parser->logger;
+
     // copy parser instance
     java_parser* parser_1 = (java_parser*)malloc_assert(sizeof(java_parser));
     java_parser* parser_2 = (java_parser*)malloc_assert(sizeof(java_parser));
@@ -198,12 +201,20 @@ static tree_node* parse_binary_ambiguity(
     copy_parser(parser, parser_2);
 
     // parse path 1
+    java_error_stack* tmp_cur = logger->current_stream;
+    error_logger_ambiguity_begin(logger);
     n1 = (*f1)(parser_1);
-    n1_valid = parser_1->error->num_err == 0;
+    n1_valid = error_logger_if_current_stack_no_error(logger);
+    error_logger_ambiguity_end(logger);
 
     // parse path 2
+    error_logger_ambiguity_begin(logger);
     n2 = (*f2)(parser_2);
-    n2_valid = parser_2->error->num_err == 0;
+    n2_valid = error_logger_if_current_stack_no_error(logger);
+    error_logger_ambiguity_end(logger);
+
+    // now current top should be the ambiguity entry
+    java_error_entry* entry_amb = error_logger_get_current_top(logger);
 
     // verify terminator and determine final validity status
     n1_valid = n1_valid &&
@@ -219,30 +230,13 @@ static tree_node* parse_binary_ambiguity(
         tree_node_add_child(node, n2);
 
         // convergence test
-        if (parser_1->buffer->cur != parser_2->buffer->cur)
+        if (parser_1->lexer->buffer->cur != parser_2->lexer->buffer->cur)
         {
-            fprintf(stderr,
-                "TODO error: internal error: ambiguity diverges: termination differs (0x%x 0x%x).\n",
-                *(parser_1->buffer->cur), *(parser_2->buffer->cur)
-            );
+            parser_error(parser, JAVA_E_AMBIGUITY_DIVERGE, *(parser_1->lexer->buffer->cur), *(parser_2->lexer->buffer->cur));
         }
 
-        /**
-         * when keeping both, error stack will enclose errors from both paths
-         * with special flags
-         *
-         * for convenience, parser will be mutated using n1
-        */
-
-        // first pathway
-        parser_error(parser, JAVA_E_AMBIGUITY_START);
-        node->data.ambiguity->error = error_stack_top(parser->error);
-        mutate_parser(parser, parser_1);
-
-        // second pathway
-        parser_error(parser, JAVA_E_AMBIGUITY_SEPARATOR);
-        error_stack_concat(parser->error, parser_2->error);
-        parser_error(parser, JAVA_E_AMBIGUITY_END);
+        // cache the ambiguity error entry in node
+        node->data.ambiguity->error = entry_amb;
     }
     else if (n2_valid || !n2->ambiguous)
     {
@@ -254,6 +248,8 @@ static tree_node* parse_binary_ambiguity(
         */
         node = n2;
         tree_node_delete(n1);
+        error_logger_ambiguity_resolve(logger, entry_amb, 1);
+        // assert(error_logger_get_current_top(logger) != entry_amb);
     }
     else
     {
@@ -266,6 +262,8 @@ static tree_node* parse_binary_ambiguity(
         */
         node = n1;
         tree_node_delete(n2);
+        error_logger_ambiguity_resolve(logger, entry_amb, 0);
+        // assert(error_logger_get_current_top(logger) != entry_amb);
     }
 
     // mutate parser accordingly
@@ -275,8 +273,8 @@ static tree_node* parse_binary_ambiguity(
     }
 
     // delete parser instance copy
-    release_parser(parser_1, true);
-    release_parser(parser_2, true);
+    release_parser(parser_1);
+    release_parser(parser_2);
     free(parser_1);
     free(parser_2);
 
@@ -585,7 +583,7 @@ static tree_node* parse_package_declaration(java_parser* parser)
     }
     else
     {
-        parser_error(parser, JAVA_E_PKG_DECL_NO_NAME);
+        parser_error_missing_token(parser, JAVA_E_PKG_DECL_NO_NAME, "name");
         return node;
     }
 
@@ -595,7 +593,7 @@ static tree_node* parse_package_declaration(java_parser* parser)
     }
     else
     {
-        parser_error(parser, JAVA_E_PKG_DECL_NO_SEMICOLON);
+        parser_error_missing_token(parser, JAVA_E_PKG_DECL_NO_SEMICOLON, ";");
     }
 
     return node;
@@ -626,7 +624,7 @@ static tree_node* parse_import_declaration(java_parser* parser)
     }
     else
     {
-        parser_error(parser, JAVA_E_IMPORT_NO_NAME);
+        parser_error_missing_token(parser, JAVA_E_IMPORT_NO_NAME, "name");
         return node;
     }
 
@@ -645,7 +643,7 @@ static tree_node* parse_import_declaration(java_parser* parser)
     }
     else
     {
-        parser_error(parser, JAVA_E_IMPORT_NO_SEMICOLON);
+        parser_error_missing_token(parser, JAVA_E_IMPORT_NO_SEMICOLON, ";");
     }
 
     return node;
@@ -702,7 +700,7 @@ static tree_node* parse_top_level(java_parser* parser)
 
     if (!peek_token_class_is(parser, TOKEN_PEEK_1st, JT_EOF))
     {
-        fprintf(stderr, "TODO error: expected class or interface declaration\n");
+        parser_error(parser, JAVA_E_TOP_LEVEL);
     }
 
     return node;
@@ -726,7 +724,7 @@ static tree_node* parse_class_declaration(java_parser* parser)
     }
     else
     {
-        parser_error(parser, JAVA_E_CLASS_NO_NAME);
+        parser_error_missing_token(parser, JAVA_E_CLASS_NO_NAME, "name");
     }
 
     // [Class Extends]
@@ -748,7 +746,7 @@ static tree_node* parse_class_declaration(java_parser* parser)
     }
     else
     {
-        parser_error(parser, JAVA_E_CLASS_NO_BODY);
+        parser_error_missing_token(parser, JAVA_E_CLASS_NO_BODY, "class body");
     }
 
     return node;
@@ -772,7 +770,7 @@ static tree_node* parse_interface_declaration(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected name after interface declaration\n");
+        parser_error_missing_token(parser, JAVA_E_INTERFACE_NO_NAME, "name");
         return node;
     }
 
@@ -789,7 +787,7 @@ static tree_node* parse_interface_declaration(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected interface body in interface declaration\n");
+        parser_error_missing_token(parser, JAVA_E_INTERFACE_NO_BODY, "class body");
     }
 
     return node;
@@ -813,7 +811,7 @@ static tree_node* parse_class_extends(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected class type after \'extends\'\n");
+        parser_error_missing_token(parser, java_E_CLASS_ENTENDS_NO_NAME, "reference type name");
     }
 
     return node;
@@ -838,7 +836,7 @@ static tree_node* parse_class_implements(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected interface type list after \'implements\'\n");
+        parser_error_missing_token(parser, java_E_CLASS_IMPLEMENTS_NO_NAME, "one or more reference type name");
     }
 
     return node;
@@ -880,7 +878,7 @@ static tree_node* parse_class_body(java_parser* parser)
     }
     else
     {
-        parser_error(parser, JAVA_E_CLASS_BODY_ENCLOSE);
+        parser_error_missing_token(parser, JAVA_E_CLASS_BODY_ENCLOSE, "}");
     }
 
     return node;
@@ -905,7 +903,7 @@ static tree_node* parse_interface_extends(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected interface type list after \'extends\'\n");
+        parser_error_missing_token(parser, java_E_INTERFACE_ENTENDS_NO_NAME, "reference type name");
     }
 
     return node;
@@ -943,7 +941,7 @@ static tree_node* parse_interface_body(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected '}' at the end of interface body\n");
+        parser_error_missing_token(parser, JAVA_E_INTERFACE_BODY_ENCLOSE, "}");
     }
 
     return node;
@@ -999,7 +997,7 @@ static tree_node* parse_interface_body_declaration(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected type name in the declaration\n");
+        parser_error_missing_token(parser, JAVA_E_MEMBER_NO_TYPE, "type name");
         return node;
     }
 
@@ -1019,7 +1017,7 @@ static tree_node* parse_interface_body_declaration(java_parser* parser)
                 }
                 else
                 {
-                    fprintf(stderr, "TODO error: expected ';'\n");
+                    parser_error_missing_token(parser, JAVA_E_MEMBER_METHOD_NO_SEMICOLON, ";");
                 }
                 break;
             case JLT_SYM_BRACKET_OPEN:
@@ -1039,17 +1037,17 @@ static tree_node* parse_interface_body_declaration(java_parser* parser)
                 }
                 else
                 {
-                    fprintf(stderr, "TODO error: expected ';'\n");
+                    parser_error_missing_token(parser, JAVA_E_MEMBER_VAR_NO_SEMICOLON, ";");
                 }
                 break;
             default:
-                fprintf(stderr, "TODO error: ambiguous declaration\n");
+                parser_error(parser, JAVA_E_MEMBER_AMBIGUOUS);
                 break;
         }
     }
     else
     {
-        fprintf(stderr, "TODO error: expected a name in declaration\n");
+        parser_error_missing_token(parser, JAVA_E_MEMBER_NO_NAME, "name");
     }
 
     return node;
@@ -1132,7 +1130,7 @@ static tree_node* parse_class_body_declaration(java_parser* parser)
     else
     {
         // if missing, we terminate current reduction and start at next declaration
-        parser_error(parser, JAVA_E_MEMBER_NO_TYPE);
+        parser_error_missing_token(parser, JAVA_E_MEMBER_NO_TYPE, "type name");
         return node;
     }
 
@@ -1162,7 +1160,7 @@ static tree_node* parse_class_body_declaration(java_parser* parser)
                 }
                 else
                 {
-                    parser_error(parser, JAVA_E_MEMBER_VAR_NO_SEMICOLON);
+                    parser_error_missing_token(parser, JAVA_E_MEMBER_VAR_NO_SEMICOLON, ";");
                 }
                 break;
             default:
@@ -1172,7 +1170,7 @@ static tree_node* parse_class_body_declaration(java_parser* parser)
     }
     else
     {
-        parser_error(parser, JAVA_E_MEMBER_NO_NAME);
+        parser_error_missing_token(parser, JAVA_E_MEMBER_NO_NAME, "name");
     }
 
     return node;
@@ -1196,7 +1194,7 @@ static tree_node* parse_static_initializer(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected block in static initializer\n");
+        parser_error_missing_token(parser, JAVA_E_STATIC_INITIALIZER_NO_BODY, "block");
     }
 
     return node;
@@ -1240,7 +1238,7 @@ static tree_node* parse_block(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected '}' at the end of block\n");
+        parser_error_missing_token(parser, JAVA_E_BLOCK_ENCLOSE, "}");
     }
 
     return node;
@@ -1387,7 +1385,7 @@ static tree_node* parse_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected statment.\n");
+        parser_error(parser, JAVA_E_STATEMENT_UNRECOGNIZED);
 
         // by default we return an ill-formed node
         return ast_node_new(JNT_STATEMENT);
@@ -1419,7 +1417,7 @@ static tree_node* parse_expression_statement(java_parser* parser)
     }
     else
     {
-        parser_error(parser, JAVA_E_LOCAL_VAR_NO_SEMICOLON);
+        parser_error_missing_token(parser, JAVA_E_EXPRESSION_NO_SEMICOLON, ";");
     }
 
     return node;
@@ -1443,7 +1441,7 @@ static tree_node* parse_local_variable_declaration(java_parser* parser)
     }
     else
     {
-        parser_error(parser, JAVA_E_VAR_NO_DECLARATOR);
+        parser_error_missing_token(parser, JAVA_E_VAR_NO_DECLARATOR, "name");
     }
 
     return node;
@@ -1467,7 +1465,7 @@ static tree_node* parse_local_variable_declaration_statement(java_parser* parser
     }
     else
     {
-        parser_error(parser, JAVA_E_LOCAL_VAR_NO_SEMICOLON);
+        parser_error_missing_token(parser, JAVA_E_LOCAL_VAR_NO_SEMICOLON, ";");
     }
 
     return node;
@@ -1532,7 +1530,7 @@ static tree_node* parse_switch_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected '(' in switch statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_SWITCH, "(");
         return node;
     }
 
@@ -1543,7 +1541,7 @@ static tree_node* parse_switch_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected expression in switch statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_SWITCH, "expression");
         return node;
     }
 
@@ -1554,7 +1552,7 @@ static tree_node* parse_switch_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected ')' in switch statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_SWITCH, ")");
         return node;
     }
 
@@ -1565,7 +1563,7 @@ static tree_node* parse_switch_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected '{' in switch statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_SWITCH, "{");
         return node;
     }
 
@@ -1609,7 +1607,7 @@ static tree_node* parse_switch_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected '}' in switch statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_SWITCH, "}");
         return node;
     }
 
@@ -1634,7 +1632,7 @@ static tree_node* parse_do_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected statement in do statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_DO, "statement");
         return node;
     }
 
@@ -1645,7 +1643,7 @@ static tree_node* parse_do_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected 'while' in do statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_DO, "while clause");
         return node;
     }
 
@@ -1656,7 +1654,7 @@ static tree_node* parse_do_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected '(' in do statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_DO, "(");
         return node;
     }
 
@@ -1667,7 +1665,7 @@ static tree_node* parse_do_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected expression in do statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_DO, "expression");
         return node;
     }
 
@@ -1678,7 +1676,7 @@ static tree_node* parse_do_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected ')' in do statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_DO, ")");
         return node;
     }
 
@@ -1689,7 +1687,7 @@ static tree_node* parse_do_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected ';' at the end of do statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_DO, ";");
     }
 
     return node;
@@ -1719,7 +1717,7 @@ static tree_node* parse_break_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected ';' at the end of break statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_BREAK, ";");
     }
 
     return node;
@@ -1749,7 +1747,7 @@ static tree_node* parse_continue_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected ';' at the end of continue statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_CONTINUE, ";");
     }
 
     return node;
@@ -1779,7 +1777,7 @@ static tree_node* parse_return_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected ';' at the end of return statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_RETURN, ";");
     }
 
     return node;
@@ -1803,7 +1801,7 @@ static tree_node* parse_synchronized_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected '(' in synchronized statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_SYNCHRONIZED, "(");
         return node;
     }
 
@@ -1814,7 +1812,7 @@ static tree_node* parse_synchronized_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected expression in synchronized statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_SYNCHRONIZED, "expression");
         return node;
     }
 
@@ -1825,7 +1823,7 @@ static tree_node* parse_synchronized_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected ')' in synchronized statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_SYNCHRONIZED, ")");
         return node;
     }
 
@@ -1836,7 +1834,7 @@ static tree_node* parse_synchronized_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected block in synchronized statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_SYNCHRONIZED, "block");
         return node;
     }
 
@@ -1861,7 +1859,7 @@ static tree_node* parse_throw_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected expression in throw statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_THROW, "expression");
         return node;
     }
 
@@ -1872,7 +1870,7 @@ static tree_node* parse_throw_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected ';' at the end of throw statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_THROW, ";");
     }
 
     return node;
@@ -1901,7 +1899,7 @@ static tree_node* parse_try_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected block in try statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_TRY, "block");
         return node;
     }
 
@@ -1922,7 +1920,7 @@ static tree_node* parse_try_statement(java_parser* parser)
     else if (!has_catch_clause)
     {
         // catch of finally clause must exist
-        fprintf(stderr, "TODO error: expected catch and/or finally clause after try block.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_TRY, "catch and/or finally clause");
     }
 
     return node;
@@ -1950,7 +1948,7 @@ static tree_node* parse_if_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected '(' in if statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_IF, "(");
         return node;
     }
 
@@ -1961,7 +1959,7 @@ static tree_node* parse_if_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected expression in if statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_IF, "expression");
         return node;
     }
 
@@ -1972,7 +1970,7 @@ static tree_node* parse_if_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected ')' in if statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_IF, ")");
         return node;
     }
 
@@ -1984,7 +1982,7 @@ static tree_node* parse_if_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected statement in if clause.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_IF, "statement");
         return node;
     }
 
@@ -2002,7 +2000,7 @@ static tree_node* parse_if_statement(java_parser* parser)
         }
         else
         {
-            fprintf(stderr, "TODO error: expected statement in else clause.\n");
+            parser_error_missing_token(parser, JAVA_E_STATEMENT_ELSE, "statement");
             return node;
         }
     }
@@ -2028,7 +2026,7 @@ static tree_node* parse_while_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected '(' in while statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_WHILE, "(");
         return node;
     }
 
@@ -2039,7 +2037,7 @@ static tree_node* parse_while_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected expression in while statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_WHILE, "expression");
         return node;
     }
 
@@ -2050,7 +2048,7 @@ static tree_node* parse_while_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected ')' in while statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_WHILE, ")");
         return node;
     }
 
@@ -2061,7 +2059,7 @@ static tree_node* parse_while_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected statement in while statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_WHILE, "statement");
         return node;
     }
 
@@ -2086,7 +2084,7 @@ static tree_node* parse_for_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected '(' in for statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_FOR, "(");
         return node;
     }
 
@@ -2103,7 +2101,7 @@ static tree_node* parse_for_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected ';' after for initialization list.\n");
+        parser_error(parser, JAVA_E_STATEMENT_FOR_INITIALIZER_NO_SEMICOLON);
         return node;
     }
 
@@ -2120,7 +2118,7 @@ static tree_node* parse_for_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected ';' before for update list.\n");
+        parser_error(parser, JAVA_E_STATEMENT_FOR_CONDITION_NO_SEMICOLON);
         return node;
     }
 
@@ -2137,7 +2135,7 @@ static tree_node* parse_for_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected ')' in for statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_FOR, ")");
         return node;
     }
 
@@ -2148,7 +2146,7 @@ static tree_node* parse_for_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected statement in while statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_FOR, "statement");
         return node;
     }
 
@@ -2174,7 +2172,7 @@ static tree_node* parse_label_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected statement at the end of label statement.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_LABEL, "statement");
     }
 
     return node;
@@ -2198,7 +2196,7 @@ static tree_node* parse_catch_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected '(' in catch clause.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_CATCH, "(");
         return node;
     }
 
@@ -2209,7 +2207,7 @@ static tree_node* parse_catch_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected expression in catch clause.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_CATCH, "expression");
         return node;
     }
 
@@ -2220,7 +2218,7 @@ static tree_node* parse_catch_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected ')' in catch clause.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_CATCH, ")");
         return node;
     }
 
@@ -2231,7 +2229,7 @@ static tree_node* parse_catch_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected block in catch clause.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_CATCH, "block");
         return node;
     }
 
@@ -2256,7 +2254,7 @@ static tree_node* parse_finally_statement(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected block in finally clause.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_FINALLY, "block");
     }
 
     return node;
@@ -2292,7 +2290,7 @@ static tree_node* parse_switch_label(java_parser* parser)
         }
         else
         {
-            fprintf(stderr, "TODO error: expected expression in case label.\n");
+            parser_error_missing_token(parser, JAVA_E_STATEMENT_SWITCH_LABEL, "expression");
             return node;
         }
     }
@@ -2304,7 +2302,7 @@ static tree_node* parse_switch_label(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected ':' at the end of switch label.\n");
+        parser_error_missing_token(parser, JAVA_E_STATEMENT_SWITCH_LABEL, ":");
     }
 
     return node;
@@ -2409,7 +2407,7 @@ static tree_node* parse_constructor_declaration(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected ')' at constructor declaration\n");
+        parser_error_missing_token(parser, JAVA_E_CONSTRUCTOR, ")");
         return node;
     }
 
@@ -2426,7 +2424,7 @@ static tree_node* parse_constructor_declaration(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected constructor body\n");
+        parser_error_missing_token(parser, JAVA_E_CONSTRUCTOR, "block");
     }
 
     return node;
@@ -2537,7 +2535,7 @@ static tree_node* parse_method_header(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected ')' at constructor declaration\n");
+        parser_error_missing_token(parser, JAVA_E_METHOD_DECLARATION, ")");
         return node;
     }
 
@@ -2554,7 +2552,7 @@ static tree_node* parse_method_header(java_parser* parser)
         }
         else
         {
-            fprintf(stderr, "TODO error: expected ']'\n");
+            parser_error_missing_token(parser, JAVA_E_METHOD_DECLARATION, "]");
             break;
         }
 
@@ -2589,7 +2587,7 @@ static tree_node* parse_method_declaration(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected method body\n");
+        parser_error_missing_token(parser, JAVA_E_METHOD_DECLARATION, "block");
     }
 
     return node;
@@ -2683,7 +2681,7 @@ static tree_node* parse_formal_parameter(java_parser* parser)
             }
             else
             {
-                fprintf(stderr, "TODO error: expected ']'\n");
+                parser_error_missing_token(parser, JAVA_E_FORMAL_PARAMETER, "]");
                 break;
             }
 
@@ -2693,7 +2691,7 @@ static tree_node* parse_formal_parameter(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected parameter name\n");
+        parser_error_missing_token(parser, JAVA_E_FORMAL_PARAMETER, "name");
     }
 
     return node;
@@ -2735,7 +2733,7 @@ static tree_node* parse_throws(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected class name\n");
+        parser_error_missing_token(parser, JAVA_E_THROWS_NO_TYPE, "one or more reference type name");
     }
 
     return node;
@@ -2765,7 +2763,7 @@ static tree_node* parse_argument_list(java_parser* parser)
         }
         else
         {
-            fprintf(stderr, "TODO error: expected expression\n");
+            parser_error_missing_token(parser, JAVA_E_NO_ARGUMENT, "expression");
             break;
         }
     }
@@ -2805,7 +2803,7 @@ static tree_node* parse_constructor_body(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected '}' at the end of constructor body\n");
+        parser_error_missing_token(parser, JAVA_E_CONSTRUCTOR, "}");
     }
 
     return node;
@@ -2847,7 +2845,7 @@ static tree_node* parse_explicit_constructor_invocation(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected ')' at the end of constructor invocation\n");
+        parser_error_missing_token(parser, JAVA_E_CONSTRUCTOR_INVOKE, ")");
     }
 
     return node;
@@ -2872,7 +2870,7 @@ static tree_node* parse_method_body(java_parser* parser)
             consume_token(parser, NULL);
             break;
         default:
-            fprintf(stderr, "TODO error: expected block or ';'\n");
+            parser_error_missing_token(parser, JAVA_E_METHOD_DECLARATION, "block/;");
             break;
     }
 
@@ -2937,7 +2935,7 @@ static tree_node* parse_variable_declarator(java_parser* parser)
         }
         else
         {
-            parser_error(parser, JAVA_E_VAR_NO_INITIALIZER);
+            parser_error_missing_token(parser, JAVA_E_VAR_NO_INITIALIZER, "variable initializer");
         }
     }
 
@@ -3013,7 +3011,7 @@ static tree_node* parse_array_initializer(java_parser* parser)
     else
     {
         // missing comma with dangling initializer also reaches here
-        fprintf(stderr, "TODO error: expected '}' at the end of array initializer\n");
+        parser_error_missing_token(parser, JAVA_E_ARRAY_INITIALIZER, "}");
     }
 
     return node;
@@ -3064,7 +3062,7 @@ static tree_node* parse_primary_creation(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected type at creation expression\n");
+        parser_error_missing_token(parser, JAVA_E_OBJECT_CREATION, "type");
         return node;
     }
 
@@ -3078,7 +3076,7 @@ static tree_node* parse_primary_creation(java_parser* parser)
             tree_node_add_child(node, parse_primary_class_instance_creation(parser));
             break;
         default:
-            fprintf(stderr, "TODO error: expected array or class instance creation\n");
+            parser_error_missing_token(parser, JAVA_E_OBJECT_CREATION, "array/instance creation");
             break;
     }
 
@@ -3099,13 +3097,12 @@ static tree_node* parse_primary_array_creation(java_parser* parser)
     // [
     consume_token(parser, NULL);
 
-    // first chunk: determin if it starts with variadic dimension
+    // first chunk: determine if it starts with variadic dimension
     if (parser_trigger_expression(parser, TOKEN_PEEK_1st))
     {
         first_variadic = false;
 
         // Expression
-        // YOLO: recursion!
         tree_node_add_child(node, parse_expression(parser));
     }
 
@@ -3118,7 +3115,7 @@ static tree_node* parse_primary_array_creation(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected ']'\n");
+        parser_error_missing_token(parser, JAVA_E_ARRAY_CREATION, "]");
         return node;
     }
 
@@ -3132,7 +3129,6 @@ static tree_node* parse_primary_array_creation(java_parser* parser)
         if (!accepting_variadic && parser_trigger_expression(parser, TOKEN_PEEK_1st))
         {
             // Expression
-            // YOLO: recursion!
             tree_node_add_child(node, parse_expression(parser));
         }
         else
@@ -3148,7 +3144,7 @@ static tree_node* parse_primary_array_creation(java_parser* parser)
         }
         else
         {
-            fprintf(stderr, "TODO error: expected ']'\n");
+            parser_error_missing_token(parser, JAVA_E_ARRAY_CREATION, "]");
             break;
         }
 
@@ -3164,7 +3160,7 @@ static tree_node* parse_primary_array_creation(java_parser* parser)
         }
         else
         {
-            fprintf(stderr, "TODO error: expected array initializer\n");
+            parser_error_missing_token(parser, JAVA_E_ARRAY_CREATION, "array initializer");
         }
     }
 
@@ -3198,7 +3194,7 @@ static tree_node* parse_primary_class_instance_creation(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected ')'\n");
+        parser_error_missing_token(parser, JAVA_E_INSTANCE_CREATION, ")");
         return node;
     }
 
@@ -3238,7 +3234,7 @@ static tree_node* parse_primary_method_invocation(java_parser* parser)
     }
     else
     {
-        fprintf(stderr, "TODO error: expected ')'\n");
+        parser_error_missing_token(parser, JAVA_E_METHOD_INVOKE, ")");
         return node;
     }
 
@@ -3268,7 +3264,7 @@ static tree_node* parse_primary_array_access(java_parser* parser)
         }
         else
         {
-            fprintf(stderr, "TODO error: expected expression\n");
+            parser_error_missing_token(parser, JAVA_E_ARRAY_ACCESS, "index expression");
             break;
         }
 
@@ -3279,7 +3275,7 @@ static tree_node* parse_primary_array_access(java_parser* parser)
         }
         else
         {
-            fprintf(stderr, "TODO error: expected ']'\n");
+            parser_error_missing_token(parser, JAVA_E_ARRAY_ACCESS, "]");
             break;
         }
     }
