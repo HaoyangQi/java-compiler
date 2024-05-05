@@ -12,6 +12,7 @@
 
 #include "string-list.h"
 #include "number.h"
+#include "index-set.h"
 
 // fast top scope worker getter (no NULL check)
 #define TSW(ir) ((ir)->scope_workers->worker)
@@ -162,6 +163,12 @@ typedef struct _instruction
     // next instruction
     struct _instruction* next;
 } instruction;
+
+typedef enum _cfg_dfs_order
+{
+    DFS_PREORDER,
+    DFS_POSTORDER,
+} cfg_dfs_order;
 
 /**
  * block edge type
@@ -390,22 +397,6 @@ typedef struct _definition
 } definition;
 
 /**
- * Optimizer Data
- *
- * It contains data for SSA and other useful info
- * from every node for code analysis and optization
-*/
-typedef struct
-{
-    basic_block* node;
-
-    // SSA: dominator set
-    node_set dominators;
-    // SSA: dominance frontier
-    node_set df;
-} ssa;
-
-/**
  * IR CFG Worker
  *
  * when a CFG is finalized, worker will contain following information:
@@ -436,9 +427,6 @@ typedef struct
     bool execute_inverse;
     bool grow_insert;
     bool is_next_asn_init;
-
-    // code analysis data
-    ssa* optimizer;
 } cfg_worker;
 
 /**
@@ -690,6 +678,14 @@ basic_block* cfg_new_basic_block(cfg* g);
 void cfg_new_edge(cfg* g, basic_block* from, basic_block* to, edge_type type);
 bool cfg_empty(const cfg* g);
 void cfg_detach(cfg* g);
+basic_block** cfg_node_order(const cfg* g, cfg_dfs_order order);
+void cfg_delete_node_order(basic_block** list);
+basic_block** cfg_idom(const cfg* g);
+void cfg_delete_idom(basic_block** idom);
+index_set* cfg_dominators(const cfg* g, const basic_block** idom);
+void cfg_delete_dominators(const cfg* g, index_set* dom);
+index_set* cfg_dominance_frontiers(const cfg* g, const basic_block** idom);
+void cfg_delete_dominance_frontiers(const cfg* g, index_set* df);
 
 void init_cfg_worker(cfg_worker* worker);
 void release_cfg_worker(cfg_worker* worker, cfg* move_to, definition_pool* pool);
@@ -718,21 +714,6 @@ basic_block* cfg_worker_current_block_split(
     edge_type to_remainder,
     bool split_before
 );
-
-void cfg_worker_ssa_release(cfg_worker* worker);
-void cfg_worker_ssa_build(cfg_worker* worker);
-
-void init_node_set(node_set* s);
-void init_node_set_with_copy(node_set* dest, const node_set* src);
-void release_node_set(node_set* s);
-bool node_set_contains(const node_set* s, const basic_block* entry);
-void node_set_add(node_set* s, basic_block* entry);
-void node_set_remove(node_set* s, basic_block* entry);
-basic_block* node_set_pop(node_set* s);
-bool node_set_empty(const node_set* s);
-bool node_set_equal(const node_set* s1, const node_set* s2);
-void node_set_union(node_set* dest, const node_set* src);
-void node_set_intersect(node_set* dest, node_set* src);
 
 reference* new_reference(reference_type t, void* doi);
 reference* copy_reference(const reference* r);

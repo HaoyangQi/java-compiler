@@ -253,6 +253,277 @@ void cfg_detach(cfg* g)
 }
 
 /**
+ * Iterative DFS Walk To Generate A Node Order
+ *
+ * it will generate an array of nodes with size of #nodes in graph,
+ * and the order of node will be either preorder or postorder,
+ * depending on the given argument
+ *
+ * the returned array is a reference array, bb should not be freed
+ * with this array
+*/
+basic_block** cfg_node_order(const cfg* g, cfg_dfs_order order)
+{
+    size_t num_nodes = g->nodes.num;
+    size_t snti = 0; // stack's next-top idx
+    size_t rnti = 0; // result's next idx
+    basic_block** r = (basic_block**)malloc_assert(sizeof(basic_block*) * num_nodes);
+    basic_block** stack = (basic_block**)malloc_assert(sizeof(basic_block*) * num_nodes);
+    size_t* nc = (size_t*)malloc_assert(sizeof(size_t) * num_nodes); // next-child-to-visit index
+    char* visited = (char*)malloc_assert(sizeof(char) * num_nodes);
+
+    // mark all as not visited at the beginning
+    memset(visited, 0, sizeof(char) * num_nodes);
+    memset(nc, 0, sizeof(size_t) * num_nodes);
+
+    // initialize: from entry node
+    stack[snti++] = g->entry;
+    visited[g->entry->id] = 1;
+
+    // main loop
+    while (snti != 0)
+    {
+        // read current top
+        basic_block* cur = stack[snti - 1];
+
+        if (order == DFS_PREORDER) { r[rnti++] = cur; }
+
+        // locate next-to-visit child
+        for (size_t* pnc = &nc[cur->id]; *pnc < cur->out.num && visited[cur->out.arr[*pnc]->to->id]; (*pnc)++);
+
+        if (nc[cur->id] >= cur->out.num)
+        {
+            // pop: when all children are visited
+            snti--;
+            if (order == DFS_POSTORDER) { r[rnti++] = cur; }
+        }
+        else
+        {
+            // push: next un-visited element
+            basic_block* next = cur->out.arr[nc[cur->id]]->to;
+
+            stack[snti++] = next;
+            visited[next->id] = 1;
+            nc[cur->id]++;
+        }
+    }
+
+    // cleanup
+    free(nc);
+    free(stack);
+    free(visited);
+
+    return r;
+}
+
+/**
+ * node order list deleter
+*/
+void cfg_delete_node_order(basic_block** list)
+{
+    free(list);
+}
+
+/**
+ * Calculate Immediate Dominator Set
+ *
+ * according to definition: immediate dominator of node n, IDOM(n), has
+ * exactly one node: for any node p, there does not exist node q, such that:
+ * p DOM q DOM n, AND p DOM n
+ *
+ * Algorithm is based on:
+ * A Simple, Fast Dominance Algorithm by Cooper et al.
+ *
+ * it returns an array of node reference, where each element
+ * represents the IDOM of the node with ID equals to the index
+*/
+basic_block** cfg_idom(const cfg* g)
+{
+    size_t num_nodes = g->nodes.num;
+    basic_block** postorder = cfg_node_order(g, DFS_POSTORDER);
+    size_t* idx_node2post = (size_t*)malloc_assert(sizeof(size_t) * num_nodes);
+    basic_block** idom = (basic_block**)malloc_assert(sizeof(basic_block*) * num_nodes);
+    bool changed = true;
+
+    // initialize dominators array
+    memset(idom, 0, sizeof(basic_block*) * num_nodes);
+
+    // initialize node-to-postorder-index map
+    for (size_t i = 0; i < num_nodes; i++)
+    {
+        idx_node2post[postorder[i]->id] = i;
+    }
+
+    idom[g->entry->id] = g->entry;
+
+    while (changed)
+    {
+        changed = false;
+
+        for (size_t i = 0; i < num_nodes; i++)
+        {
+            basic_block* b = postorder[num_nodes - i - 1]; // traverse in reverse postorder
+
+            if (b == g->entry) { continue; }
+
+            basic_block* new_idom = b->in.arr[0]->from; // pick first predecessor ?
+
+            // for all other predecessors
+            for (size_t j = 1; j < b->in.num; j++)
+            {
+                basic_block* pred = b->in.arr[j]->from;
+
+                if (idom[pred->id] != NULL)
+                {
+                    // fast intersect(pred, new_idom), using their postorder index
+                    // converge to same node, hence a dominator
+                    while (new_idom != pred)
+                    {
+                        while (idx_node2post[new_idom->id] < idx_node2post[pred->id])
+                        {
+                            new_idom = idom[new_idom->id];
+                        }
+                        while (idx_node2post[pred->id] < idx_node2post[new_idom->id])
+                        {
+                            pred = idom[pred->id];
+                        }
+                    }
+                }
+            }
+
+            // update
+            if (idom[b->id] != new_idom)
+            {
+                idom[b->id] = new_idom;
+                changed = true;
+            }
+        }
+    }
+
+    // cleanup
+    cfg_delete_node_order(postorder);
+    free(idx_node2post);
+
+    return idom;
+}
+
+/**
+ * IDOM array deleter
+*/
+void cfg_delete_idom(basic_block** idom)
+{
+    free(idom);
+}
+
+/**
+ * Calculate Dominators Set
+ *
+ * It uses IDOM sets to generate DOM sets
+ *
+ * it returns an array of index set, where each element
+ * represents the DOM set of the node with ID equals to the index
+*/
+index_set* cfg_dominators(const cfg* g, const basic_block** idom)
+{
+    size_t num_nodes = g->nodes.num;
+    index_set* dom = (index_set*)malloc_assert(sizeof(index_set) * num_nodes);
+
+    // initialize
+    for (size_t i = 0; i < num_nodes; i++)
+    {
+        init_index_set(&dom[i], num_nodes);
+        index_set_add(&dom[i], i); // n DOM n is always true
+    }
+
+    for (size_t i = 0; i < num_nodes; i++)
+    {
+        basic_block* b = (basic_block*)(idom[i]);
+
+        while (true)
+        {
+            index_set_add(&dom[i], b->id);
+
+            if (b == g->entry) { break; }
+
+            b = (basic_block*)(idom[b->id]);
+        }
+    }
+
+    return dom;
+}
+
+/**
+ * helper for deletion of dominator sets
+*/
+void cfg_delete_dominators(const cfg* g, index_set* dom)
+{
+    for (size_t i = 0; i < g->nodes.num; i++)
+    {
+        release_index_set(&dom[i]);
+    }
+
+    free(dom);
+}
+
+/**
+ * Calculate Dominance Frontier (DF) Set
+ *
+ * Algorithm is based on:
+ * A Simple, Fast Dominance Algorithm by Cooper et al.
+ *
+ * it returns an array of index set, where each element
+ * represents the DF set of the node with ID equals to the index
+ *
+ * each set is also a node set, but only indicies of nodes are stored
+*/
+index_set* cfg_dominance_frontiers(const cfg* g, const basic_block** idom)
+{
+    size_t num_nodes = g->nodes.num;
+    index_set* df = (index_set*)malloc_assert(sizeof(index_set) * num_nodes);
+
+    // initialize
+    for (size_t i = 0; i < num_nodes; i++)
+    {
+        init_index_set(&df[i], num_nodes);
+    }
+
+    for (size_t i = 0; i < num_nodes; i++)
+    {
+        basic_block* b = g->nodes.arr[i];
+
+        if (b->in.num >= 2)
+        {
+            for (size_t j = 0; j < b->in.num; j++)
+            {
+                basic_block* probe = b->in.arr[j]->from;
+
+                while (probe != idom[b->id])
+                {
+                    // add b to probe's df set
+                    index_set_add(&df[probe->id], b->id);
+                    probe = (basic_block*)(idom[probe->id]);
+                }
+            }
+        }
+    }
+
+    return df;
+}
+
+/**
+ * helper for deletion of dominance frontier sets
+*/
+void cfg_delete_dominance_frontiers(const cfg* g, index_set* df)
+{
+    for (size_t i = 0; i < g->nodes.num; i++)
+    {
+        release_index_set(&df[i]);
+    }
+
+    free(df);
+}
+
+/**
  * allocate and initialize a new instruction
 */
 instruction* new_instruction()
