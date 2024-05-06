@@ -231,7 +231,7 @@ void debug_test_optimizer()
      *
      * EXPECTED: idom = {0,0,0,0,0,0}
     */
-    printf("\n===== OPTIMIZER TEST 1 =====\n");
+    printf("\n===== DOMINANCE TEST 1 =====\n");
 
     init_cfg_worker(&worker);
     p[6] = cfg_worker_grow(&worker);
@@ -251,7 +251,7 @@ void debug_test_optimizer()
     // Test
     __optimizer_test_case_run(&worker);
 
-    printf("===== END OF OPTIMIZER TEST 1 =====\n");
+    printf("===== END OF DOMINANCE TEST 1 =====\n");
 
     /**
      * Test Case 2
@@ -260,12 +260,12 @@ void debug_test_optimizer()
      * Page 24
      *
      * EXPECTED: df =
-     *     [0]: (null)
+     *     [0]: {}
      *     [1]: {5}
      *     [2]: {4}
      *     [3]: {4}
      *     [4]: {5}
-     *     [5]: (null)
+     *     [5]: {}
      *
      * EXPECTED: dominator tree
      *       0
@@ -274,7 +274,7 @@ void debug_test_optimizer()
      *  / | \
      * 2  3  4
     */
-    printf("\n===== OPTIMIZER TEST 2 =====\n");
+    printf("\n===== DOMINANCE TEST 2 =====\n");
 
     init_cfg_worker(&worker);
     p[0] = cfg_worker_grow(&worker);
@@ -292,5 +292,45 @@ void debug_test_optimizer()
     // Test
     __optimizer_test_case_run(&worker);
 
-    printf("===== END OF OPTIMIZER TEST 2 =====\n");
+    printf("===== END OF DOMINANCE TEST 2 =====\n");
+
+    /**
+     * Test Case 3
+     *
+     * https://ethz.ch/content/dam/ethz/special-interest/infk/inst-cs/lst-dam/
+     *    documents/Education/Classes/Spring2016/2810_Advanced_Compiler_Design/Homework/slides_hw1.pdf
+     * Page 39
+     *
+     * EXPECTED: df =
+     *     [0]: {}
+     *     [1]: {3}
+     *     [2]: {2,3}
+     *     [3]: {}
+     *     [4]: {2}
+     *
+     * EXPECTED: dominator tree
+     *    0
+     *  / | \
+     * 1  2  3
+     *    |
+     *    4
+    */
+    printf("\n===== DOMINANCE TEST 3 =====\n");
+
+    init_cfg_worker(&worker);
+    p[0] = cfg_worker_grow(&worker);
+    p[1] = cfg_worker_grow(&worker);
+    cfg_worker_jump(&worker, p[0], true, false);
+    p[2] = cfg_worker_grow(&worker);
+    p[3] = cfg_worker_grow(&worker);
+    cfg_worker_jump(&worker, p[1], true, false);
+    cfg_worker_jump(&worker, p[3], false, true);
+    cfg_worker_jump(&worker, p[2], true, false);
+    p[4] = cfg_worker_grow(&worker);
+    cfg_worker_jump(&worker, p[2], false, true);
+
+    // Test
+    __optimizer_test_case_run(&worker);
+
+    printf("===== END OF DOMINANCE TEST 3 =====\n");
 }

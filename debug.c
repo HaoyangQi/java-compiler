@@ -423,6 +423,7 @@ void debug_optimizer(optimizer* o)
     for (size_t i = 0; i < o->graph->nodes.num; i++)
     {
         debug_print_indentation(1);
+        printf("[%zd]: ", i);
         debug_print_index_set(&o->dominance.dom[i]);
         printf("\n");
     }
@@ -431,6 +432,7 @@ void debug_optimizer(optimizer* o)
     for (size_t i = 0; i < o->graph->nodes.num; i++)
     {
         debug_print_indentation(1);
+        printf("[%zd]: ", i);
         debug_print_index_set(&o->dominance.frontier[i]);
         printf("\n");
     }
