@@ -1772,9 +1772,6 @@ static void walk_constructor(java_ir* ir, definition* ctor_def)
     // we need to keep all definitions active
     lookup_pop_scope(ir, &worker->variables);
 
-    // convert CFG to SSA form
-    cfg_worker_ssa_build(worker);
-
     // release worker
     release_cfg_worker(worker, &ctor_def->method->code, &ctor_def->method->local_variables);
     free(worker);
@@ -1875,9 +1872,6 @@ static void walk_method(java_ir* ir, definition* method_def)
 
     // we need to keep all definitions active
     lookup_pop_scope(ir, &worker->variables);
-
-    // convert CFG to SSA form
-    cfg_worker_ssa_build(worker);
 
     // release worker
     release_cfg_worker(worker, &method_def->method->code, &method_def->method->local_variables);

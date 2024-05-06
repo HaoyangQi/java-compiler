@@ -57,6 +57,7 @@ typedef void (*pair_data_deleter)(void* key, void* value);
 
 void init_hash_table(hash_table* table, size_t data_size);
 void release_hash_table(hash_table* table, pair_data_deleter deleter);
+void reset_hash_table(hash_table* table);
 
 size_t hash_table_longest_chain_length(hash_table* table);
 size_t hash_table_bucket_head_filled(hash_table* table);

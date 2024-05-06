@@ -42,7 +42,8 @@ static char* test_paths[] = {
 int main(int argc, char* argv[])
 {
     // library tests
-    // debug_number_library();
+    // debug_test_number_library();
+    debug_test_optimizer();
 
     architecture arch;
     compiler compiler;
@@ -59,8 +60,8 @@ int main(int argc, char* argv[])
     init_compiler(&compiler);
 
     debug_report(&compiler);
-    // debug_print_reserved_words();
-    // debug_print_symbol_table(&compiler.rw_lookup_table);
+    // debug_reserved_words();
+    // debug_symbol_table(&compiler.rw_lookup_table);
 
     for (int i = 0; i < num_source_files; i++)
     {
@@ -71,7 +72,7 @@ int main(int argc, char* argv[])
             COMPILER_STAGE_PARSE | COMPILER_STAGE_CONTEXT | COMPILER_STAGE_EMIT))
         {
             debug_ast(&compiler.context);
-            debug_print_global_import(&compiler.ir);
+            debug_global_import(&compiler.ir);
             debug_ir_global_names(&compiler.ir);
             debug_ir_lookup(&compiler.ir);
         }
@@ -79,7 +80,7 @@ int main(int argc, char* argv[])
         // debug_file_buffer(&compiler.reader);
         // debug_tokenize(&compiler.reader, &compiler.rw_lookup_table, &compiler->logger);
         compiler_error_format_print(&compiler);
-        debug_print_error_logger(&compiler.logger);
+        debug_error_logger(&compiler.logger);
     }
 
     release_compiler(&compiler);

@@ -8,16 +8,10 @@
 void init_hash_table(hash_table* table, size_t data_size)
 {
     data_size = data_size > 0 ? data_size : HASH_TABLE_DEFAULT_BUCKET_SIZE;
-    size_t size = sizeof(hash_pair*) * data_size;
 
-    table->bucket = (hash_pair**)malloc_assert(size);
+    table->bucket = (hash_pair**)malloc_assert(sizeof(hash_pair*) * data_size);
     table->bucket_size = data_size;
-    table->num_filled = 0;
-    table->num_pairs = 0;
-
-    // this is important because we need to make sure 
-    // all bucket header are set to NULL
-    memset(table->bucket, 0, size);
+    reset_hash_table(table);
 }
 
 /**
@@ -46,6 +40,23 @@ void release_hash_table(hash_table* table, pair_data_deleter deleter)
     }
 
     free(table->bucket);
+}
+
+/**
+ * Reset the table
+ *
+ * It will reset all buckets without affecting the size of it
+ *
+ * WARNING: this function does not handle pair deletion
+*/
+void reset_hash_table(hash_table* table)
+{
+    table->num_filled = 0;
+    table->num_pairs = 0;
+
+    // this is important because we need to make sure 
+    // all bucket header are set to NULL
+    memset(table->bucket, 0, sizeof(hash_pair*) * table->bucket_size);
 }
 
 /**
