@@ -126,6 +126,7 @@ hash_table* lookup_working_scope(java_ir* ir)
 void lookup_top_level_begin(java_ir* ir, global_top_level* desc)
 {
     ir->working_top_level = desc;
+    ir->walk_state.num_member_variable = 0;
 }
 
 /**
@@ -191,7 +192,7 @@ definition* new_definition(definition_type type)
     {
         case DEFINITION_VARIABLE:
             v->variable = (definition_variable*)malloc_assert(sizeof(definition_variable));
-            v->variable->is_class_member = false;
+            v->variable->kind = VARIABLE_KIND_MAX;
             v->variable->modifier = JLT_UNDEFINED;
             __init_type_name(&v->variable->type);
             break;

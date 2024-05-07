@@ -63,6 +63,87 @@ void ir_error(java_ir* ir, java_error_id id)
     error_logger_log(ir->logger, 0, 0, id);
 }
 
+void ir_walk_state_init(java_ir* ir)
+{
+    ir->walk_state.type = IR_WALK_DEFAULT;
+    ir->walk_state.num_local_variable = 0;
+    ir->walk_state.num_field_init_instruction = 0;
+    ir->walk_state.num_method_instruction = 0;
+}
+
+/**
+ * set current walk state
+*/
+void ir_walk_state_mutate(java_ir* ir, ir_walk_state_type type)
+{
+    ir->walk_state.type = type;
+
+    // additional work
+    switch (type)
+    {
+        case IR_WALK_METHOD:
+            // new method. instructions and locals are in new CFG, so reset
+            ir->walk_state.num_method_instruction = 0;
+            ir->walk_state.num_local_variable = 0;
+            break;
+        case IR_WALK_FIELD:
+            /**
+             * default and implicit behavior
+             *
+             * instruction counter will not reset
+             *
+             * because init code may not stay together, but they all
+             * fall into same CFG
+            */
+            break;
+        case IR_WALK_DEF_MEMBER_VAR:
+            /**
+             * default and implicit behavior
+             *
+             * member def counter will not reset, because it is managed by
+             * lookup_top_level_begin
+            */
+            break;
+        case IR_WALK_DEF_LOCAL_VAR:
+            /**
+             * default and implicit behavior
+             *
+             * local def counter will not reset, because it is managed
+             * IR_WALK_METHOD
+            */
+            break;
+        default:
+            // default
+            break;
+    }
+}
+
+/**
+ * It returns an index ID
+ *
+ * if state_override is specified any state other than default (IR_WALK_DEFAULT),
+ * this state will be referenced, instead of the one in ir->walk_state
+*/
+size_t ir_walk_state_allocate_id(java_ir* ir, ir_walk_state_type state_override)
+{
+    ir_walk_state_type type = state_override == IR_WALK_DEFAULT ? ir->walk_state.type : state_override;
+
+    switch (type)
+    {
+        case IR_WALK_DEF_MEMBER_VAR:
+            return ir->walk_state.num_member_variable++;
+        case IR_WALK_DEF_LOCAL_VAR:
+            return ir->walk_state.num_local_variable++;
+        case IR_WALK_FIELD:
+            return ir->walk_state.num_field_init_instruction++;
+        case IR_WALK_METHOD:
+            return ir->walk_state.num_method_instruction++;
+        default:
+            // not managed
+            return 0;
+    }
+}
+
 /**
  * Token-To-String Helper
  *
@@ -318,7 +399,6 @@ global_top_level* new_global_top_level(top_level_type type)
     top->num_implement = 0;
     top->code_member_init = NULL;
     top->node_first_body_decl = NULL;
-    top->num_member_variable = 0;
 
     init_definition_pool(&top->member_init_variables);
     init_hash_table(&top->tbl_member, HASH_TABLE_DEFAULT_BUCKET_SIZE);

@@ -140,7 +140,7 @@ typedef struct
 } reference;
 
 /**
- * Single Assignment Form
+ * IR High Level Instruction Model
  *
  * It is generalized as a "single instruction"
  * a sequence of instructions defines a node
@@ -149,8 +149,10 @@ typedef struct
 */
 typedef struct _instruction
 {
+    // index ID
+    size_t id;
     // opcode
-    operation op;
+    irop op;
     // value reference
     reference* lvalue;
     reference* operand_1;
@@ -323,10 +325,22 @@ typedef enum
     DEFINITION_STRING,
 } definition_type;
 
+/**
+ * Variable Kind
+*/
+typedef enum
+{
+    VARIABLE_KIND_MEMBER,
+    VARIABLE_KIND_PARAMETER,
+    VARIABLE_KIND_LOCAL,
+
+    VARIABLE_KIND_MAX,
+} variable_kind;
+
 typedef struct
 {
-    // if it is a member variable
-    bool is_class_member;
+    // variable kind
+    variable_kind kind;
     // modifier
     lbit_flag modifier;
     // type
@@ -378,10 +392,10 @@ typedef struct _definition
 {
     // definition type
     definition_type type;
-    // used by dataflow analysis
-    size_t def_count;
-    // serialization id, used during IR emit process
-    size_t sid;
+    // member order index id
+    size_t mid;
+    // local order index id
+    size_t lid;
     // internal-only: the code walk root
     tree_node* root_code_walk;
 
@@ -409,8 +423,6 @@ typedef struct _definition
  * following control flags are defined:
  * 1. execute_inverse: push instruction in front of start of current instruction list
  * 2. grow_insert: allow next block grow to handle insertion
- * 3. is_next_asn_init: mark next IROP_ASN instruction as part of initialization,
- *                      so it will not increament version number
  *
  * a CFG can have multiple exit node because every "return" statemnt
  * will behave as an exit node;
@@ -426,7 +438,6 @@ typedef struct
     edge_type next_outbound_strategy;
     bool execute_inverse;
     bool grow_insert;
-    bool is_next_asn_init;
 } cfg_worker;
 
 /**
@@ -530,9 +541,47 @@ typedef struct
 
     // internal-only: first JNT_CLASS_BODY_DECL node reference
     tree_node* node_first_body_decl;
-    // member definition order tracker
-    size_t num_member_variable;
 } global_top_level;
+
+/**
+ * Walk State Type
+ *
+ * NOTE:
+ * IR_WALK_* types are "walk" state
+ * IR_WALK_DEF_* are actually "def" state, and they should be transient
+ * (hence: use-and-recover)
+*/
+typedef enum __walk_state_type
+{
+    IR_WALK_DEFAULT,
+    IR_WALK_DEF_MEMBER_VAR,
+    IR_WALK_DEF_LOCAL_VAR,
+    IR_WALK_FIELD,
+    IR_WALK_METHOD,
+} ir_walk_state_type;
+
+/**
+ * Walk State
+ *
+ * Stores information required globally during IR walk
+ *
+ * num_member_variable and num_local_variable are a bit
+ * weird, because their state are not actually "walk",
+ * they belong to the "def" stage instead; so those states
+ * should not be set as a continuous state, use
+ * state_override argument in ir_walk_state_allocate_id
+ * to use these states in transient way, so that they will
+ * not interfere with the actual "walk" state the IR parser
+ * is currently at
+*/
+typedef struct __ir_walk_state
+{
+    ir_walk_state_type type;
+    size_t num_member_variable;
+    size_t num_local_variable;
+    size_t num_method_instruction;
+    size_t num_field_init_instruction;
+} ir_walk_state;
 
 /**
  * Compilation Unit Abstraction
@@ -564,6 +613,8 @@ typedef struct
     cfg_worker_context* scope_workers;
     // statement context stack
     statement_context* statement_contexts;
+    // walk state
+    ir_walk_state walk_state;
 
     // architecture info
     architecture* arch;
@@ -653,14 +704,16 @@ definition* def_li_raw(
     java_number_type num_type,
     java_number_bit_length num_bits
 );
-definition* type2def(
+definition* type2def(tree_node* node, definition_type type);
+definition* def_var(
+    java_ir* ir,
     tree_node* node,
-    definition_type type,
+    definition** type,
     lbit_flag modifier,
-    bool is_member
+    variable_kind kind,
+    def_use_control duc
 );
-definition* def_var(java_ir* ir, tree_node* node, definition** type, def_use_control duc, bool is_member);
-void def_vars(java_ir* ir, tree_node* node, lbit_flag modifier, bool is_member);
+void def_vars(java_ir* ir, tree_node* node, lbit_flag modifier, variable_kind kind);
 void def_params(java_ir* ir, tree_node* node, definition** ordered_list);
 void def_global(java_ir* ir, tree_node* compilation_unit);
 
@@ -694,14 +747,13 @@ basic_block* cfg_worker_grow(cfg_worker* worker);
 void cfg_worker_next_outbound_strategy(cfg_worker* worker, edge_type type);
 void cfg_worker_execution_strategy(cfg_worker* worker, bool inverse);
 void cfg_worker_next_grow_strategy(cfg_worker* worker, bool insert);
-void cfg_worker_next_asn_strategy(cfg_worker* worker, bool is_init);
 void cfg_worker_set_current_block_type(cfg_worker* worker, block_type t);
 void cfg_worker_jump(cfg_worker* worker, basic_block* to, bool change_cur, bool edge);
 void cfg_worker_grow_with_graph(cfg_worker* dest, cfg_worker* src);
 instruction* cfg_worker_execute(
     java_ir* ir,
     cfg_worker* worker,
-    operation irop,
+    irop op,
     reference** lvalue,
     reference** operand_1,
     reference** operand_2
@@ -736,5 +788,8 @@ void init_ir(java_ir* ir, java_expression* expression, java_error_logger* logger
 void release_ir(java_ir* ir);
 void contextualize(java_ir* ir, architecture* arch, tree_node* compilation_unit);
 void ir_error(java_ir* ir, java_error_id id);
+void ir_walk_state_init(java_ir* ir);
+void ir_walk_state_mutate(java_ir* ir, ir_walk_state_type type);
+size_t ir_walk_state_allocate_id(java_ir* ir, ir_walk_state_type state_override);
 
 #endif

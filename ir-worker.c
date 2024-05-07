@@ -17,7 +17,6 @@ void init_cfg_worker(cfg_worker* worker)
     worker->next_outbound_strategy = EDGE_ANY;
     worker->execute_inverse = false;
     worker->grow_insert = false;
-    worker->is_next_asn_init = false;
 
     init_cfg(worker->graph);
     init_definition_pool(&worker->variables);
@@ -139,14 +138,6 @@ void cfg_worker_next_grow_strategy(cfg_worker* worker, bool insert)
 }
 
 /**
- * mark next IROP_ASN strategy
-*/
-void cfg_worker_next_asn_strategy(cfg_worker* worker, bool is_init)
-{
-    worker->is_next_asn_init = is_init;
-}
-
-/**
  * set current block type
 */
 void cfg_worker_set_current_block_type(cfg_worker* worker, block_type t)
@@ -259,7 +250,7 @@ void cfg_worker_grow_with_graph(cfg_worker* dest, cfg_worker* src)
 instruction* cfg_worker_execute(
     java_ir* ir,
     cfg_worker* worker,
-    operation irop,
+    irop op,
     reference** lvalue,
     reference** operand_1,
     reference** operand_2
@@ -282,7 +273,8 @@ instruction* cfg_worker_execute(
     }
 
     // fill
-    inst->op = irop;
+    inst->id = ir_walk_state_allocate_id(ir, IR_WALK_DEFAULT);
+    inst->op = op;
     inst->lvalue = lvalue ? *lvalue : NULL;
     inst->operand_1 = operand_1 ? *operand_1 : NULL;
     inst->operand_2 = operand_2 ? *operand_2 : NULL;
@@ -305,30 +297,18 @@ instruction* cfg_worker_execute(
     }
 
     /**
-     * def-use info update
-     *
-     * NOTE:
-     * irop == IROP_ASN here is not sufficient, because any operator
-     * can implicitly contain an assignment if lvalue is set
-    */
-    if (!worker->is_next_asn_init && inst->lvalue && irop != IROP_INIT)
-    {
-        inst->lvalue->ver = ++((definition*)inst->lvalue->doi)->def_count;
-    }
-
-    /**
      * special worker state update
      *
      * NOTE: do NOT grow node here -- let parser do it
      * because valid code dtructure will scope them correctly
-     * so that return/break/continue is the last operation in
+     * so that return/break/continue is the last irop in
      * current block
      *
      * and those are not valid can stay as-is so that we can
      * use this context to issue warning and skip statements
      * that will never executed
     */
-    switch (irop)
+    switch (op)
     {
         case IROP_RET:
             block->type = BLOCK_RETURN;
@@ -340,7 +320,6 @@ instruction* cfg_worker_execute(
             break;
     }
 
-    worker->is_next_asn_init = false;
     return inst;
 }
 

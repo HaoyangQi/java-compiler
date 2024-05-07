@@ -43,7 +43,7 @@ void debug_report(compiler* compiler)
         sizeof(java_expression) +
         sizeof(java_operator) * OPID_MAX +
         sizeof(operator_id) * JLT_MAX +
-        sizeof(operation) * OPID_MAX +
+        sizeof(irop) * OPID_MAX +
         sizeof(size_t) * OPID_MAX
     );
     printf("Error static data size: %zd bytes\n",

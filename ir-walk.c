@@ -18,13 +18,13 @@
 static reference* execute_irop_instruction(
     java_ir* ir,
     cfg_worker* worker,
-    operation irop,
+    irop op,
     reference** ref_lvalue,
     reference** ref_operand_1,
     reference** ref_operand_2
 )
 {
-    instruction* inst = cfg_worker_execute(ir, worker, irop, ref_lvalue, ref_operand_1, ref_operand_2);
+    instruction* inst = cfg_worker_execute(ir, worker, op, ref_lvalue, ref_operand_1, ref_operand_2);
 
     // cleanup
     if (ref_lvalue) { delete_reference(*ref_lvalue); *ref_lvalue = NULL; }
@@ -42,13 +42,13 @@ static reference* execute_irop_instruction(
 static void execute_irop_instruction_clean(
     java_ir* ir,
     cfg_worker* worker,
-    operation irop,
+    irop op,
     reference** ref_lvalue,
     reference** ref_operand_1,
     reference** ref_operand_2
 )
 {
-    cfg_worker_execute(ir, worker, irop, ref_lvalue, ref_operand_1, ref_operand_2);
+    cfg_worker_execute(ir, worker, op, ref_lvalue, ref_operand_1, ref_operand_2);
 
     // cleanup
     if (ref_lvalue) { delete_reference(*ref_lvalue); *ref_lvalue = NULL; }
@@ -61,9 +61,9 @@ static void execute_irop_instruction_clean(
  *
  * NOTE: it will NOT validate correctness of instruction format
 */
-inline static void execute_irop_instruction_simple(java_ir* ir, cfg_worker* worker, operation irop)
+inline static void execute_irop_instruction_simple(java_ir* ir, cfg_worker* worker, irop op)
 {
-    cfg_worker_execute(ir, worker, irop, NULL, NULL, NULL);
+    cfg_worker_execute(ir, worker, op, NULL, NULL, NULL);
 }
 
 /**
@@ -91,7 +91,7 @@ static reference* execute_opid_instruction(
     reference* operand_2 = ref_operand_2 ? *ref_operand_2 : NULL;
     reference* ret;
     reference* ret_override = NULL;
-    operation irop;
+    irop op;
     bool validate_lvalue = false;
 
     /**
@@ -203,18 +203,18 @@ static reference* execute_opid_instruction(
     }
 
     // get IROP
-    irop = expr_opid2irop(ir->expression, opid);
+    op = expr_opid2irop(ir->expression, opid);
 
     // fix IROP
-    switch (irop)
+    switch (op)
     {
         case IROP_AINC:
         case IROP_BINC:
-            irop = IROP_ADD;
+            op = IROP_ADD;
             break;
         case IROP_ADEC:
         case IROP_BDEC:
-            irop = IROP_SUB;
+            op = IROP_SUB;
             break;
         default:
             break;
@@ -226,7 +226,7 @@ static reference* execute_opid_instruction(
 
     // execute instruction: cannot use parameter directly here
     // because above algorithm may alter their values
-    ret = execute_irop_instruction(ir, worker, irop, &lvalue, &operand_1, &operand_2);
+    ret = execute_irop_instruction(ir, worker, op, &lvalue, &operand_1, &operand_2);
 
     // if instruction ref has an override, use it
     if (ret_override)
@@ -504,14 +504,14 @@ static reference* walk_operand(java_ir* ir, tree_node* base)
                      * to be top-level
                      *
                      * TODO: the use scope here needs to be the scope of previous
-                     * field access point, if ther is none, it has to be current
+                     * field access point, if there is none, it has to be current
                      * top-level scope (only)
                     */
                     __def = use(ir, content, DU_CTL_LOOKUP_TOP_LEVEL, JAVA_E_REF_UNDEFINED);
 
                     ref->type = IR_ASN_REF_DEFINITION;
                     ref->doi = __def;
-                    ref->ver = __def ? __def->def_count : 0;
+                    ref->ver = 0;
 
                     /**
                      * TODO: how to handle field access?
@@ -995,7 +995,7 @@ static void __execute_variable_declaration(java_ir* ir, tree_node* stmt)
     stmt = stmt->first_child;
 
     // get type definition
-    definition* type = type2def(stmt, DEFINITION_VARIABLE, JLT_UNDEFINED, false);
+    definition* type = type2def(stmt, DEFINITION_VARIABLE);
     definition* var;
     reference* lvalue;
     reference* operand;
@@ -1004,7 +1004,14 @@ static void __execute_variable_declaration(java_ir* ir, tree_node* stmt)
     for (stmt = stmt->next_sibling->first_child; stmt != NULL; stmt = stmt->next_sibling)
     {
         // only move the definition for the last variable
-        var = def_var(ir, stmt, &type, stmt->next_sibling ? DU_CTL_DATA_COPY : DU_CTL_DEFAULT, false);
+        var = def_var(
+            ir,
+            stmt,
+            &type,
+            JLT_UNDEFINED,
+            VARIABLE_KIND_LOCAL,
+            stmt->next_sibling ? DU_CTL_DATA_COPY : DU_CTL_DEFAULT
+        );
 
         // only generate code for successful registration
         if (!var) { continue; }
@@ -1019,7 +1026,6 @@ static void __execute_variable_declaration(java_ir* ir, tree_node* stmt)
 
             // assignment code
             operand = new_reference(IR_ASN_REF_INSTRUCTION, TSW(ir)->cur_blk->inst_last);
-            cfg_worker_next_asn_strategy(TSW(ir), true);
             execute_irop_instruction_clean(ir, TSW(ir), IROP_ASN, &lvalue, &operand, NULL);
         }
         else
@@ -1810,7 +1816,6 @@ static void walk_field(java_ir* ir, definition* field_def, cfg_worker* field_ini
                 operand = new_reference(IR_ASN_REF_INSTRUCTION, worker->cur_blk->inst_last);
 
                 // add assignment code
-                cfg_worker_next_asn_strategy(TSW(ir), true);
                 execute_irop_instruction_clean(ir, worker, IROP_ASN, &lvalue, &operand, NULL);
 
                 // merge code
@@ -1900,6 +1905,7 @@ void walk_class(java_ir* ir, global_top_level* class)
 
     init_cfg_worker(&member_init_worker);
     lookup_top_level_begin(ir, class);
+    ir_walk_state_init(ir);
 
     /**
      * Walk field initializer and method body
@@ -1923,9 +1929,12 @@ void walk_class(java_ir* ir, global_top_level* class)
             switch (desc->type)
             {
                 case DEFINITION_VARIABLE:
+                    ir_walk_state_mutate(ir, IR_WALK_FIELD);
                     walk_field(ir, desc, &member_init_worker);
                     break;
                 case DEFINITION_METHOD:
+                    ir_walk_state_mutate(ir, IR_WALK_METHOD);
+
                     if (desc->method->is_constructor)
                     {
                         walk_constructor(ir, desc);
