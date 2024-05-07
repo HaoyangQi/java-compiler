@@ -24,7 +24,7 @@ void debug_print_number_type(java_number_type number);
 void debug_print_token_content(java_token* token);
 void debug_print_modifier_bit_flag(lbit_flag modifiers);
 void debug_print_ast_node(java_parser* parser, tree_node* node);
-void debug_print_irop(operation irop);
+void debug_print_irop(irop op);
 void debug_print_cfg_node_type(block_type type);
 void debug_print_reference(reference* r);
 void debug_print_instructions(instruction* inst, size_t* cnt, size_t depth);

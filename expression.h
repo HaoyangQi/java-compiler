@@ -69,11 +69,11 @@ typedef unsigned short java_operator;
 #define OP(a, p, t) (OP_ASSOC(a) | OP_PRECD(p) | OP_TOKEN(t))
 
 /**
- * IR OP CODE
+ * IR High-Level OP Code
  *
- * every operation has unique identifier, despite what form it has
+ * every irop has unique identifier, despite what form it has
  *
- * The following operator id does not have specific operation:
+ * The following operator id does not have specific irop:
  * 1. composite assignment operators will not be modelled here because it is
  *    implicitly supported by the assignment form
  *
@@ -204,7 +204,7 @@ typedef enum
     IROP_BOOL,
 
     IROP_MAX,
-} operation;
+} irop;
 
 /**
  * Java Expression Definition
@@ -222,7 +222,7 @@ typedef struct
     /* token-to-operator map */
     operator_id* op_map;
     /* static map from OPID to IROP */
-    operation* ir_map;
+    irop* ir_map;
     /* #operand needed for each IROP */
     size_t* opid_operand_count;
 } java_expression;
@@ -233,7 +233,7 @@ void release_expression(java_expression* expression);
 tree_node* expr_opid2node(const operator_id opid);
 java_operator expr_opid2def(const java_expression* expression, operator_id opid);
 operator_id expr_tid2opid(const java_expression* expression, java_lexeme_type tid);
-operation expr_opid2irop(const java_expression* expression, operator_id opid);
+irop expr_opid2irop(const java_expression* expression, operator_id opid);
 size_t expr_opid_operand_count(const java_expression* expression, operator_id opid);
 
 /**

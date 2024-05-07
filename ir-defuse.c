@@ -8,7 +8,7 @@
  *       during lookup because they are global names
  *       that are reserved across entire compilation unit
  *
- * if name has conflict, funtions ignores def_data_control
+ * if name has conflict, funtion ignores def_data_control
  * and keeps type_def as-is;
  * otherwise type_def will be set to NULL if data control is
  * DEF_DATA_MOVE
@@ -81,20 +81,31 @@ definition* def(
     }
 
     /**
-     * mark sid if it is a member
+     * Mark mid/lid
      *
-     * this information is needed because the order of member variable declaration needs to be
+     * mid information is needed because the order of member variable declaration needs to be
      * preserved for object size calculation with struct padding
     */
-    if (tdef && tdef->variable->is_class_member)
+    if (tdef)
     {
-        if (!ir->working_top_level || lookup_top_level_scope(ir) != table)
+        if (tdef->variable->kind == VARIABLE_KIND_MEMBER)
         {
-            fprintf(stderr, "TODO ERROR: internal error: member variable detected inside local scope.\n");
-        }
+            if (!ir->working_top_level || lookup_top_level_scope(ir) != table)
+            {
+                fprintf(stderr, "TODO ERROR: internal error: member variable detected inside local scope.\n");
+            }
 
-        tdef->sid = ir->working_top_level->num_member_variable;
-        ir->working_top_level->num_member_variable++;
+            tdef->mid = ir_walk_state_allocate_id(ir, IR_WALK_DEF_MEMBER_VAR);
+        }
+        else
+        {
+            if (lookup_top_level_scope(ir) == table)
+            {
+                fprintf(stderr, "TODO ERROR: internal error: local variable detected outside local scope.\n");
+            }
+
+            tdef->lid = ir_walk_state_allocate_id(ir, IR_WALK_DEF_LOCAL_VAR);
+        }
     }
 
     /**
@@ -287,22 +298,18 @@ definition* def_li_raw(
  * modifier is optional, pass JLT_UNDEFINED
  * as "no modifier specified"
  *
+ * NOTE: context-dependent information like modifier flags and variable kind
+ * etc will not be set
+ *
  * node: JNT_TYPE
 */
-definition* type2def(
-    tree_node* node,
-    definition_type type,
-    lbit_flag modifier,
-    bool is_member
-)
+definition* type2def(tree_node* node, definition_type type)
 {
     definition* desc = new_definition(type);
 
     switch (type)
     {
         case DEFINITION_VARIABLE:
-            desc->variable->is_class_member = is_member;
-            desc->variable->modifier = modifier;
             desc->variable->type.primitive = node->data.declarator->id.simple;
             desc->variable->type.dim = node->data.declarator->dimension;
 
@@ -314,7 +321,6 @@ definition* type2def(
             }
             break;
         case DEFINITION_METHOD:
-            desc->method->modifier = modifier;
             desc->method->return_type.primitive = node->data.declarator->id.simple;
             desc->method->return_type.dim = node->data.declarator->dimension;
 
@@ -528,7 +534,14 @@ static void def_constructor(java_ir* ir, tree_node* node, lbit_flag modifier)
  *
  * node: JNT_VAR_DECL
 */
-definition* def_var(java_ir* ir, tree_node* node, definition** type, def_use_control duc, bool is_member)
+definition* def_var(
+    java_ir* ir,
+    tree_node* node,
+    definition** type,
+    lbit_flag modifier,
+    variable_kind kind,
+    def_use_control duc
+)
 {
     /**
      * JNT_VAR_DECL          <--- HERE
@@ -536,6 +549,14 @@ definition* def_var(java_ir* ir, tree_node* node, definition** type, def_use_con
      * +--- JNT_EXPRESSION   <--- root_code_walk if is_member=true
     */
     char* name = t2s(node->data.declarator->id.complex);
+    bool is_member = kind == VARIABLE_KIND_MEMBER;
+
+    // fill must finish before def()
+    if (*type)
+    {
+        (*type)->variable->modifier = modifier;
+        (*type)->variable->kind = kind;
+    }
 
     definition* data = def(
         ir, &name, type,
@@ -566,9 +587,9 @@ definition* def_var(java_ir* ir, tree_node* node, definition** type, def_use_con
  *
  * node: JNT_TYPE
 */
-void def_vars(java_ir* ir, tree_node* node, lbit_flag modifier, bool is_member)
+void def_vars(java_ir* ir, tree_node* node, lbit_flag modifier, variable_kind kind)
 {
-    definition* desc = type2def(node, DEFINITION_VARIABLE, modifier, is_member);
+    definition* desc = type2def(node, DEFINITION_VARIABLE);
 
     /**
      * JNT_TYPE
@@ -589,7 +610,7 @@ void def_vars(java_ir* ir, tree_node* node, lbit_flag modifier, bool is_member)
     while (node)
     {
         // only move the definition for the last variable
-        def_var(ir, node, &desc, node->next_sibling ? DU_CTL_DATA_COPY : DU_CTL_DEFAULT, is_member);
+        def_var(ir, node, &desc, modifier, kind, node->next_sibling ? DU_CTL_DATA_COPY : DU_CTL_DEFAULT);
         node = node->next_sibling;
     }
 
@@ -637,8 +658,11 @@ void def_params(java_ir* ir, tree_node* node, definition** ordered_list)
 
     while (node)
     {
-        desc = type2def(node->first_child, DEFINITION_VARIABLE, JLT_UNDEFINED, false);
+        desc = type2def(node->first_child, DEFINITION_VARIABLE);
         name = t2s(node->data.declarator->id.complex);
+
+        // fill
+        desc->variable->kind = VARIABLE_KIND_PARAMETER;
 
         /**
          * 1. move name and desc
@@ -676,11 +700,14 @@ void def_params(java_ir* ir, tree_node* node, definition** ordered_list)
 */
 static void def_method(java_ir* ir, tree_node* node, lbit_flag modifier)
 {
-    definition* desc = type2def(node, DEFINITION_METHOD, modifier, true);
+    definition* desc = type2def(node, DEFINITION_METHOD);
     definition* method;
     tree_node* node_method_decl = node->next_sibling;
     char* name;
     size_t param_count;
+
+    // fill
+    desc->method->modifier = modifier;
 
     /**
      * JNT_TYPE
@@ -945,7 +972,7 @@ static void def_class(java_ir* ir, tree_node* node)
             switch (probe->next_sibling->type)
             {
                 case JNT_VAR_DECLARATORS:
-                    def_vars(ir, probe, part->data.top_level->modifier, true);
+                    def_vars(ir, probe, part->data.top_level->modifier, VARIABLE_KIND_MEMBER);
                     break;
                 case JNT_METHOD_DECL:
                     def_method(ir, probe, part->data.top_level->modifier);

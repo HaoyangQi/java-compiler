@@ -12,7 +12,7 @@ void init_expression(java_expression* expression)
 
     expression->definition = (java_operator*)malloc_assert(sizeof(java_operator) * OPID_MAX);
     expression->op_map = (operator_id*)malloc_assert(map_size);
-    expression->ir_map = (operation*)malloc_assert(sizeof(operation) * OPID_MAX);
+    expression->ir_map = (irop*)malloc_assert(sizeof(irop) * OPID_MAX);
     expression->opid_operand_count = (size_t*)malloc_assert(sizeof(size_t) * OPID_MAX);
 
     // set default because OPID_UNDEFINED = 0
@@ -296,7 +296,7 @@ operator_id expr_tid2opid(const java_expression* expression, java_lexeme_type ti
 /**
  * map OPID to IROP
 */
-operation expr_opid2irop(const java_expression* expression, operator_id opid)
+irop expr_opid2irop(const java_expression* expression, operator_id opid)
 {
     return expression->ir_map[opid];
 }

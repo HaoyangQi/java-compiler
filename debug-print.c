@@ -960,9 +960,9 @@ void debug_print_ast_node(java_parser* parser, tree_node* node)
     }
 }
 
-void debug_print_irop(operation irop)
+void debug_print_irop(irop op)
 {
-    switch (irop)
+    switch (op)
     {
         case IROP_UNDEFINED:
             printf("(Invalid: IROP_UNDEFINED)");
@@ -1091,7 +1091,7 @@ void debug_print_irop(operation irop)
             printf("(Invalid: IROP_MAX)");
             break;
         default:
-            printf("(UNDEFINED IROP: %d)", irop);
+            printf("(UNDEFINED IROP: %d)", op);
             break;
     }
 }
@@ -1218,7 +1218,7 @@ void debug_print_instructions(instruction* inst, size_t* cnt, size_t depth)
     {
         printf("|");
         debug_print_indentation(depth);
-        printf("[%p][%zd]: ", inst, inst->node->id);
+        printf("[%zd][%p][%zd]: ", inst->id, inst, inst->node->id);
 
         if (inst->lvalue)
         {
@@ -1297,19 +1297,18 @@ void debug_print_cfg(cfg* g, size_t depth)
         debug_print_instructions(b->inst_first, &instruction_count, depth + 1);
     }
 
-    printf(">>>>> SUMMARY <<<<<\n");
-    printf("node count: %zd\n", g->nodes.num);
-    printf("node arr size: %zd\n", g->nodes.size);
-    printf("edge count: %zd\n", g->edges.num);
-    printf("edge arr size: %zd\n", g->edges.size);
-    printf("instruction count: %zd\n", instruction_count);
-    printf("memory size: %zd bytes\n",
+    printf(">>>>> %zd bytes: %zd/%zd nodes, %zd/%zd edges, %zd instructions\n",
         sizeof(cfg) +
         sizeof(basic_block*) * g->nodes.size +
         sizeof(basic_block) * g->nodes.num +
         sizeof(cfg_edge*) * (g->edges.size + node_in_count + node_out_count) +
         sizeof(cfg_edge) * g->edges.num +
-        sizeof(instruction) * instruction_count
+        sizeof(instruction) * instruction_count,
+        g->nodes.num,
+        g->nodes.size,
+        g->edges.num,
+        g->edges.size,
+        instruction_count
     );
 }
 
@@ -1322,13 +1321,20 @@ void debug_print_definition(definition* v, size_t depth)
     switch (v->type)
     {
         case DEFINITION_VARIABLE:
-            if (v->variable->is_class_member)
+            switch (v->variable->kind)
             {
-                printf("def member var, order %zd, ", v->sid);
-            }
-            else
-            {
-                printf("def var, ");
+                case VARIABLE_KIND_LOCAL:
+                    printf("def local var, order %zd, ", v->lid);
+                    break;
+                case VARIABLE_KIND_MEMBER:
+                    printf("def member var, order %zd, ", v->mid);
+                    break;
+                case VARIABLE_KIND_PARAMETER:
+                    printf("def parameter var, order %zd, ", v->lid);
+                    break;
+                default:
+                    printf("def unknown kind var, ");
+                    break;
             }
 
             printf("Access: ");
