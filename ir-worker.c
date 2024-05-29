@@ -17,6 +17,7 @@ void init_cfg_worker(cfg_worker* worker)
     worker->next_outbound_strategy = EDGE_ANY;
     worker->execute_inverse = false;
     worker->grow_insert = false;
+    worker->loop_level = 0;
 
     init_cfg(worker->graph);
     init_definition_pool(&worker->variables);
@@ -84,6 +85,8 @@ basic_block* cfg_worker_grow(cfg_worker* worker)
 {
     basic_block* b = cfg_new_basic_block(worker->graph);
 
+    b->in_loop = worker->loop_level > 0;
+
     // if we are inserting, move outbound info
     if (worker->cur_blk && worker->grow_insert)
     {
@@ -143,6 +146,16 @@ void cfg_worker_next_grow_strategy(cfg_worker* worker, bool insert)
 void cfg_worker_set_current_block_type(cfg_worker* worker, block_type t)
 {
     worker->cur_blk->type = t;
+}
+
+void cfg_worker_start_loop(cfg_worker* worker)
+{
+    worker->loop_level++;
+}
+
+void cfg_worker_end_loop(cfg_worker* worker)
+{
+    worker->loop_level--;
 }
 
 /**
@@ -206,10 +219,11 @@ void cfg_worker_grow_with_graph(cfg_worker* dest, cfg_worker* src)
             src_graph->edges.num * sizeof(cfg_edge*)
         );
 
-        // update node id
+        // update node id and loop detection
         for (size_t id = dest_graph->nodes.num, i = 0; i < src_graph->nodes.num; id++, i++)
         {
             src_graph->nodes.arr[i]->id = id;
+            src_graph->nodes.arr[i]->in_loop = src_graph->nodes.arr[i]->in_loop || dest->loop_level > 0;
         }
 
         // update counter
@@ -242,10 +256,6 @@ void cfg_worker_grow_with_graph(cfg_worker* dest, cfg_worker* src)
  * code generation interface
  *
  * all operands will be moved, and stay as-is if failed
- *
- * TODO: specially process following:
- * 1. ternary operator(? :)
- * 2. short-circuit for logical operators
 */
 instruction* cfg_worker_execute(
     java_ir* ir,
@@ -273,7 +283,7 @@ instruction* cfg_worker_execute(
     }
 
     // fill
-    inst->id = ir_walk_state_allocate_id(ir, IR_WALK_DEFAULT);
+    inst->id = ir_walk_state_allocate_id(ir, IR_WALK_CODE_WORKER);
     inst->op = op;
     inst->lvalue = lvalue ? *lvalue : NULL;
     inst->operand_1 = operand_1 ? *operand_1 : NULL;

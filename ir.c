@@ -65,79 +65,101 @@ void ir_error(java_ir* ir, java_error_id id)
 
 void ir_walk_state_init(java_ir* ir)
 {
-    ir->walk_state.type = IR_WALK_DEFAULT;
+    ir->walk_state.num_member_variable = 0;
     ir->walk_state.num_local_variable = 0;
+    ir->walk_state.num_member_variable_use = 0;
+    ir->walk_state.num_worker_instruction = 0;
     ir->walk_state.num_field_init_instruction = 0;
-    ir->walk_state.num_method_instruction = 0;
+    ir->walk_state.num_field_init_member_variable_use = 0;
 }
 
 /**
  * set current walk state
+ *
+ * it will reset corresponding counters so that ir_walk_state_allocate_id
+ * could retrive information from the beginning
+ *
+ * IR_WALK_CODE_FIELD_INIT: it still uses IR_WALK_CODE_WORKER
+ * to actively tracking ID, except that every walk_field()
+ * starts, num_field_init_instruction will be copied into
+ * num_worker_instruction
+ * therefore, this routine will never reset num_field_init_instruction,
+ * walk_field() will sync it with num_worker_instruction everytime
+ * it finishes
 */
 void ir_walk_state_mutate(java_ir* ir, ir_walk_state_type type)
 {
-    ir->walk_state.type = type;
-
-    // additional work
     switch (type)
     {
-        case IR_WALK_METHOD:
-            // new method. instructions and locals are in new CFG, so reset
-            ir->walk_state.num_method_instruction = 0;
+        case IR_WALK_CODE_WORKER:
+            ir->walk_state.num_worker_instruction = 0;
             ir->walk_state.num_local_variable = 0;
+            ir->walk_state.num_member_variable_use = 0;
             break;
-        case IR_WALK_FIELD:
-            /**
-             * default and implicit behavior
-             *
-             * instruction counter will not reset
-             *
-             * because init code may not stay together, but they all
-             * fall into same CFG
-            */
+        case IR_WALK_CODE_FIELD_INIT:
+            // sync back to worker state
+            ir->walk_state.num_worker_instruction = ir->walk_state.num_field_init_instruction;
+            ir->walk_state.num_local_variable = 0; // unused
+            ir->walk_state.num_member_variable_use = ir->walk_state.num_field_init_member_variable_use;
             break;
         case IR_WALK_DEF_MEMBER_VAR:
-            /**
-             * default and implicit behavior
-             *
-             * member def counter will not reset, because it is managed by
-             * lookup_top_level_begin
-            */
+            ir->walk_state.num_member_variable = 0;
             break;
         case IR_WALK_DEF_LOCAL_VAR:
+        case IR_WALK_USE_MEMBER_VAR:
             /**
              * default and implicit behavior
              *
-             * local def counter will not reset, because it is managed
-             * IR_WALK_METHOD
+             * managed by IR_WALK_CODE_WORKER
             */
             break;
         default:
-            // default
             break;
     }
 }
 
 /**
- * It returns an index ID
+ * Sync state info
  *
- * if state_override is specified any state other than default (IR_WALK_DEFAULT),
- * this state will be referenced, instead of the one in ir->walk_state
+ * This is used when one state is shared by multiple walks
+ * alternating, the transient info will be accumulated
+ * in another fields
+ *
+ * Synced fields will be reset to 0
 */
-size_t ir_walk_state_allocate_id(java_ir* ir, ir_walk_state_type state_override)
+void ir_walk_state_sync(java_ir* ir, ir_walk_state_type type)
 {
-    ir_walk_state_type type = state_override == IR_WALK_DEFAULT ? ir->walk_state.type : state_override;
-
     switch (type)
     {
+        case IR_WALK_CODE_FIELD_INIT:
+            ir->walk_state.num_field_init_instruction = ir->walk_state.num_worker_instruction;
+            ir->walk_state.num_field_init_member_variable_use = ir->walk_state.num_member_variable_use;
+            break;
+        default:
+            // no-op
+            break;
+    }
+}
+
+/**
+ * It returns an index ID, also progresses the counter
+ *
+*/
+size_t ir_walk_state_allocate_id(java_ir* ir, ir_walk_state_type type)
+{
+    switch (type)
+    {
+        case IR_WALK_USE_MEMBER_VAR:
+            return ir->walk_state.num_member_variable_use++;
         case IR_WALK_DEF_MEMBER_VAR:
             return ir->walk_state.num_member_variable++;
         case IR_WALK_DEF_LOCAL_VAR:
             return ir->walk_state.num_local_variable++;
-        case IR_WALK_FIELD:
+        case IR_WALK_CODE_FIELD_INIT:
+            // not used in this way, but add the logic anyway
             return ir->walk_state.num_field_init_instruction++;
-        case IR_WALK_METHOD:
-            return ir->walk_state.num_method_instruction++;
+        case IR_WALK_CODE_WORKER:
+            return ir->walk_state.num_worker_instruction++;
         default:
             // not managed
             return 0;
@@ -258,6 +280,7 @@ statement_context* push_statement_context(java_ir* ir, statement_context_query t
     c->_continue = NULL;
     c->_test = NULL;
     c->next = ir->statement_contexts;
+
     ir->statement_contexts = c;
 
     return c;

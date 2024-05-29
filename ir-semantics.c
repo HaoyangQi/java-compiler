@@ -24,6 +24,15 @@ void contextualize(java_ir* ir, architecture* arch, tree_node* compilation_unit)
     tree_node* node = compilation_unit->first_child;
     global_top_level* top;
 
+    /**
+     * state init
+     *
+     * instruction counter of member initialization code state must only init once
+     * because the code are not guaranteed to stay together
+    */
+    ir_walk_state_init(ir);
+    ir_walk_state_mutate(ir, IR_WALK_DEF_MEMBER_VAR);
+
     // prepare definitions
     def_global(ir, compilation_unit);
 

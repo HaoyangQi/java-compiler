@@ -1063,9 +1063,6 @@ void debug_print_irop(irop op)
         case IROP_LMD:
             printf("IROP_LMD");
             break;
-        case IROP_STORE:
-            printf("IROP_STORE");
-            break;
         case IROP_INIT:
             printf("IROP_INIT");
             break;
@@ -1083,9 +1080,6 @@ void debug_print_irop(irop op)
             break;
         case IROP_NOOP:
             printf("IROP_NOOP");
-            break;
-        case IROP_BOOL:
-            printf("IROP_BOOL");
             break;
         case IROP_MAX:
             printf("(Invalid: IROP_MAX)");
@@ -1123,28 +1117,31 @@ void debug_print_cfg_node_type(block_type type)
 
 void debug_print_reference(reference* r)
 {
-    definition* d;
-    uint64_t n;
-    float nf;
-    double nd;
-
     if (!r)
     {
         printf("(null)");
         return;
     }
 
+    definition* d = r->def;
+    uint64_t n;
+    float nf;
+    double nd;
+
     switch (r->type)
     {
         case IR_ASN_REF_DEFINITION:
-            printf("(def[%zd]: %p)", r->ver, r->doi);
-            break;
-        case IR_ASN_REF_INSTRUCTION:
-            printf("(inst: %p)", r->doi);
+            switch (d->variable->kind)
+            {
+                case VARIABLE_KIND_MEMBER:
+                    printf("%%M%zd", d->mid);
+                    break;
+                default:
+                    printf("%%L%zd", d->lid);
+                    break;
+            }
             break;
         case IR_ASN_REF_LITERAL:
-            d = r->doi;
-
             switch (d->type)
             {
                 case DEFINITION_NULL:
@@ -1198,7 +1195,7 @@ void debug_print_reference(reference* r)
 
             break;
         default:
-            printf("(undefined(%d): %p)", r->type, r->doi);
+            printf("(undefined(%d): %p)", r->type, d);
             break;
     }
 }
@@ -1218,7 +1215,7 @@ void debug_print_instructions(instruction* inst, size_t* cnt, size_t depth)
     {
         printf("|");
         debug_print_indentation(depth);
-        printf("[%zd][%p][%zd]: ", inst->id, inst, inst->node->id);
+        printf("[%zd] [%zd]: ", inst->node->id, inst->id);
 
         if (inst->lvalue)
         {
@@ -1231,6 +1228,21 @@ void debug_print_instructions(instruction* inst, size_t* cnt, size_t depth)
         debug_print_irop(inst->op);
         printf(" ");
         debug_print_reference(inst->operand_2);
+
+        if (inst->op == IROP_PHI)
+        {
+            printf(" phi(");
+
+            for (size_t i = 0; i < inst->operand_phi.num; i++)
+            {
+                if (i) { printf(", "); }
+                if (inst->operand_phi.arr[i]->lvalue != inst->lvalue) { printf("err"); }
+                printf("%zd", inst->operand_phi.arr[i]->lvalue->ver);
+            }
+
+            printf(")");
+        }
+
         printf("\n");
 
         if (cnt) { (*cnt)++; }
@@ -1326,6 +1338,9 @@ void debug_print_definition(definition* v, size_t depth)
                 case VARIABLE_KIND_LOCAL:
                     printf("def local var, order %zd, ", v->lid);
                     break;
+                case VARIABLE_KIND_TEMPORARY:
+                    printf("def temporary var, order %zd, ", v->lid);
+                    break;
                 case VARIABLE_KIND_MEMBER:
                     printf("def member var, order %zd, ", v->mid);
                     break;
@@ -1345,15 +1360,22 @@ void debug_print_definition(definition* v, size_t depth)
             {
                 debug_print_lexeme_type(v->variable->type.primitive);
             }
-            else
+            else if (v->variable->type.reference)
             {
                 printf("%s", v->variable->type.reference);
+            }
+            else
+            {
+                printf("(undefined)");
             }
 
             printf("\n");
             break;
         case DEFINITION_METHOD:
-            printf("def %s, ", v->method->is_constructor ? method_ctor : method_regular);
+            printf("def %s, uses %zd member(s), ",
+                v->method->is_constructor ? method_ctor : method_regular,
+                v->method->member_variable_use_count
+            );
 
             printf("Access: ");
             debug_print_modifier_bit_flag(v->method->modifier);
@@ -1386,9 +1408,13 @@ void debug_print_definition(definition* v, size_t depth)
             {
                 debug_print_lexeme_type(v->method->return_type.primitive);
             }
-            else
+            else if (v->method->return_type.reference)
             {
                 printf("%s", v->method->return_type.reference);
+            }
+            else
+            {
+                printf("void");
             }
 
             printf("\n");

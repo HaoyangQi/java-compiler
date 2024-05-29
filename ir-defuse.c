@@ -1,6 +1,11 @@
 #include "ir.h"
 #include "jil.h"
 
+bool is_def_member_variable(const definition* def)
+{
+    return def && def->type == DEFINITION_VARIABLE && def->variable->kind == VARIABLE_KIND_MEMBER;
+}
+
 /**
  * hierarchical name register routine
  *
@@ -183,6 +188,31 @@ definition* use(java_ir* ir, const char* name, def_use_control duc, java_error_i
     }
 
     return p->value;
+}
+
+/**
+ * Create Temporary Variable In Worker
+ *
+ * NOTE: make sure the variable has a reason to exist, do not abuse this function!
+ *
+ * the variable goes directly into the variable pool of worker
+ * the variable does not have a name, so the registration always succeeds
+ * except when there is no active worker available
+*/
+definition* def_tmp(java_ir* ir)
+{
+    cfg_worker* worker = get_scope_worker(ir);
+
+    if (!worker) { return NULL; }
+
+    definition* var = new_definition(DEFINITION_VARIABLE);
+
+    var->variable->kind = VARIABLE_KIND_TEMPORARY;
+    var->lid = ir_walk_state_allocate_id(ir, IR_WALK_DEF_LOCAL_VAR);
+
+    definition_pool_add(&worker->variables, var);
+
+    return var;
 }
 
 /**
@@ -984,6 +1014,8 @@ static void def_class(java_ir* ir, tree_node* node)
 
         part = part->next_sibling;
     }
+
+    ir->working_top_level->num_fields = ir->walk_state.num_member_variable;
 
     // cleanup
     lookup_top_level_end(ir);

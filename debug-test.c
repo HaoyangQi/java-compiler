@@ -6,6 +6,14 @@ typedef struct
     java_number_type type;
 } debug_number_data;
 
+typedef struct
+{
+    basic_block** postorder;
+    basic_block** idom;
+    index_set* dom;
+    index_set* frontier;
+} dominance_data;
+
 static const debug_number_data test_numbers[] = {
     { "0x123456789abcdef", JT_NUM_HEX },
     { "0X123456789ABCDEF", JT_NUM_HEX },
@@ -205,20 +213,56 @@ void debug_test_number_library()
     printf("\n");
 }
 
-static __optimizer_test_case_run(cfg_worker* worker)
+static debug_test_case_run_dominance(cfg_worker* worker, size_t case_number)
 {
+    printf("\n===== DOMINANCE TEST %zd =====\n", case_number);
+
     cfg g;
-    optimizer o;
+    dominance_data d;
 
     release_cfg_worker(worker, &g, NULL);
-    init_optimizer(&o, &g);
+
+    d.postorder = cfg_node_order(&g, DFS_POSTORDER);
+    d.idom = cfg_idom(&g, d.postorder);
+    d.dom = cfg_dominators(&g, d.idom);
+    d.frontier = cfg_dominance_frontiers(&g, d.idom);
+
+    printf("CFG:\n");
     debug_print_cfg(&g, 1);
-    debug_optimizer(&o);
-    release_optimizer(&o);
+
+    printf("Immediate Dominators:\n");
+    for (size_t i = 0; i < g.nodes.num; i++)
+    {
+        debug_print_indentation(1);
+        printf("[%zd]: %zd\n", i, d.idom[i]->id);
+    }
+
+    printf("\nDominators:\n");
+    for (size_t i = 0; i < g.nodes.num; i++)
+    {
+        debug_print_indentation(1);
+        printf("[%zd]: ", i);
+        debug_print_index_set(&d.dom[i]);
+        printf("\n");
+    }
+
+    printf("\nDominance Frontiers:\n");
+    for (size_t i = 0; i < g.nodes.num; i++)
+    {
+        debug_print_indentation(1);
+        printf("[%zd]: ", i);
+        debug_print_index_set(&d.frontier[i]);
+        printf("\n");
+    }
+
+    cfg_delete_node_order(d.postorder);
+    cfg_delete_idom(d.idom);
+    cfg_delete_dominators(&g, d.dom);
+    cfg_delete_dominance_frontiers(&g, d.frontier);
     release_cfg(&g);
 }
 
-void debug_test_optimizer()
+void debug_test_dominance()
 {
     cfg_worker worker;
     basic_block* p[10]; // temp variables, expand as needed
@@ -231,8 +275,6 @@ void debug_test_optimizer()
      *
      * EXPECTED: idom = {0,0,0,0,0,0}
     */
-    printf("\n===== DOMINANCE TEST 1 =====\n");
-
     init_cfg_worker(&worker);
     p[6] = cfg_worker_grow(&worker);
     p[5] = cfg_worker_grow(&worker);
@@ -249,9 +291,7 @@ void debug_test_optimizer()
     cfg_worker_jump(&worker, p[3], false, true);
 
     // Test
-    __optimizer_test_case_run(&worker);
-
-    printf("===== END OF DOMINANCE TEST 1 =====\n");
+    debug_test_case_run_dominance(&worker, 1);
 
     /**
      * Test Case 2
@@ -274,8 +314,6 @@ void debug_test_optimizer()
      *  / | \
      * 2  3  4
     */
-    printf("\n===== DOMINANCE TEST 2 =====\n");
-
     init_cfg_worker(&worker);
     p[0] = cfg_worker_grow(&worker);
     p[1] = cfg_worker_grow(&worker);
@@ -290,9 +328,7 @@ void debug_test_optimizer()
     cfg_worker_jump(&worker, p[5], false, true);
 
     // Test
-    __optimizer_test_case_run(&worker);
-
-    printf("===== END OF DOMINANCE TEST 2 =====\n");
+    debug_test_case_run_dominance(&worker, 2);
 
     /**
      * Test Case 3
@@ -315,8 +351,6 @@ void debug_test_optimizer()
      *    |
      *    4
     */
-    printf("\n===== DOMINANCE TEST 3 =====\n");
-
     init_cfg_worker(&worker);
     p[0] = cfg_worker_grow(&worker);
     p[1] = cfg_worker_grow(&worker);
@@ -330,7 +364,5 @@ void debug_test_optimizer()
     cfg_worker_jump(&worker, p[2], false, true);
 
     // Test
-    __optimizer_test_case_run(&worker);
-
-    printf("===== END OF DOMINANCE TEST 3 =====\n");
+    debug_test_case_run_dominance(&worker, 3);
 }

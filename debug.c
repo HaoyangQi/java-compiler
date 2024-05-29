@@ -407,33 +407,3 @@ void debug_error_logger(java_error_logger* logger)
         debug_print_error_stack(logger->current_stream, 0);
     }
 }
-
-void debug_optimizer(optimizer* o)
-{
-    printf("\n===== OPTIMIZER =====\n");
-
-    printf("Immediate Dominators:\n");
-    for (size_t i = 0; i < o->graph->nodes.num; i++)
-    {
-        debug_print_indentation(1);
-        printf("[%zd]: %zd\n", i, o->dominance.idom[i]->id);
-    }
-
-    printf("\nDominators:\n");
-    for (size_t i = 0; i < o->graph->nodes.num; i++)
-    {
-        debug_print_indentation(1);
-        printf("[%zd]: ", i);
-        debug_print_index_set(&o->dominance.dom[i]);
-        printf("\n");
-    }
-
-    printf("\nDominance Frontiers:\n");
-    for (size_t i = 0; i < o->graph->nodes.num; i++)
-    {
-        debug_print_indentation(1);
-        printf("[%zd]: ", i);
-        debug_print_index_set(&o->dominance.frontier[i]);
-        printf("\n");
-    }
-}

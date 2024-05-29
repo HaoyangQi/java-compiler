@@ -45,9 +45,8 @@ void debug_java_symbol_lookup_table_no_collision_test(bool use_prime_size);
 void debug_global_import(java_ir* ir);
 void debug_ir_global_names(java_ir* ir);
 void debug_error_logger(java_error_logger* logger);
-void debug_optimizer(optimizer* o);
 
 void debug_test_number_library();
-void debug_test_optimizer();
+void debug_test_dominance();
 
 #endif
