@@ -122,7 +122,6 @@ typedef unsigned short java_operator;
  * IROP_TC      ternary: condition part (a ? TB)
  * IROP_TB,     ternary: branch part (c : d)
  * IROP_LMD     lambda
- * IROP_INIT    default initialization of a variable
  * IROP_JMP     jump (triggers EDGE_JUMP)
  * IROP_RET     return
  * IROP_TEST    test-and-jump
@@ -194,7 +193,6 @@ typedef enum
 
     /* IR-specific */
 
-    IROP_INIT,
     IROP_JMP,
     IROP_RET,
     IROP_TEST,
