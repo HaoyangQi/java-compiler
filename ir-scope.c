@@ -126,7 +126,6 @@ hash_table* lookup_working_scope(java_ir* ir)
 void lookup_top_level_begin(java_ir* ir, global_top_level* desc)
 {
     ir->working_top_level = desc;
-    ir->walk_state.num_member_variable = 0;
 }
 
 /**

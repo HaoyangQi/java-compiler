@@ -43,7 +43,7 @@ int main(int argc, char* argv[])
 {
     // library tests
     // debug_test_number_library();
-    debug_test_optimizer();
+    debug_test_dominance();
 
     architecture arch;
     compiler compiler;

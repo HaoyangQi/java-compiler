@@ -214,6 +214,7 @@ void cfg_new_edge(cfg* g, basic_block* from, basic_block* to, edge_type type)
     // new edge
     cfg_edge* edge = (cfg_edge*)malloc_assert(sizeof(cfg_edge));
     edge->type = type;
+    edge->to_phi_operand_index = to->in.num;
     edge->from = from;
     edge->to = to;
 
@@ -337,10 +338,9 @@ void cfg_delete_node_order(basic_block** list)
  * it returns an array of node reference, where each element
  * represents the IDOM of the node with ID equals to the index
 */
-basic_block** cfg_idom(const cfg* g)
+basic_block** cfg_idom(const cfg* g, basic_block** postorder)
 {
     size_t num_nodes = g->nodes.num;
-    basic_block** postorder = cfg_node_order(g, DFS_POSTORDER);
     size_t* idx_node2post = (size_t*)malloc_assert(sizeof(size_t) * num_nodes);
     basic_block** idom = (basic_block**)malloc_assert(sizeof(basic_block*) * num_nodes);
     bool changed = true;
@@ -401,7 +401,6 @@ basic_block** cfg_idom(const cfg* g)
     }
 
     // cleanup
-    cfg_delete_node_order(postorder);
     free(idx_node2post);
 
     return idom;
@@ -563,18 +562,44 @@ void delete_instruction(instruction* inst, bool destructive)
     delete_reference(inst->operand_1);
     delete_reference(inst->operand_2);
 
+    for (size_t i = 0; i < inst->operand_aux.num; i++)
+    {
+        delete_reference(inst->operand_aux.arr[i]);
+    }
+
+    free(inst->operand_aux.arr);
+    free(inst->operand_phi.arr);
     free(inst);
+}
+
+/**
+ * Push Aux Operand Into Instruction
+ *
+ * NOTE: PHI instruction should NOT use this one, use operand_phi instead
+*/
+void instruction_aux_operand_push(instruction* inst, reference* ref)
+{
+    inst->operand_aux.arr = (reference**)realloc_assert(inst->operand_aux.arr, sizeof(reference*) * (inst->operand_aux.num + 1));
+    inst->operand_aux.arr[inst->operand_aux.num++] = ref;
+}
+
+/**
+ * Test if it is an SSA PHI statement
+*/
+bool instruction_is_ssa_phi(const instruction* inst)
+{
+    return inst && inst->operand_phi.arr != NULL;
 }
 
 /**
  * new reference
 */
-reference* new_reference(reference_type t, void* doi)
+reference* new_reference(reference_type t, definition* def)
 {
     reference* ref = (reference*)malloc_assert(sizeof(reference));
 
     ref->type = t;
-    ref->doi = doi;
+    ref->def = def;
     ref->ver = 0;
 
     return ref;
@@ -583,7 +608,7 @@ reference* new_reference(reference_type t, void* doi)
 /**
  * copy reference
  *
- * doi is not the case here (they are references anyway)
+ * def is not the case here (they are references anyway)
  * the case is the version number
 */
 reference* copy_reference(const reference* r)
@@ -603,7 +628,7 @@ reference* copy_reference(const reference* r)
 */
 void delete_reference(reference* ref)
 {
-    // so far all doi will be referenced, so no deletion
+    // so far all def will be referenced, so no deletion
     free(ref);
 }
 
@@ -682,36 +707,35 @@ instruction* instruction_pop_back(basic_block* node)
 }
 
 /**
+ * pop instruction at the beginning
+*/
+instruction* instruction_pop_front(basic_block* node)
+{
+    instruction* inst = node->inst_first;
+
+    if (inst)
+    {
+        node->inst_first = inst->next;
+        inst->prev = NULL;
+        inst->next = NULL;
+
+        if (node->inst_first)
+        {
+            node->inst_first->prev = NULL;
+        }
+        else
+        {
+            node->inst_last = NULL;
+        }
+    }
+
+    return inst;
+}
+
+/**
  * push instruction at the beginning
 */
 bool instruction_push_front(basic_block* node, instruction* inst)
 {
     return instruction_insert(node, NULL, inst);
-}
-
-/**
- * find the very first instrcution that belongs to current instruction
-*/
-instruction* instruction_locate_enclosure_start(instruction* inst)
-{
-    while (inst)
-    {
-        // order matters here
-        if (inst->operand_1 && inst->operand_1->type == IR_ASN_REF_INSTRUCTION)
-        {
-            // operand 1 code covers operand 2
-            inst = inst->operand_1->doi;
-        }
-        else if (inst->operand_2 && inst->operand_2->type == IR_ASN_REF_INSTRUCTION)
-        {
-            inst = inst->operand_2->doi;
-        }
-        else
-        {
-            // if neither requires enclosure, then this is the one
-            break;
-        }
-    }
-
-    return inst;
 }
