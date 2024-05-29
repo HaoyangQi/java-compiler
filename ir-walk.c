@@ -996,11 +996,13 @@ static void __execute_variable_declaration(java_ir* ir, tree_node* stmt)
         }
         else
         {
+            operand = new_reference(IR_ASN_REF_LITERAL, def_li_null(ir));
+
             /**
              * otherwise we insert a dummy code, indicate that
              * the variable is defined here and some initialization required
             */
-            execute_irop_instruction(ir, TSW(ir), IROP_INIT, &lvalue, NULL, NULL);
+            execute_irop_instruction(ir, TSW(ir), IROP_ASN, &lvalue, &operand, NULL);
         }
     }
 
@@ -1808,11 +1810,13 @@ static void walk_field(java_ir* ir, definition* field_def, cfg_worker* field_ini
     }
     else
     {
+        operand = new_reference(IR_ASN_REF_LITERAL, def_li_null(ir));
+
         /**
          * otherwise we insert a dummy code, indicate that
          * the variable is defined here and some initialization required
         */
-        execute_irop_instruction(ir, field_init_worker, IROP_INIT, &lvalue, NULL, NULL);
+        execute_irop_instruction(ir, field_init_worker, IROP_ASN, &lvalue, &operand, NULL);
     }
 }
 

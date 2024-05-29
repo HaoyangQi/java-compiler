@@ -1,10 +1,10 @@
 /**
  * Optimistic Allocator Heuristic
  *
- * TODO: read and based on:
- * https://groups.seas.harvard.edu/courses/cs153/2018fa/lectures/Lec20-Register-alloc-I.pdf
- * https://groups.seas.harvard.edu/courses/cs153/2018fa/lectures/Lec21-Register-alloc-II.pdf
- * https://www.cs.utexas.edu/users/mckinley/380C/lecs/12.pdf
+ * The allocator uses interference graph to find optimal use of
+ * registers, and spill the rest into memory
+ *
+ * This approach is considered to be expensive in general
 */
 
 #include "optimizer.h"

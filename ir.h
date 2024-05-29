@@ -19,6 +19,7 @@
 
 // some wrapper of def() variants
 #define def_li_dec32(ir, content) def_li_raw(ir, content, JLT_LTR_NUMBER, JT_NUM_DEC, JT_NUM_BIT_LENGTH_NORMAL)
+#define def_li_null(ir) def_li_raw(ir, "null", JLT_RWD_NULL, JT_NUM_MAX, JT_NUM_BIT_LENGTH_NORMAL)
 
 /**
  * def/use control bit flags

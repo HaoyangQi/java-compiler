@@ -1063,9 +1063,6 @@ void debug_print_irop(irop op)
         case IROP_LMD:
             printf("IROP_LMD");
             break;
-        case IROP_INIT:
-            printf("IROP_INIT");
-            break;
         case IROP_JMP:
             printf("IROP_JMP");
             break;
@@ -1439,7 +1436,7 @@ void debug_print_definition(definition* v, size_t depth)
             printf("\n");
             break;
         case DEFINITION_NULL:
-            printf("null\n");
+            printf("null object\n");
             break;
         default:
             // no-op
