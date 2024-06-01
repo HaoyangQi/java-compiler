@@ -733,7 +733,10 @@ bool lookup_register(
     java_error_id err
 );
 
+bool is_def_variable(const definition* def);
 bool is_def_member_variable(const definition* def);
+bool is_def_temporary_variable(const definition* def);
+bool is_def_user_defined_variable(const definition* def);
 definition* def(
     java_ir* ir,
     char** name,

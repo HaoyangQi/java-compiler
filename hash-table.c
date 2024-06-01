@@ -159,6 +159,17 @@ hash_pair* new_pair(void* k, void* v, bytes_length len)
 }
 
 /**
+ * key compare
+ *
+ * key MUST match length as well as the content
+ * otherwise a substring of a key will produce false-positive match result
+*/
+bool hash_pair_key_compare(const hash_pair* pair, const void* key, size_t len)
+{
+    return pair->key_length == len && memcmp(pair->key, key, len) == 0;
+}
+
+/**
  * rehash: test if table needs resizing with one more element
  *
  * rehash does not guarantee prime size,
@@ -245,7 +256,7 @@ bool bhash_table_update(hash_table* table, const void* k, bytes_length len, void
     // lookup with collision check
     while (b)
     {
-        if (memcmp(b->key, k, len) == 0)
+        if (hash_pair_key_compare(b, k, len))
         {
             b->value = v;
             return true;
@@ -268,7 +279,7 @@ bool bhash_table_test(const hash_table* table, const void* k, bytes_length len)
     // lookup with collision check
     while (b)
     {
-        if (memcmp(b->key, k, len) == 0)
+        if (hash_pair_key_compare(b, k, len))
         {
             return true;
         }
@@ -294,7 +305,7 @@ void* bhash_table_find(hash_table* table, const void* k, bytes_length len)
     // lookup with collision check
     while (b)
     {
-        if (memcmp(b->key, k, len) == 0)
+        if (hash_pair_key_compare(b, k, len))
         {
             return b->value;
         }
@@ -318,7 +329,7 @@ hash_pair* bhash_table_get(const hash_table* table, const void* k, bytes_length 
     // lookup with collision check
     while (b)
     {
-        if (memcmp(b->key, k, len) == 0)
+        if (hash_pair_key_compare(b, k, len))
         {
             return b;
         }
@@ -340,7 +351,7 @@ hash_pair* bhash_table_remove(hash_table* table, const void* k, bytes_length len
     // lookup with collision check
     while (b)
     {
-        if (memcmp(b->key, k, len) == 0)
+        if (hash_pair_key_compare(b, k, len))
         {
             if (!b->prev && !b->next)
             {

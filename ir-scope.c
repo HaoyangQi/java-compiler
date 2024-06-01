@@ -271,26 +271,42 @@ definition* definition_copy(definition* v)
 {
     definition* w = (definition*)malloc_assert(sizeof(definition));
 
-    // shallow copy first
+    // shallow copy for all simple data
     memcpy(w, v, sizeof(definition));
 
-    // now deep copy
+    // now deep copy aux data
     switch (v->type)
     {
         case DEFINITION_VARIABLE:
+            w->variable = (definition_variable*)malloc_assert(sizeof(definition_variable));
+            memcpy(w->variable, v->variable, sizeof(definition_variable));
             w->variable->type.reference = strmcpy_assert(v->variable->type.reference);
             break;
         case DEFINITION_METHOD:
+            w->method = (definition_method*)malloc_assert(sizeof(definition_method));
+            memcpy(w->method, v->method, sizeof(definition_method));
+
             /**
              * TODO: so far there is no use case for CFG copy
              * so we leave it empty
             */
             fprintf(stderr, "TODO ERROR: internal error: method copy detected, but it is not implemented yet.\n");
             w->method->return_type.reference = strmcpy_assert(v->method->return_type.reference);
+            memset(&w->method->local_variables, 0, sizeof(definition_pool));
             memset(&w->method->code, 0, sizeof(cfg));
             break;
+        case DEFINITION_NUMBER:
+        case DEFINITION_BOOLEAN:
+        case DEFINITION_CHARACTER:
+            w->li_number = (definition_number*)malloc_assert(sizeof(definition_number));
+            memcpy(w->li_number, v->li_number, sizeof(definition_number));
+            break;
+        case DEFINITION_STRING:
+            w->li_string = (definition_string*)malloc_assert(sizeof(definition_string));
+            memcpy(w->li_string, v->li_string, sizeof(definition_string));
+            break;
+        case DEFINITION_NULL:
         default:
-            // no-op
             break;
     }
 

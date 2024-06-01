@@ -950,6 +950,8 @@ static bool optimizer_allocator_heuristics_state_machine(
 
 /**
  * Heuristic Register Allocator Entry Point
+ *
+ * NOTE: optimizer::variables and optimizer::instructions will be changed
 */
 void optimizer_allocator_heuristic(optimizer* om, size_t num_avail_registers)
 {

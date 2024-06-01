@@ -10,6 +10,7 @@
 #include "ir.h"
 #include "il.h"
 #include "error.h"
+#include "optimizer.h"
 
 typedef struct
 {
@@ -23,6 +24,7 @@ typedef struct
     java_lexer lexer;
     java_parser context;
     java_ir ir;
+    optimizer om;
     java_error_logger logger;
 } compiler;
 
@@ -34,7 +36,8 @@ typedef enum
 {
     COMPILER_STAGE_PARSE = 0x1,
     COMPILER_STAGE_CONTEXT = 0x2,
-    COMPILER_STAGE_EMIT = 0x4,
+    COMPILER_STAGE_OPTIMIZE = 0x4,
+    COMPILER_STAGE_EMIT = 0x8,
 } compiler_stage;
 
 bool init_compiler(compiler* compiler);

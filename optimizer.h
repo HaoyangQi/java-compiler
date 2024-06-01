@@ -94,10 +94,11 @@ size_t varmap_lid2idx(optimizer* om, size_t lid);
 size_t varmap_idx2lid(optimizer* om, size_t var_map_index);
 bool varmap_idx_is_member(optimizer* om, size_t var_map_index);
 instruction* optimizer_phi_locate(basic_block* node, const definition* variable);
-instruction* optimizer_phi_place(basic_block* node, definition* variable, size_t id);
-bool optimizer_phi_set_operand(basic_block* node, size_t idx, instruction* assignment);
+bool optimizer_phi_place(optimizer* om, basic_block* node, definition* variable);
 void optimizer_populate_variables(optimizer* om);
 void optimizer_populate_instructions(optimizer* om);
+void optimizer_invalidate_variables(optimizer* om);
+void optimizer_invalidate_instructions(optimizer* om);
 void optimizer_profile_copy(optimizer* om, optimizer_profile* profile);
 void optimizer_profile_apply(optimizer* om, optimizer_profile* profile);
 
@@ -108,8 +109,10 @@ void optimizer_liveness_analyze(optimizer* om);
 void optimizer_allocator_heuristic(optimizer* om, size_t num_avail_registers);
 void optimizer_allocator_linear(optimizer* om, size_t num_avail_registers);
 
-void init_optimizer(optimizer* om, global_top_level* top_level, definition* target);
+void init_optimizer(optimizer* om);
 void release_optimizer(optimizer* om);
+void optimizer_attach(optimizer* om, global_top_level* top_level, definition* target);
+void optimizer_detach(optimizer* om);
 void optimizer_execute(optimizer* om);
 
 #endif

@@ -21,8 +21,8 @@ static char* test_paths[] = {
     // "./test/interface-decl-1.txt",
 
     // "./test/simple.txt",
-    "./test/il.txt",
-    // "./test/ssa.txt",
+    // "./test/il.txt",
+    "./test/ssa.txt",
 
     // "./test/general-no-block-and-statement.txt",
 
@@ -43,7 +43,7 @@ int main(int argc, char* argv[])
 {
     // library tests
     // debug_test_number_library();
-    debug_test_dominance();
+    // debug_test_dominance();
 
     architecture arch;
     compiler compiler;
@@ -69,9 +69,9 @@ int main(int argc, char* argv[])
 
         if (compile(
             &compiler, &arch, test_paths[i],
-            COMPILER_STAGE_PARSE | COMPILER_STAGE_CONTEXT | COMPILER_STAGE_EMIT))
+            COMPILER_STAGE_PARSE | COMPILER_STAGE_CONTEXT | COMPILER_STAGE_OPTIMIZE | COMPILER_STAGE_EMIT))
         {
-            debug_ast(&compiler.context);
+            // debug_ast(&compiler.context);
             debug_global_import(&compiler.ir);
             debug_ir_global_names(&compiler.ir);
             debug_ir_lookup(&compiler.ir);

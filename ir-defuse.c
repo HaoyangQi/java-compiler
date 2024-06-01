@@ -1,9 +1,24 @@
 #include "ir.h"
 #include "jil.h"
 
+bool is_def_variable(const definition* def)
+{
+    return def && def->type == DEFINITION_VARIABLE;
+}
+
 bool is_def_member_variable(const definition* def)
 {
-    return def && def->type == DEFINITION_VARIABLE && def->variable->kind == VARIABLE_KIND_MEMBER;
+    return is_def_variable(def) && def->variable->kind == VARIABLE_KIND_MEMBER;
+}
+
+bool is_def_temporary_variable(const definition* def)
+{
+    return is_def_variable(def) && def->variable->kind == VARIABLE_KIND_TEMPORARY;
+}
+
+bool is_def_user_defined_variable(const definition* def)
+{
+    return def && def->type == DEFINITION_VARIABLE && def->variable->kind != VARIABLE_KIND_TEMPORARY;
 }
 
 /**
@@ -91,7 +106,7 @@ definition* def(
      * mid information is needed because the order of member variable declaration needs to be
      * preserved for object size calculation with struct padding
     */
-    if (tdef)
+    if (is_def_variable(tdef))
     {
         if (tdef->variable->kind == VARIABLE_KIND_MEMBER)
         {
