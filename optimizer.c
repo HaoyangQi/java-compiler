@@ -2,6 +2,28 @@
 
 /**
  * initialize optimizer for given code graph
+*/
+void init_optimizer(optimizer* om)
+{
+    memset(om, 0, sizeof(optimizer));
+    init_definition_pool(&om->spill_pool);
+}
+
+/**
+ * release optimizer
+*/
+void release_optimizer(optimizer* om)
+{
+    if (!om || !om->graph) { return; }
+
+    optimizer_invalidate_instructions(om);
+    optimizer_invalidate_variables(om);
+    cfg_delete_node_order(om->node_postorder);
+    release_definition_pool(&om->spill_pool);
+}
+
+/**
+ * attach optimizer for given code graph
  *
  * NOTE: this process only fills information, no data will be allocated
  *
@@ -12,12 +34,9 @@
  * TODO: probably just register using top-level,
  * and do everything within?
 */
-void init_optimizer(optimizer* om, global_top_level* top_level, definition* target)
+void optimizer_attach(optimizer* om, global_top_level* top_level, definition* target)
 {
-    if (!om || !target) { return; }
-
-    memset(om, 0, sizeof(optimizer));
-    init_definition_pool(&om->spill_pool);
+    if (!om || !top_level || !target) { return; }
 
     /**
      * TODO: how to handle member init code?
@@ -51,24 +70,12 @@ void init_optimizer(optimizer* om, global_top_level* top_level, definition* targ
 }
 
 /**
- * release optimizer
+ * Detach optimizer from current code graph
 */
-void release_optimizer(optimizer* om)
+void optimizer_detach(optimizer* om)
 {
-    if (!om || !om->graph) { return; }
-
-    for (size_t i = 0; i < om->profile.num_instructions; i++)
-    {
-        release_index_set(&om->instructions[i].def);
-        release_index_set(&om->instructions[i].use);
-        release_index_set(&om->instructions[i].in);
-        release_index_set(&om->instructions[i].out);
-    }
-
-    cfg_delete_node_order(om->node_postorder);
-    free(om->variables);
-    free(om->instructions);
-    release_definition_pool(&om->spill_pool);
+    release_optimizer(om);
+    init_optimizer(om);
 }
 
 /**
@@ -81,7 +88,7 @@ void release_optimizer(optimizer* om)
 */
 void optimizer_execute(optimizer* om)
 {
-    optimizer_populate_variables(om);
+    if (!om->graph) { return; }
 
     // SSA begin
     optimizer_ssa_build(om);
@@ -94,7 +101,7 @@ void optimizer_execute(optimizer* om)
     */
 
     // SSA end
-    optimizer_ssa_eliminate(om);
+    // optimizer_ssa_eliminate(om);
 
-    optimizer_allocator_heuristic(om, 4);
+    // optimizer_allocator_heuristic(om, 4);
 }

@@ -1131,7 +1131,10 @@ void debug_print_reference(reference* r)
             switch (d->variable->kind)
             {
                 case VARIABLE_KIND_MEMBER:
-                    printf("%%M%zd", d->mid);
+                    printf("%%M%zd[%zd]", d->mid, r->ver);
+                    break;
+                case VARIABLE_KIND_LOCAL:
+                    printf("%%L%zd[%zd]", d->lid, r->ver);
                     break;
                 default:
                     printf("%%L%zd", d->lid);
@@ -1232,9 +1235,38 @@ void debug_print_instructions(instruction* inst, size_t* cnt, size_t depth)
 
             for (size_t i = 0; i < inst->operand_phi.num; i++)
             {
+                instruction* phi_ref = inst->operand_phi.arr[i];
+
                 if (i) { printf(", "); }
-                if (inst->operand_phi.arr[i]->lvalue != inst->lvalue) { printf("err"); }
-                printf("%zd", inst->operand_phi.arr[i]->lvalue->ver);
+
+                if (!phi_ref)
+                {
+                    /**
+                     * if phi operand is null AND lvalue is a member
+                     * variable, then the NULL operand is valid and
+                     * implies the very first value this variable
+                     * contains upon code entry
+                    */
+                    if (is_def_member_variable(inst->lvalue->def))
+                    {
+                        printf("entry");
+                    }
+                    else
+                    {
+                        printf("null");
+                    }
+                }
+                else if (phi_ref->lvalue->def != inst->lvalue->def)
+                {
+                    printf("err: ");
+                    debug_print_reference(phi_ref->lvalue);
+                    printf(" ");
+                    debug_print_reference(inst->lvalue);
+                }
+                else
+                {
+                    printf("%zd", inst->operand_phi.arr[i]->lvalue->ver);
+                }
             }
 
             printf(")");

@@ -53,6 +53,7 @@ bool init_compiler(compiler* compiler)
         &compiler->logger
     );
     init_ir(&compiler->ir, &compiler->expression, &compiler->logger);
+    init_optimizer(&compiler->om);
 
     return true;
 }
@@ -68,6 +69,7 @@ void release_compiler(compiler* compiler)
     release_error_logger(&compiler->logger);
     release_parser(&compiler->context);
     release_ir(&compiler->ir);
+    release_optimizer(&compiler->om);
 }
 
 /**
@@ -80,6 +82,7 @@ void detask_compiler(compiler* compiler)
     release_lexer(&compiler->lexer);
     release_parser(&compiler->context);
     release_ir(&compiler->ir);
+    release_optimizer(&compiler->om);
 }
 
 /**
@@ -106,6 +109,7 @@ bool retask_compiler(compiler* compiler, char* source_path)
         &compiler->logger
     );
     init_ir(&compiler->ir, &compiler->expression, &compiler->logger);
+    init_optimizer(&compiler->om);
 
     /**
      * load file last
@@ -126,37 +130,82 @@ bool compile(compiler* compiler, architecture* arch, char* source_path, compiler
     {
         return false;
     }
-    else if (stages < COMPILER_STAGE_PARSE)
+
+    // parse (mandatory for future steps)
+    if (stages & COMPILER_STAGE_PARSE)
+    {
+        parse(&compiler->context);
+
+        // check error from parser
+        if (!error_logger_if_main_stack_no_error(&compiler->logger))
+        {
+            return false;
+        }
+    }
+    else
     {
         return true;
     }
 
-    parse(&compiler->context);
-
-    // check error from parser
-    if (!error_logger_if_main_stack_no_error(&compiler->logger))
+    // contextualize (mandatory for future steps)
+    if (stages & COMPILER_STAGE_CONTEXT)
     {
-        return false;
-    }
-    else if (stages < COMPILER_STAGE_CONTEXT)
-    {
-        return true;
-    }
+        contextualize(&compiler->ir, arch, compiler->context.ast_root);
 
-    contextualize(&compiler->ir, arch, compiler->context.ast_root);
-
-    // check error from contextualizer
-    if (!error_logger_if_main_stack_no_error(&compiler->logger))
-    {
-        return false;
+        // check error from contextualizer
+        if (!error_logger_if_main_stack_no_error(&compiler->logger))
+        {
+            return false;
+        }
     }
-    else if (stages < COMPILER_STAGE_EMIT)
+    else
     {
         return true;
     }
 
-    // emit IR
-    jil_emit(&compiler->ir);
+    // optimize (optional for future steps)
+    if (stages & COMPILER_STAGE_OPTIMIZE)
+    {
+        hash_table* table = lookup_global_scope(&compiler->ir);
+
+        // iterate all top levels
+        for (size_t i = 0; i < table->bucket_size; i++)
+        {
+            for (hash_pair* p = table->bucket[i]; p != NULL; p = p->next)
+            {
+                global_top_level* top_level = p->value;
+
+                // so far only class contains code
+                if (!top_level || top_level->type != TOP_LEVEL_CLASS)
+                {
+                    continue;
+                }
+
+                // iterate all members
+                for (size_t j = 0; j < top_level->tbl_member.bucket_size; j++)
+                {
+                    for (hash_pair* pm = top_level->tbl_member.bucket[j]; pm != NULL; pm = pm->next)
+                    {
+                        optimizer_attach(&compiler->om, top_level, pm->value);
+                        optimizer_execute(&compiler->om);
+                        optimizer_detach(&compiler->om);
+                    }
+                }
+            }
+        }
+
+        // check error from optimizer
+        if (!error_logger_if_main_stack_no_error(&compiler->logger))
+        {
+            return false;
+        }
+    }
+
+    // emit IR (optional for future steps)
+    if (stages & COMPILER_STAGE_EMIT)
+    {
+        jil_emit(&compiler->ir);
+    }
 
     /**
      * TODO:

@@ -1,31 +1,46 @@
-class MyPackageClass {
-    void example_1_dominator_set() {
-        int a = 0;
+// example from https://coursys.sfu.ca/2018sp-cmpt-379-d1/pages/lecture18/view, page 12
+// output result of PHI should match eactaly as what is shown in this slide page
+class SSA_Test
+{
+    int a,b,c,d,y,z;
 
-        if (a > 0) {
-            a = a + 1;
-        } else {
-            a = a - 1;
-        }
+    void ssa()
+    {
+        int i = 1;
+        
+        do 
+        {
+            a = 2;
+            c = 3;
 
-        do {
-            a = a * 2;
-        } while (a < 100);
-
-        a = 1;
-    }
-
-    void example_2_df_set() {
-        int a = 0;
-
-        if (a < 0) {
-            if (a > 0) {
-                a = a + 1;
-            } else {
-                a = a - 1;
+            if (a < c)
+            {
+                b = 4;
+                c = 5;
+                d = 6;
             }
-        }
+            else
+            {
+                a = 7;
+                d = 8;
 
-        a = 1;
+                if (a <= d)
+                {
+                    d = 9;
+                }
+                else
+                {
+                    c = 10;
+                }
+
+                b = 11;
+            }
+
+            y = a + b;
+            z = c + d;
+            i = i + 1;
+        } while (i <= 100);
+
+        return;
     }
 }

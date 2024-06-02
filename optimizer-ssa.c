@@ -11,6 +11,35 @@ typedef struct _variable_version_stack
 } variable_version_stack;
 
 /**
+ * Node Stack
+ *
+ * used for node-based tree walk
+*/
+typedef struct _node_walk_stack
+{
+    basic_block* ref;
+    struct _node_walk_stack* next;
+} node_walk_stack;
+
+/**
+ * Variable-Specific Data
+ *
+ * version_counter only increments in algorithm, meaning
+ * it incremnts when new version number is generated,
+ * but when popping version stack, this counter will
+ * not change, by design
+*/
+typedef struct _variable_ssa_info
+{
+    // version stack
+    variable_version_stack* vvs;
+    // version counter
+    size_t version_counter;
+    // blocks that contain definition of each variable
+    index_set blocks;
+} variable_ssa_info;
+
+/**
  * this struct contains some static memory chunk and info accquired by routines
  * multiple times
 */
@@ -18,59 +47,103 @@ typedef struct
 {
     size_t num_nodes;
 
-    /**
-     * PHI placement data
-    */
-    struct
-    {
-        size_t sz_flags;
-        byte* inserted;
-        byte* added;
-    } phi;
+    // Globals set, candidates for PHI placement
+    index_set globals;
 
-    /**
-     * Variable renaming data
-    */
-    struct
-    {
-        variable_version_stack** variable;
-    } rename;
+    // Variable Data
+    variable_ssa_info* variables;
 } ssa_builder;
+
+static node_walk_stack* node_stack_push(node_walk_stack* s, basic_block* bb)
+{
+    node_walk_stack* top = (node_walk_stack*)malloc_assert(sizeof(node_walk_stack));
+
+    top->ref = bb;
+    top->next = s;
+
+    return top;
+}
+
+static node_walk_stack* node_stack_pop(node_walk_stack* s)
+{
+    if (!s) { return NULL; }
+
+    node_walk_stack* top = s;
+
+    s = s->next;
+
+    free(top);
+    return s;
+}
+
+static basic_block* node_stack_top(node_walk_stack* s)
+{
+    return s ? s->ref : NULL;
+}
 
 static void ssa_builder_init(optimizer* om, ssa_builder* builder)
 {
-    size_t sz_version_stack = sizeof(variable_version_stack*) * (om->profile.num_variables);
+    /**
+     * Optimizer Context Init
+     *
+     * instruction array is nullified due to PHI code injection
+    */
+    optimizer_invalidate_instructions(om);
+    optimizer_invalidate_variables(om);
+    optimizer_populate_variables(om);
 
     builder->num_nodes = om->graph->nodes.num;
-    builder->phi.sz_flags = sizeof(bool) * builder->num_nodes;
-    builder->phi.inserted = (byte*)malloc_assert(builder->phi.sz_flags);
-    builder->phi.added = (byte*)malloc_assert(builder->phi.sz_flags);
-    builder->rename.variable = (variable_version_stack**)malloc_assert(sz_version_stack);
+    builder->variables = (variable_ssa_info*)malloc_assert(sizeof(variable_ssa_info) * om->profile.num_variables);
 
-    memset(builder->rename.variable, 0, sz_version_stack);
+    init_index_set(&builder->globals, om->profile.num_variables);
 
-    /**
-     * rename version for members
-     *
-     * members are not defined in CFG scope, but they are valid, default to version 0
-    */
-    for (size_t i = 0; i < om->profile.num_members; i++)
+    for (size_t i = 0; i < om->profile.num_variables; i++)
     {
-        builder->rename.variable[i] = (variable_version_stack*)malloc_assert(sizeof(variable_version_stack));
-        builder->rename.variable[i]->version = 0;
-        builder->rename.variable[i]->source = NULL;
-        builder->rename.variable[i]->next = NULL;
+        variable_ssa_info* info = &builder->variables[i];
+
+        // ignore all temporary variables
+        if (!is_def_user_defined_variable(om->variables[i].ref))
+        {
+            memset(info, 0, sizeof(variable_ssa_info));
+            continue;
+        }
+
+        // version stack initialize
+        if (varmap_idx_is_member(om, i))
+        {
+            /**
+             * member are firstly defined outside, so it always maintain a valid definition upon entry
+             *
+             * NOTE:
+             * there is a weird exception: the source of member version 0 is NULL
+             * we cannot use member init code ref here, because that is NOT immediate assignment
+             * context upon code entry (well, not always)
+             *
+             * so, it is left NULL on purpose, combined with lvalue of the PHI being a member variable,
+             * implies that a "null" operand in PHI means very first value of the member upon entry
+            */
+            info->vvs = (variable_version_stack*)malloc_assert(sizeof(variable_version_stack));
+            info->vvs->version = 0;
+            info->vvs->source = NULL;
+            info->vvs->next = NULL;
+            info->version_counter = 1;
+        }
+        else
+        {
+            info->vvs = NULL;
+            info->version_counter = 0;
+        }
+
+        init_index_set(&info->blocks, builder->num_nodes);
     }
 }
 
 static void ssa_builder_release(optimizer* om, ssa_builder* builder)
 {
-    free(builder->phi.inserted);
-    free(builder->phi.added);
-
     for (size_t i = 0; i < om->profile.num_variables; i++)
     {
-        variable_version_stack* v = builder->rename.variable[i];
+        variable_ssa_info* info = &builder->variables[i];
+        variable_version_stack* v = info->vvs;
         variable_version_stack* next = NULL;
 
         while (v)
@@ -79,228 +152,301 @@ static void ssa_builder_release(optimizer* om, ssa_builder* builder)
             free(v);
             v = next;
         }
+
+        release_index_set(&info->blocks);
     }
 
-    free(builder->rename.variable);
+    release_index_set(&builder->globals);
+    free(builder->variables);
 }
 
-static size_t ssa_builder_generate_variable_version(
+static variable_ssa_info* ssa_get_variable_info(optimizer* om, ssa_builder* builder, const definition* variable)
+{
+    return &builder->variables[varmap_varid2idx(om, variable)];
+}
+
+static void ssa_builder_generate_variable_version(
     optimizer* om,
     ssa_builder* builder,
-    const definition* variable,
+    reference* ref,
     instruction* source
 )
 {
-    size_t v = varmap_varid2idx(om, variable);
+    definition* variable = ref2vardef(ref);
+
+    if (!is_def_user_defined_variable(variable)) { return; }
+
+    variable_ssa_info* info = &builder->variables[varmap_varid2idx(om, variable)];
     variable_version_stack* frame = (variable_version_stack*)malloc_assert(sizeof(variable_version_stack));
-    size_t ver = builder->rename.variable[v]->version;
+    variable_version_stack* top = info->vvs;
+    size_t i = info->version_counter;
 
-    if (builder->rename.variable[v])
-    {
-        frame->version = ver + 1;
-    }
-    else
-    {
-        frame->version = 0;
-    }
-
+    // push version i onto stack
+    frame->version = i;
     frame->source = source;
-    frame->next = builder->rename.variable[v];
-    builder->rename.variable[v] = frame;
+    frame->next = top;
+    info->vvs = frame;
 
-    return ver;
+    // increment counter and set reference version properly
+    info->version_counter++;
+    ref->ver = i;
 }
 
-static size_t ssa_builder_get_variable_version(optimizer* om, ssa_builder* builder, const definition* variable)
+static void ssa_builder_get_variable_version(optimizer* om, ssa_builder* builder, reference* ref)
 {
-    if (!variable) { return 0; }
+    definition* variable = ref2vardef(ref);
 
-    variable_version_stack* top = builder->rename.variable[varmap_varid2idx(om, variable)];
-    return top ? top->version : 0;
+    if (!is_def_user_defined_variable(variable)) { return; }
+
+    ref->ver = ssa_get_variable_info(om, builder, variable)->vvs->version;
 }
 
+/**
+ *
+*/
 static instruction* ssa_builder_get_variable_source(optimizer* om, ssa_builder* builder, const definition* variable)
 {
-    if (!variable) { return 0; }
+    if (!variable) { return NULL; }
 
-    variable_version_stack* top = builder->rename.variable[varmap_varid2idx(om, variable)];
-    return top ? top->source : NULL;
+    return ssa_get_variable_info(om, builder, variable)->vvs->source;
 }
 
 static void ssa_builder_pop_variable_version(optimizer* om, ssa_builder* builder, const definition* variable)
 {
-    if (!variable) { return; }
+    if (!is_def_user_defined_variable(variable)) { return; }
 
-    size_t v = varmap_varid2idx(om, variable);
-    variable_version_stack* top = builder->rename.variable[v];
+    variable_ssa_info* info = ssa_get_variable_info(om, builder, variable);
+    variable_version_stack* top = info->vvs;
 
-    builder->rename.variable[v] = top->next;
+    if (!top) { return; }
+
+    info->vvs = top->next;
     free(top);
+}
+
+static void optimizer_ssa_build_globals(optimizer* om, ssa_builder* builder)
+{
+    index_set kill;
+
+    init_index_set(&kill, om->profile.num_variables);
+
+    for (size_t i = 0; i < builder->num_nodes; i++)
+    {
+        basic_block* bb = om->node_postorder[i];
+
+        index_set_clear(&kill);
+
+        // node order does not matter
+        for (instruction* p = bb->inst_first; p != NULL; p = p->next)
+        {
+            definition* d;
+            size_t idx;
+
+            if (p->operand_1)
+            {
+                d = p->operand_1->def;
+                idx = varmap_varid2idx(om, d);
+
+                if (is_def_user_defined_variable(d) && !index_set_contains(&kill, idx))
+                {
+                    index_set_add(&builder->globals, idx);
+                }
+            }
+
+            if (p->operand_2)
+            {
+                d = p->operand_2->def;
+                idx = varmap_varid2idx(om, d);
+
+                if (is_def_user_defined_variable(d) && !index_set_contains(&kill, idx))
+                {
+                    index_set_add(&builder->globals, idx);
+                }
+            }
+
+            if (p->lvalue)
+            {
+                d = p->lvalue->def;
+                idx = varmap_varid2idx(om, d);
+
+                if (is_def_user_defined_variable(d))
+                {
+                    index_set_add(&kill, idx);
+                    index_set_add(&builder->variables[idx].blocks, bb->id);
+                }
+            }
+        }
+    }
+
+    release_index_set(&kill);
 }
 
 /**
  * insert phi instruction for given variable
 */
-static void optimizer_ssa_place_phi(
-    optimizer* om,
-    ssa_builder* builder,
-    definition* variable,
-    const index_set* df
-)
+static void optimizer_ssa_place_phi(optimizer* om, ssa_builder* builder, definition* variable, index_set* df)
 {
-    if (!variable) { return; }
+    /**
+     * Only "variable" defined by user will be considered
+     * (thus: variables written in the source code file)
+     *
+     * temporary variable, for example, is NOT user-defined,
+     * it is IR-defined "holder" that transfer data inside
+     * one, and only one block that it belongs to; so SSA
+     * does not need to care about them
+    */
+    if (!is_def_user_defined_variable(variable)) { return; }
 
     index_set worklist;
     index_set_iterator itor_set;
     size_t n;
-    basic_block* node;
 
-    init_index_set(&worklist, builder->num_nodes);
+    init_index_set_copy(&worklist, &ssa_get_variable_info(om, builder, variable)->blocks);
 
-    // reset
-    memset(builder->phi.inserted, 0, builder->phi.sz_flags);
-    memset(builder->phi.added, 0, builder->phi.sz_flags);
-    index_set_clear(&worklist);
-
-    // initialize
-    for (n = 0; n < builder->num_nodes; n++)
-    {
-        node = om->graph->nodes.arr[n];
-        instruction* p = node->inst_first;
-
-        while (p)
-        {
-            if (p->lvalue && p->lvalue->def == variable)
-            {
-                index_set_add(&worklist, node->id);
-                builder->phi.added[node->id] = 1;
-                break;
-            }
-
-            p = p->next;
-        }
-    }
-
-    // main loop
     while (index_set_pop(&worklist, &n))
     {
-        index_set_iterator_init(&itor_set, (index_set*)(&df[n]));
+        index_set_iterator_init(&itor_set, &df[n]);
 
         while (!index_set_iterator_end(&itor_set))
         {
-            n = index_set_iterator_get(&itor_set);
-            node = om->graph->nodes.arr[n];
+            basic_block* node = om->graph->nodes.arr[index_set_iterator_get(&itor_set)];
 
-            if (!builder->phi.inserted[n])
+            if (optimizer_phi_place(om, node, variable))
             {
-                optimizer_phi_place(node, variable, om->profile.num_instructions);
-                builder->phi.inserted[n] = 1;
-                om->profile.num_instructions++;
-
-                // mutate worklist
-                if (!builder->phi.added[n])
-                {
-                    builder->phi.added[n] = 1;
-                    index_set_add(&worklist, n);
-                }
+                index_set_add(&worklist, node->id);
             }
 
             index_set_iterator_next(&itor_set);
         }
 
-        // cleanup
         index_set_iterator_release(&itor_set);
     }
+
+    release_index_set(&worklist);
 }
 
 /**
  * Rename Variables
  *
- * Iterative DFS Walk
+ * Iterative DFS Walk order on dominator tree
 */
-static void optimizer_ssa_rename_variable(optimizer* om, ssa_builder* builder)
+static void optimizer_ssa_rename_variable(optimizer* om, ssa_builder* builder, basic_block** idom)
 {
     size_t num_nodes = om->graph->nodes.num;
-    size_t snti = 0; // stack's next-top idx
-    size_t rnti = 0; // result's next idx
-    basic_block** stack = (basic_block**)malloc_assert(sizeof(basic_block*) * num_nodes);
-    size_t* nc = (size_t*)malloc_assert(sizeof(size_t) * num_nodes); // next-child-to-visit index
-    char* visited = (char*)malloc_assert(sizeof(char) * num_nodes);
+    index_set* domtree_node_children = (index_set*)malloc_assert(sizeof(index_set) * num_nodes);
+    bool* domtree_node_visited = (bool*)malloc_assert(sizeof(bool) * num_nodes);
+    bool domtree_visiting_next;
+    size_t dometree_next;
+    node_walk_stack* dometree_node_stack = NULL;
+    instruction* inst;
 
-    // mark all as not visited at the beginning
-    memset(visited, 0, sizeof(char) * num_nodes);
-    memset(nc, 0, sizeof(size_t) * num_nodes);
-
-    // initialize: from entry node
-    stack[snti++] = om->graph->entry;
-    visited[om->graph->entry->id] = 1;
-
-    // main loop
-    while (snti != 0)
+    // initialize dominator tree
+    for (size_t i = 0; i < num_nodes; i++)
     {
-        // read current top
-        basic_block* cur = stack[snti - 1];
+        init_index_set(&domtree_node_children[i], num_nodes);
+        domtree_node_visited[i] = false;
+    }
 
-        /**
-         * Preorder: name generation on current node
-        */
-        for (instruction* i = cur->inst_first; i != NULL; i = i->next)
+    // construct dominator tree, simply inverse idom array
+    for (size_t i = 0; i < num_nodes; i++)
+    {
+        index_set_add(&domtree_node_children[idom[i]->id], i);
+    }
+
+    // start from entry node
+    dometree_node_stack = node_stack_push(dometree_node_stack, om->graph->entry);
+
+    while (true)
+    {
+        basic_block* bb = node_stack_top(dometree_node_stack);
+
+        // if stack is empty, we are done
+        if (!bb)
         {
-            // order matters here: RHS then LHS
-            i->operand_1->ver = ssa_builder_get_variable_version(om, builder, ref2vardef(i->operand_1));
-            i->operand_2->ver = ssa_builder_get_variable_version(om, builder, ref2vardef(i->operand_2));
-            i->lvalue->ver = ssa_builder_generate_variable_version(om, builder, ref2vardef(i->lvalue), i);
+            break;
         }
 
         /**
-         * Preorder: PHI argument insertion on successor nodes
+         * Pre-order
+         *
+         * if visit of this node is first time, work on SSA
+         * otherwise just skip this part, and do DFS part
         */
-        for (size_t i = 0; i < cur->out.num; i++)
+        if (!domtree_node_visited[bb->id])
         {
-            size_t phi_index = cur->out.arr[i]->to_phi_operand_index;
-
-            for (instruction* sp = cur->out.arr[i]->to->inst_first; sp->op == IROP_PHI; sp = sp->next)
+            // for each x = PHI(...)
+            for (inst = bb->inst_first; inst && inst->op == IROP_PHI; inst = inst->next)
             {
-                optimizer_phi_set_operand(
-                    cur, phi_index, ssa_builder_get_variable_source(om, builder, ref2vardef(sp->lvalue)));
+                ssa_builder_generate_variable_version(om, builder, inst->lvalue, inst);
+            }
+
+            // for each x = y OP z
+            for (inst = bb->inst_first; inst; inst = inst->next)
+            {
+                if (inst->op == IROP_PHI) { continue; }
+
+                // order matters here: RHS then LHS
+                ssa_builder_get_variable_version(om, builder, inst->operand_1);
+                ssa_builder_get_variable_version(om, builder, inst->operand_2);
+                ssa_builder_generate_variable_version(om, builder, inst->lvalue, inst);
+            }
+
+            // PHI argument insertion on successor CFG nodes
+            for (size_t i = 0; i < bb->out.num; i++)
+            {
+                cfg_edge* out = bb->out.arr[i];
+
+                for (instruction* sp = out->to->inst_first; sp && sp->op == IROP_PHI; sp = sp->next)
+                {
+                    sp->operand_phi.arr[out->to_phi_operand_index] =
+                        ssa_builder_get_variable_source(om, builder, ref2vardef(sp->lvalue));
+                }
             }
         }
 
-        // locate next-to-visit child
-        for (size_t* pnc = &nc[cur->id]; *pnc < cur->out.num && visited[cur->out.arr[*pnc]->to->id]; (*pnc)++);
-
-        // traverse next
-        if (nc[cur->id] >= cur->out.num)
+        /**
+         * DFS Walk
+         *
+         * Now current node has been visited
+         * Once reached an unvisited child, push onto stack and start over
+        */
+        domtree_visiting_next = false;
+        domtree_node_visited[bb->id] = true;
+        while (index_set_pop(&domtree_node_children[bb->id], &dometree_next))
         {
-            /**
-             * pop all versions defined in this node
-             *
-             * popping from the last instruction is more semantically correct, but
-             * logically speaking there is no difference
-            */
-            for (instruction* i = cur->inst_first; i != NULL; i = i->next)
+            if (!domtree_node_visited[dometree_next])
             {
-                ssa_builder_pop_variable_version(om, builder, ref2def(i->lvalue));
+                domtree_visiting_next = true;
+                dometree_node_stack = node_stack_push(dometree_node_stack, om->graph->nodes.arr[dometree_next]);
+                break;
+            }
+        }
+
+        /**
+         * DFS Walk
+         *
+         * if no child left, we are done with this node, pop all versions used in this block
+        */
+        if (!domtree_visiting_next)
+        {
+            for (inst = bb->inst_first; inst; inst = inst->next)
+            {
+                ssa_builder_pop_variable_version(om, builder, ref2def(inst->lvalue));
             }
 
-            // pop: when all children are visited
-            snti--;
-        }
-        else
-        {
-            // push: next un-visited element
-            basic_block* next = cur->out.arr[nc[cur->id]]->to;
-
-            stack[snti++] = next;
-            visited[next->id] = 1;
-            nc[cur->id]++;
+            dometree_node_stack = node_stack_pop(dometree_node_stack);
         }
     }
 
     // cleanup
-    free(nc);
-    free(stack);
-    free(visited);
+
+    for (size_t i = 0; i < num_nodes; i++)
+    {
+        release_index_set(&domtree_node_children[i]);
+    }
+
+    free(domtree_node_children);
+    free(domtree_node_visited);
 }
 
 /**
@@ -309,24 +455,31 @@ static void optimizer_ssa_rename_variable(optimizer* om, ssa_builder* builder)
  * 1. Compute DF
  * 2. Place PHI
  * 3. Rename variables
+ *
+ * NOTE: it will repopulate optimizer::variables array
+ * NOTE: it will nullify optimizer::instructions array
 */
 void optimizer_ssa_build(optimizer* om)
 {
     ssa_builder builder;
     basic_block** idom = cfg_idom(om->graph, om->node_postorder);
     index_set* df = cfg_dominance_frontiers(om->graph, idom);
+    size_t v;
 
     // initialize builder
     ssa_builder_init(om, &builder);
 
-    // phi placement for every variable
-    for (size_t v = 0; v < om->profile.num_variables; v++)
+    // prepare global set
+    optimizer_ssa_build_globals(om, &builder);
+
+    // phi placement for every variable in global set
+    while (index_set_pop(&builder.globals, &v))
     {
         optimizer_ssa_place_phi(om, &builder, om->variables[v].ref, df);
     }
 
     // rename variable for each node
-    optimizer_ssa_rename_variable(om, &builder);
+    optimizer_ssa_rename_variable(om, &builder, idom);
 
     // cleanup
     ssa_builder_release(om, &builder);
@@ -338,10 +491,15 @@ void optimizer_ssa_build(optimizer* om)
  * Eliminate SSA instructions
  *
  * The CFG will be cleaned by eliminating all PHI instructions
+ *
+ * NOTE: it will nullify optimizer::instructions array
 */
 void optimizer_ssa_eliminate(optimizer* om)
 {
     size_t num_nodes = om->graph->nodes.num;
+
+    // nullify instruction array due to instruction removal
+    optimizer_invalidate_instructions(om);
 
     for (size_t n = 0; n < num_nodes; n++)
     {
@@ -351,6 +509,7 @@ void optimizer_ssa_eliminate(optimizer* om)
         while (p && p->op == IROP_PHI)
         {
             delete_instruction(instruction_pop_front(b), true);
+            om->profile.num_instructions--;
             p = b->inst_first;
         }
     }
