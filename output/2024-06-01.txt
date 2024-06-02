@@ -1,0 +1,123 @@
+===== COMPILER RUNTIME REPORT =====
+Language version: 1
+Reserved word:
+    count: 50
+    memory: 4824 bytes
+    load factor: 14.16%
+    longest chain: 1
+Expression static data size: 1072 bytes
+Error static data size: 1014 bytes
+===== END OF REPORT =====
+
+File 1: ./test/ssa.txt
+
+===== IMPORTS =====
+count: 0
+memory: 88 bytes
+load factor: 0.00%
+longest chain: 0
+
+===== GLOBAL NAMES =====
+count: 1
+memory: 128 bytes
+load factor: 9.09%
+longest chain: 1
+    SSA_Test: Access: No Modifier
+*       Member Variable Initialization:
+>            Definition Pool: 0 definition(s), 40 byte(s)
+|            node[0] (entry point) <ANY>
+|                [0] [0]: %M4[0] <- (li: null object) IROP_ASN (null)
+|                [0] [1]: %M2[0] <- (li: null object) IROP_ASN (null)
+|                [0] [2]: %M1[0] <- (li: null object) IROP_ASN (null)
+|                [0] [3]: %M3[0] <- (li: null object) IROP_ASN (null)
+|                [0] [4]: %M5[0] <- (li: null object) IROP_ASN (null)
+|                [0] [5]: %M0[0] <- (li: null object) IROP_ASN (null)
+>>>>> 792 bytes: 1/2 nodes, 0/2 edges, 6 instructions
+
+*       Member: 7 member(s)
+            [000001E667FB6A50] y: def member var, order 4, Access: No Modifier, Type: JLT_RWD_INT
+            [000001E667FB6AB0] c: def member var, order 2, Access: No Modifier, Type: JLT_RWD_INT
+            [000001E667FB6B10] b: def member var, order 1, Access: No Modifier, Type: JLT_RWD_INT
+            [000001E667FB7080] d: def member var, order 3, Access: No Modifier, Type: JLT_RWD_INT
+            [000001E667FB6C00] z: def member var, order 5, Access: No Modifier, Type: JLT_RWD_INT
+            [000001E667FB6C90] a: def member var, order 0, Access: No Modifier, Type: JLT_RWD_INT
+            [000001E667FB6C60] ssa: def method, uses 20 member(s), Access: No Modifier, Parameter Count: 0(), Return: JLT_RWD_VOID
+>                Definition Pool: 7 definition(s), 368 byte(s)
+>                    [0](000001E667FB69F0): def temporary var, order 1, Access: No Modifier, Type: (undefined)
+>                    [1](000001E667FBBEB0): def temporary var, order 2, Access: No Modifier, Type: (undefined)
+>                    [2](000001E667FBBF40): def temporary var, order 3, Access: No Modifier, Type: (undefined)
+>                    [3](000001E667FBC180): def temporary var, order 4, Access: No Modifier, Type: (undefined)
+>                    [4](000001E667FBC3C0): def temporary var, order 5, Access: No Modifier, Type: (undefined)
+>                    [5](000001E667FB6BD0): def temporary var, order 6, Access: No Modifier, Type: (undefined)
+>                    [6](000001E667FB7020): def local var, order 0, Access: No Modifier, Type: JLT_RWD_INT
+|                node[0] (entry point) <ANY> -> 1
+|                    [0] [0]: %L0[0] <- (li: 0x1{1}) IROP_ASN (null)
+|                node[1] <ANY> -> 4
+|                    [1] [34]: %L0[1] <- (null) IROP_PHI (null) phi(0, 2)
+|                    [1] [32]: %M3[1] <- (null) IROP_PHI (null) phi(entry, 3)
+|                    [1] [28]: %M2[1] <- (null) IROP_PHI (null) phi(entry, 4)
+|                    [1] [27]: %M1[1] <- (null) IROP_PHI (null) phi(entry, 3)
+|                    [1] [24]: %M0[1] <- (null) IROP_PHI (null) phi(entry, 3)
+|                node[2] <TEST> -> 1(TRUE) -> 3(FALSE)
+|                    [2] [21]: %L6 <- %L0[2] IROP_LE (li: 0x64{100})
+|                    [2] [22]: (null) IROP_TEST (null)
+|                node[3] <RETURN>
+|                    [3] [23]: (null) IROP_RET (null)
+|                node[4] <TEST> -> 5(TRUE) -> 7(FALSE)
+|                    [4] [1]: %M0[2] <- (li: 0x2{2}) IROP_ASN (null)
+|                    [4] [2]: %M2[2] <- (li: 0x3{3}) IROP_ASN (null)
+|                    [4] [3]: %L1 <- %M0[2] IROP_LT %M2[2]
+|                    [4] [4]: (null) IROP_TEST (null)
+|                node[5] <ANY> -> 6
+|                    [5] [5]: %M1[2] <- (li: 0x4{4}) IROP_ASN (null)
+|                    [5] [6]: %M2[3] <- (li: 0x5{5}) IROP_ASN (null)
+|                    [5] [7]: %M3[2] <- (li: 0x6{6}) IROP_ASN (null)
+|                node[6] <ANY> -> 2
+|                    [6] [31]: %M3[3] <- (null) IROP_PHI (null) phi(2, 6)
+|                    [6] [29]: %M2[4] <- (null) IROP_PHI (null) phi(3, 5)
+|                    [6] [26]: %M1[3] <- (null) IROP_PHI (null) phi(2, 4)
+|                    [6] [25]: %M0[3] <- (null) IROP_PHI (null) phi(2, 4)
+|                    [6] [15]: %L3 <- %M0[3] IROP_ADD %M1[3]
+|                    [6] [16]: %M4[1] <- %L3 IROP_ASN (null)
+|                    [6] [17]: %L4 <- %M2[4] IROP_ADD %M3[3]
+|                    [6] [18]: %M5[1] <- %L4 IROP_ASN (null)
+|                    [6] [19]: %L5 <- %L0[1] IROP_ADD (li: 0x1{1})
+|                    [6] [20]: %L0[2] <- %L5 IROP_ASN (null)
+|                node[7] <TEST> -> 8(TRUE) -> 10(FALSE)
+|                    [7] [8]: %M0[4] <- (li: 0x7{7}) IROP_ASN (null)
+|                    [7] [9]: %M3[4] <- (li: 0x8{8}) IROP_ASN (null)
+|                    [7] [10]: %L2 <- %M0[4] IROP_LE %M3[4]
+|                    [7] [11]: (null) IROP_TEST (null)
+|                node[8] <ANY> -> 9
+|                    [8] [12]: %M3[5] <- (li: 0x9{9}) IROP_ASN (null)
+|                node[9] <ANY> -> 6
+|                    [9] [33]: %M3[6] <- (null) IROP_PHI (null) phi(5, 4)
+|                    [9] [30]: %M2[5] <- (null) IROP_PHI (null) phi(2, 6)
+|                    [9] [14]: %M1[4] <- (li: 0xb{11}) IROP_ASN (null)
+|                node[10] <ANY> -> 9
+|                    [10] [13]: %M2[6] <- (li: 0xa{10}) IROP_ASN (null)
+>>>>> 5568 bytes: 11/16 nodes, 13/16 edges, 35 instructions
+
+
+*       Literals: 13 literal(s)
+            [000001E667FB6A80] 1: number, 0x1
+            [000001E667FBC270] 9: number, 0x9
+            [000001E667FBBE20] 7: number, 0x7
+            [000001E667FBC330] 5: number, 0x5
+            [000001E667FBBDC0] 8: number, 0x8
+            [000001E667FB7140] 3: number, 0x3
+            [000001E667FBBFD0] 10: number, 0xa
+            [000001E667FBBFA0] 11: number, 0xb
+            [000001E667FB7050] 2: number, 0x2
+            [000001E667FBC2A0] 100: number, 0x64
+            [000001E667FB6CC0] null: null object
+            [000001E667FBBDF0] 6: number, 0x6
+            [000001E667FBC1B0] 4: number, 0x4
+
+
+===== LOOKUP STACK =====
+(lookup stack is empty)
+
+===== ERROR LOGGER (MAIN STREAM) =====
+(null)
+Press any key to continue . . .
