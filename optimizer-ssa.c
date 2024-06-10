@@ -92,7 +92,7 @@ static void ssa_builder_init(optimizer* om, ssa_builder* builder)
     optimizer_invalidate_variables(om);
     optimizer_populate_variables(om);
 
-    builder->num_nodes = om->graph->nodes.num;
+    builder->num_nodes = om->profile.num_nodes;
     builder->variables = (variable_ssa_info*)malloc_assert(sizeof(variable_ssa_info) * om->profile.num_variables);
 
     init_index_set(&builder->globals, om->profile.num_variables);
@@ -245,32 +245,40 @@ static void optimizer_ssa_build_globals(optimizer* om, ssa_builder* builder)
             if (p->operand_1)
             {
                 d = p->operand_1->def;
-                idx = varmap_varid2idx(om, d);
 
-                if (is_def_user_defined_variable(d) && !index_set_contains(&kill, idx))
+                if (is_def_user_defined_variable(d))
                 {
-                    index_set_add(&builder->globals, idx);
+                    idx = varmap_varid2idx(om, d);
+
+                    if (!index_set_contains(&kill, idx))
+                    {
+                        index_set_add(&builder->globals, idx);
+                    }
                 }
             }
 
             if (p->operand_2)
             {
                 d = p->operand_2->def;
-                idx = varmap_varid2idx(om, d);
 
-                if (is_def_user_defined_variable(d) && !index_set_contains(&kill, idx))
+                if (is_def_user_defined_variable(d))
                 {
-                    index_set_add(&builder->globals, idx);
+                    idx = varmap_varid2idx(om, d);
+
+                    if (!index_set_contains(&kill, idx))
+                    {
+                        index_set_add(&builder->globals, idx);
+                    }
                 }
             }
 
             if (p->lvalue)
             {
                 d = p->lvalue->def;
-                idx = varmap_varid2idx(om, d);
 
                 if (is_def_user_defined_variable(d))
                 {
+                    idx = varmap_varid2idx(om, d);
                     index_set_add(&kill, idx);
                     index_set_add(&builder->variables[idx].blocks, bb->id);
                 }
@@ -332,7 +340,7 @@ static void optimizer_ssa_place_phi(optimizer* om, ssa_builder* builder, definit
 */
 static void optimizer_ssa_rename_variable(optimizer* om, ssa_builder* builder, basic_block** idom)
 {
-    size_t num_nodes = om->graph->nodes.num;
+    size_t num_nodes = om->profile.num_nodes;
     index_set* domtree_node_children = (index_set*)malloc_assert(sizeof(index_set) * num_nodes);
     bool* domtree_node_visited = (bool*)malloc_assert(sizeof(bool) * num_nodes);
     bool domtree_visiting_next;
@@ -496,7 +504,7 @@ void optimizer_ssa_build(optimizer* om)
 */
 void optimizer_ssa_eliminate(optimizer* om)
 {
-    size_t num_nodes = om->graph->nodes.num;
+    size_t num_nodes = om->profile.num_nodes;
 
     // nullify instruction array due to instruction removal
     optimizer_invalidate_instructions(om);

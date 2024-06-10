@@ -60,11 +60,31 @@ static void index_set_match_source_cell_count(index_set* dest, const index_set* 
 */
 void init_index_set_fill(index_set* ixs, size_t upper_bound, bool fill)
 {
-    ixs->n_cell = idx2cidx(upper_bound) + 1;
-    ixs->data = (INDEX_CELL_TYPE*)malloc_assert(sizeof(INDEX_CELL_TYPE) * ixs->n_cell);
+    size_t cell_idx_max = upper_bound / INDEX_CELL_BITS;
+    size_t sz_cells = sizeof(INDEX_CELL_TYPE) * (cell_idx_max + 1);
 
-    // this is important because set is empty by default
-    memset(ixs->data, fill ? 0xFF : 0, sizeof(INDEX_CELL_TYPE) * ixs->n_cell);
+    ixs->n_cell = cell_idx_max + 1;
+    ixs->data = (INDEX_CELL_TYPE*)malloc_assert(sz_cells);
+
+    if (fill)
+    {
+        memset(ixs->data, 0xFF, sz_cells);
+
+        size_t tail_shift = INDEX_CELL_BITS - (upper_bound % INDEX_CELL_BITS);
+
+        // upper bound does not necessarily imply the upper cell is occupied fully
+        // so we need to flip unused bits back to 0 to make iterator work properly
+        if (tail_shift != INDEX_CELL_BITS)
+        {
+            ixs->data[cell_idx_max] >>= tail_shift;
+            ixs->data[cell_idx_max] <<= tail_shift;
+        }
+    }
+    else
+    {
+        // empty set by default
+        memset(ixs->data, 0, sz_cells);
+    }
 }
 
 /**
