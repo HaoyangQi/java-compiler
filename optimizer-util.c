@@ -176,7 +176,7 @@ void optimizer_populate_variables(optimizer* om)
     om->variables = (variable_item*)malloc_assert(sz_variables);
     memset(om->variables, 0, sz_variables);
 
-    for (size_t i = 0; i < om->graph->nodes.num; i++)
+    for (size_t i = 0; i < om->profile.num_nodes; i++)
     {
         basic_block* bb = om->graph->nodes.arr[i];
 
@@ -202,7 +202,7 @@ void optimizer_populate_variables(optimizer* om)
 */
 void optimizer_populate_instructions(optimizer* om)
 {
-    size_t num_nodes = om->graph->nodes.num;
+    size_t num_nodes = om->profile.num_nodes;
     size_t sz_instructions = sizeof(instruction_item) * om->profile.num_instructions;
 
     om->instructions = (instruction_item*)malloc_assert(sz_instructions);

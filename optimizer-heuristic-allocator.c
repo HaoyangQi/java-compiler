@@ -434,7 +434,7 @@ static float allocator_node_spill_cost(heuristic_allocator* allocator, size_t n)
  * WARNING: do NOT update allocator::om::profile because it is useful to safely release
  * old optimizer instance; use allocator::profile instead
 */
-void allocator_spill_code_read(heuristic_allocator* allocator, instruction* target, const variable_item* var_item)
+static void allocator_spill_code_read(heuristic_allocator* allocator, instruction* target, const variable_item* var_item)
 {
     definition* var = var_item->ref;
 
@@ -487,7 +487,7 @@ void allocator_spill_code_read(heuristic_allocator* allocator, instruction* targ
  * WARNING: do NOT update allocator::om::profile because it is useful to safely release
  * old optimizer instance; use allocator::profile instead
 */
-void allocator_spill_code_write(heuristic_allocator* allocator, instruction* target, const variable_item* var_item)
+static void allocator_spill_code_write(heuristic_allocator* allocator, instruction* target, const variable_item* var_item)
 {
     definition* var = var_item->ref;
 
@@ -512,6 +512,9 @@ void allocator_spill_code_write(heuristic_allocator* allocator, instruction* tar
 
 /**
  * Build Stage
+ *
+ * TODO: live-in AND live-out needed?
+ * (see: https://web.stanford.edu/class/archive/cs/cs143/cs143.1128/lectures/17/Slides17.pdf, page 130)
  *
  * Build inteference graph, and detect move-related variables
  * This stage is very expensive
@@ -845,7 +848,7 @@ static void optimizer_allocator_select(heuristic_allocator* allocator)
     // spill the variable
     if (allocator->state == ALLOCATOR_STATE_BUILD)
     {
-        size_t num_nodes = allocator->om->graph->nodes.num;
+        size_t num_nodes = allocator->om->profile.num_nodes;
         variable_item* var_spilled = &allocator->om->variables[varmap_lid2idx(allocator->om, frame->node)];
 
         // assign stack index, later in backend this index will be translated into offset

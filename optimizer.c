@@ -51,13 +51,15 @@ void optimizer_attach(optimizer* om, global_top_level* top_level, definition* ta
             om->node_postorder = cfg_node_order(om->graph, DFS_POSTORDER);
 
             /**
-             * NOTE:
+             * Fill Optimizer Profile
              *
+             * NOTE:
              * om->profile.num_members counts total number of member variables
              * on top level, instead of target->method->member_variable_use_count,
              * because the index id "mid" is used to index variables, so all
              * slots need to be reserved
             */
+            om->profile.num_nodes = om->graph->nodes.num;
             om->profile.num_locals = target->method->local_variables.num;
             om->profile.num_members = top_level->num_fields;
             om->profile.num_variables = om->profile.num_members + om->profile.num_locals;
@@ -66,6 +68,37 @@ void optimizer_attach(optimizer* om, global_top_level* top_level, definition* ta
         default:
             // halt if target is invalid
             return;
+    }
+
+    /**
+     * This loop guarantees every node has at least one instruction
+     *
+     * this aid helps to build clean algorithm in optimizer, as an example,
+     * liveness analysis, and any other algorithms that require to access
+     * neighbors of instruction along control flow, will be built in cleaner
+     * way based on this assumption.
+     *
+     * node order does not matter here
+    */
+    for (size_t i = 0; i < om->profile.num_nodes; i++)
+    {
+        basic_block* n = om->node_postorder[i];
+
+        // if node is empty, insert a placeholder
+        // it contribute to no logical meaning, but it is still an "instruction"
+        // so algorithms can reference it when necessary
+        if (!n->inst_first)
+        {
+            instruction* inst = new_instruction();
+
+            // prepare instruction
+            inst->op = IROP_NOOP;
+            inst->node = n;
+            instruction_insert(n, NULL, inst);
+
+            // update profile
+            om->profile.num_instructions++;
+        }
     }
 }
 
@@ -101,7 +134,9 @@ void optimizer_execute(optimizer* om)
     */
 
     // SSA end
-    // optimizer_ssa_eliminate(om);
+    optimizer_ssa_eliminate(om);
 
+    // register allocation
     // optimizer_allocator_heuristic(om, 4);
+    optimizer_allocator_linear(om, 4);
 }

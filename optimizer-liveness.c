@@ -1,7 +1,7 @@
 #include "optimizer.h"
 
 /**
- * TODO:Liveness Analysis
+ * Liveness Analysis
  *
  * It will fill the following data in optimizer object:
  * 1. in
@@ -14,14 +14,14 @@
  * out(n): union in(m), m is every successor of n
  * in(n): (out(n) - kill(n)) union gen(n)
  *
- * TODO:for def and use fill, we need to figure out how to handle
- * notes that is empty (hence no instruction)
- * => we can also create array map on nodes level for def and use
- * => anything simpler than this?
+ * NOTE:
+ * This algorithm works based on assumption that makes sure
+ * every node in CFG has at least one instruction. See
+ * optimizer_attach() on how it fulfills this assumption
 */
 void optimizer_liveness_analyze(optimizer* om)
 {
-    size_t num_nodes = om->graph->nodes.num;
+    size_t num_nodes = om->profile.num_nodes;
     size_t idx;
     index_set worklist;
 
@@ -55,6 +55,7 @@ void optimizer_liveness_analyze(optimizer* om)
         else
         {
             n = s->node;
+
             for (size_t i = 0; i < n->out.num; i++)
             {
                 index_set_union(live_out, &om->instructions[n->out.arr[i]->to->inst_first->id].in);
@@ -78,7 +79,7 @@ void optimizer_liveness_analyze(optimizer* om)
             else
             {
                 n = s->node;
-                for (size_t i = 0; i < n->out.num; i++)
+                for (size_t i = 0; i < n->in.num; i++)
                 {
                     index_set_add(&worklist, n->in.arr[i]->from->inst_last->id);
                 }

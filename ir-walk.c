@@ -625,7 +625,6 @@ static reference* walk_operand(java_ir* ir, tree_node* base)
  * Expression AST Walk
  *
  * it returns a variable definition that stores final result
- * it also returns reference type through parameter
  *
  * node (root of expression): JNT_EXPRESSION | JNT_PRIMARY
 */
@@ -779,7 +778,8 @@ static definition* walk_expression(java_ir* ir, tree_node* root)
                 execute_irop_instruction(ir, TSW(ir), IROP_ASN, &tmp_var, &operand_value, NULL);
 
                 // add TEST code on tmp_var
-                execute_irop_instruction_simple(ir, TSW(ir), IROP_TEST);
+                tmp_var = new_reference(IR_ASN_REF_DEFINITION, execution_stack->var_return);
+                execute_irop_instruction(ir, TSW(ir), IROP_TEST, NULL, &tmp_var, NULL);
 
                 // short-circuit: if first condition implies entire condition, it is done
                 cfg_worker_next_outbound_strategy(
@@ -816,7 +816,8 @@ static definition* walk_expression(java_ir* ir, tree_node* root)
                 execute_irop_instruction(ir, TSW(ir), IROP_ASN, &tmp_var, &operand_value, NULL);
 
                 // add TEST code on tmp_var
-                execute_irop_instruction_simple(ir, TSW(ir), IROP_TEST);
+                tmp_var = new_reference(IR_ASN_REF_DEFINITION, execution_stack->var_return);
+                execute_irop_instruction(ir, TSW(ir), IROP_TEST, NULL, &tmp_var, NULL);
 
                 // jump along TRUE branch into new block
                 cfg_worker_next_outbound_strategy(TSW(ir), EDGE_TRUE);
@@ -1055,15 +1056,16 @@ static void __execute_statement_if(java_ir* ir, tree_node* stmt)
 {
     basic_block* test;
     basic_block* phi;
+    reference* var_expr_condition;
 
     // Expression
     stmt = stmt->first_child;
 
     // parse condition
-    walk_expression(ir, stmt);
+    var_expr_condition = new_reference(IR_ASN_REF_DEFINITION, walk_expression(ir, stmt));
 
     // mark block as a test block
-    execute_irop_instruction_simple(ir, TSW(ir), IROP_TEST);
+    execute_irop_instruction(ir, TSW(ir), IROP_TEST, NULL, &var_expr_condition, NULL);
 
     // mark test node
     test = cfg_worker_current_block(TSW(ir));
@@ -1142,6 +1144,7 @@ static void __execute_statement_variable_declaration(java_ir* ir, tree_node* stm
 static void __execute_statement_while(java_ir* ir, tree_node* stmt)
 {
     statement_context* sc = push_statement_context(ir, SCQ_LOOP);
+    reference* var_expr_condition;
 
     cfg_worker_start_loop(TSW(ir));
 
@@ -1159,11 +1162,11 @@ static void __execute_statement_while(java_ir* ir, tree_node* stmt)
 
     // parse condition
     stmt = stmt->first_child;
-    walk_expression(ir, stmt);
+    var_expr_condition = new_reference(IR_ASN_REF_DEFINITION, walk_expression(ir, stmt));
     sc->_test = cfg_worker_current_block(TSW(ir));
 
     // mark test block
-    execute_irop_instruction_simple(ir, TSW(ir), IROP_TEST);
+    execute_irop_instruction(ir, TSW(ir), IROP_TEST, NULL, &var_expr_condition, NULL);
 
     /**
      * prepare break point first
@@ -1234,6 +1237,7 @@ static void __execute_statement_do(java_ir* ir, tree_node* stmt)
 {
     statement_context* sc = push_statement_context(ir, SCQ_LOOP);
     basic_block* body;
+    reference* var_expr_condition;
 
     cfg_worker_start_loop(TSW(ir));
 
@@ -1291,8 +1295,8 @@ static void __execute_statement_do(java_ir* ir, tree_node* stmt)
     cfg_worker_jump(TSW(ir), body, false, true);
 
     // parse condition
-    walk_expression(ir, stmt->next_sibling);
-    execute_irop_instruction_simple(ir, TSW(ir), IROP_TEST);
+    var_expr_condition = new_reference(IR_ASN_REF_DEFINITION, walk_expression(ir, stmt->next_sibling));
+    execute_irop_instruction(ir, TSW(ir), IROP_TEST, NULL, &var_expr_condition, NULL);
 
     // connect end of expression to break point then stop there
     cfg_worker_next_outbound_strategy(TSW(ir), EDGE_FALSE);
@@ -1326,6 +1330,7 @@ static void __execute_statement_for(java_ir* ir, tree_node* stmt)
 {
     statement_context* sc = push_statement_context(ir, SCQ_LOOP);
     basic_block* test_expr_start; // loop-back node (NOT continue point!)
+    reference* var_expr_condition = NULL;
 
     cfg_worker_start_loop(TSW(ir));
 
@@ -1360,13 +1365,13 @@ static void __execute_statement_for(java_ir* ir, tree_node* stmt)
     // for condition
     if (stmt->type == JNT_EXPRESSION || stmt->type == JNT_PRIMARY)
     {
-        walk_expression(ir, stmt);
+        var_expr_condition = new_reference(IR_ASN_REF_DEFINITION, walk_expression(ir, stmt));
         stmt = stmt->next_sibling;
     }
 
     // mark, also makes sure that this node is not empty
     // so that body can stays isolated
-    execute_irop_instruction_simple(ir, TSW(ir), IROP_TEST);
+    execute_irop_instruction(ir, TSW(ir), IROP_TEST, NULL, &var_expr_condition, NULL);
 
     // must get this after condition because 
     // expression may be expanded

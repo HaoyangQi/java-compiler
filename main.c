@@ -22,7 +22,8 @@ static char* test_paths[] = {
 
     // "./test/simple.txt",
     // "./test/il.txt",
-    "./test/ssa.txt",
+    // "./test/ssa.txt",
+    "./test/reg-alloc-1.txt",
 
     // "./test/general-no-block-and-statement.txt",
 

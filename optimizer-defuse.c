@@ -15,7 +15,7 @@
 */
 void optimizer_defuse_analyze(optimizer* om)
 {
-    size_t num_nodes = om->graph->nodes.num;
+    size_t num_nodes = om->profile.num_nodes;
 
     for (size_t i = 0; i < om->profile.num_instructions; i++)
     {

@@ -77,6 +77,85 @@ typedef struct _linear_scan_allocator
     size_t active_count;
 } linear_scan_allocator;
 
+static void __debug_print_interval(const live_interval* interval)
+{
+    printf("(%zd, %zd), %s, active order: %zd, alloc: %zd\n",
+        interval->start,
+        interval->end,
+        interval->spilled ? "spilled" : "not spilled",
+        interval->active_order,
+        interval->spilled ? interval->alloc.stack : interval->alloc.reg
+    );
+}
+
+static void __debug_print_linear_allocator(const linear_scan_allocator* allocator)
+{
+    printf("\n===== LINEAR ALLOCATOR INFO =====\n");
+
+    printf("Registers: ");
+    for (size_t i = 0; i < allocator->num_registers; i++)
+    {
+        printf("%d ", allocator->register_occupied[i]);
+    }
+    printf("\n");
+
+    printf("Liveness:\n");
+    for (size_t i = 0; i < allocator->om->profile.num_instructions; i++)
+    {
+        size_t* buf = (size_t*)malloc_assert(sizeof(size_t) * allocator->om->profile.num_variables);
+        size_t n;
+
+        printf("[%zd]: live-in: ", i);
+        n = index_set_to_array(&allocator->om->instructions[i].in, buf);
+        printf("{");
+        for (size_t j = 0; j < n; j++)
+        {
+            if (j > 0) { printf(", "); }
+
+            printf("%zd", buf[j]);
+        }
+        printf("}");
+
+        printf(", live-out: ");
+        n = index_set_to_array(&allocator->om->instructions[i].out, buf);
+        printf("{");
+        for (size_t j = 0; j < n; j++)
+        {
+            if (j > 0) { printf(", "); }
+
+            printf("%zd", buf[j]);
+        }
+        printf("}\n");
+
+        free(buf);
+    }
+
+    printf("Number of variables using stack: %zd\n", allocator->num_on_stack);
+
+    printf("Invervals: \n");
+    for (size_t i = 0; i < allocator->num_intervals; i++)
+    {
+        printf("[%zd]: ", i);
+        __debug_print_interval(&allocator->intervals[i]);
+    }
+
+    printf("Invervals In Scan Order (Inc, Start): \n");
+    for (size_t i = 0; i < allocator->num_intervals; i++)
+    {
+        printf("--- Local Var %zd: ", allocator->scan_order[i]);
+        __debug_print_interval(&allocator->intervals[allocator->scan_order[i]]);
+    }
+
+    printf("Invervals In Active Order (Inc, End): \n");
+    for (size_t i = 0; i < allocator->num_intervals; i++)
+    {
+        printf("%s Local Var %zd: ", allocator->active[i] ? "[.]" : "[ ]", allocator->active_order[i]);
+        __debug_print_interval(&allocator->intervals[allocator->active_order[i]]);
+    }
+
+    printf("\n");
+}
+
 /**
  * allocate a register from the pool
  *
@@ -127,9 +206,24 @@ static void active_interval_remove(linear_scan_allocator* allocator, size_t idx_
     allocator->active_count--;
 }
 
-static void delete_intervals(live_interval* intervals)
+/**
+ * Initialize Range data of interval object to mark it as "uninitialized"
+ *
+ * It sets start location to a max value that it can never reach
+*/
+static void interval_range_data_init(linear_scan_allocator* allocator, live_interval* interval)
 {
-    free(intervals);
+    interval->start = allocator->om->profile.num_instructions;
+}
+
+/**
+ * Check if an interval is valid
+ *
+ * Based on interval_init, this condition is sufficient
+*/
+static bool interval_valid(const linear_scan_allocator* allocator, const live_interval* interval)
+{
+    return interval->start < allocator->om->profile.num_instructions;
 }
 
 static void interval_assign_register(live_interval* interval, size_t reg)
@@ -148,23 +242,17 @@ static void interval_assign_stack_location(live_interval* interval, size_t loc)
  * compare intervals
  *
  * it returns true if order a->b matches program
+ * it uses equality bound "<=" to make original order stable
  *
  * (default: INTERVAL_SORT_DECREASE | INTERVAL_SORT_END)
 */
 static bool interval_compare(const live_interval* a, const live_interval* b, interval_sort program)
 {
-    bool sinc = a->start < b->start;
-    bool einc = a->end < b->end;
+    bool sinc = a->start <= b->start;
+    bool einc = a->end <= b->end;
     bool prog_inc = (program & INTERVAL_SORT_INCREASE) ? true : false;
 
     return (program & INTERVAL_SORT_START) ? (prog_inc == sinc) : (prog_inc == einc);
-}
-
-static void index_swap(size_t* a, size_t* b)
-{
-    size_t tmp = *b;
-    *b = *a;
-    *a = tmp;
 }
 
 /**
@@ -174,14 +262,13 @@ static void index_swap(size_t* a, size_t* b)
 */
 static void sort_intervals_internal(size_t* arr, size_t* buf, size_t from, size_t len, const live_interval* interval, interval_sort program)
 {
-    size_t to = from + len - 1;
+    size_t to = len == 0 ? from : (from + len - 1);
     size_t len_half = len / 2;
     size_t div_from[2] = { from, from + len_half };
     size_t div_len[2] = { len_half, len - len_half };
     size_t i = from;
-    size_t v0, v1;
 
-    switch (len - from)
+    switch (len)
     {
         case 0:
         case 1:
@@ -191,7 +278,10 @@ static void sort_intervals_internal(size_t* arr, size_t* buf, size_t from, size_
             // minimum case: swap once
             if (!interval_compare(&interval[arr[from]], &interval[arr[to]], program))
             {
-                index_swap(&arr[from], &arr[to]);
+                size_t tmp = arr[from];
+
+                arr[from] = arr[to];
+                arr[to] = tmp;
             }
             break;
         default:
@@ -199,35 +289,29 @@ static void sort_intervals_internal(size_t* arr, size_t* buf, size_t from, size_
             sort_intervals_internal(arr, buf, div_from[1], div_len[1], interval, program);
 
             // fill
-            while (true)
+            while (div_len[0] || div_len[1])
             {
-                if (div_len[0])
+                if (div_len[0] && div_len[1])
                 {
-                    v0 = arr[div_from[0]];
+                    size_t v0 = arr[div_from[0]];
+                    size_t v1 = arr[div_from[1]];
 
-                    if (div_len[1])
+                    if (interval_compare(&interval[v0], &interval[v1], program))
                     {
-                        v1 = arr[div_from[1]];
-
-                        if (interval_compare(&interval[v0], &interval[v1], program))
-                        {
-                            buf[i++] = v0;
-                            buf[i++] = v1;
-                        }
-                        else
-                        {
-                            buf[i++] = v1;
-                            buf[i++] = v0;
-                        }
-
-                        div_from[1]++;
-                        div_len[1]--;
+                        buf[i++] = v0;
+                        div_from[0]++;
+                        div_len[0]--;
                     }
                     else
                     {
-                        buf[i++] = v0;
+                        buf[i++] = v1;
+                        div_from[1]++;
+                        div_len[1]--;
                     }
-
+                }
+                else if (div_len[0])
+                {
+                    buf[i++] = arr[div_from[0]];
                     div_from[0]++;
                     div_len[0]--;
                 }
@@ -237,14 +321,9 @@ static void sort_intervals_internal(size_t* arr, size_t* buf, size_t from, size_
                     div_from[1]++;
                     div_len[1]--;
                 }
-                else
-                {
-                    break;
-                }
             }
 
             memcpy(arr + from, buf + from, sizeof(size_t) * len);
-            free(buf);
             break;
     }
 }
@@ -264,6 +343,7 @@ static size_t* sort_intervals(live_interval* interval, size_t count, interval_so
     }
 
     sort_intervals_internal(r, buf, 0, count, interval, program);
+    free(buf);
 
     return r;
 }
@@ -285,16 +365,19 @@ static void live_set_to_interval(linear_scan_allocator* allocator, index_set* li
         {
             n = varmap_idx2lid(allocator->om, n);
 
-            if (first)
+            if (!interval_valid(allocator, &allocator->intervals[n]))
             {
-                first = false;
+                // if first set, fill both
                 allocator->intervals[n].start = inst_id;
                 allocator->intervals[n].end = inst_id;
             }
-            else
+            else if (inst_id < allocator->intervals[n].start)
             {
-                allocator->intervals[n].start = min(allocator->intervals[n].start, inst_id);
-                allocator->intervals[n].end = max(allocator->intervals[n].end, inst_id);
+                allocator->intervals[n].start = inst_id;
+            }
+            else if (inst_id > allocator->intervals[n].end)
+            {
+                allocator->intervals[n].end = inst_id;
             }
         }
 
@@ -306,25 +389,56 @@ static void live_set_to_interval(linear_scan_allocator* allocator, index_set* li
 
 static void init_linear_scan_allocator(optimizer* om, linear_scan_allocator* allocator, size_t num_registers)
 {
+    // nothing to work on, then work nothing
+    if (om->profile.num_instructions == 0) { return; }
+
+    /**
+     * Build Optimizer Data
+     *
+     * It uses a simple NULL check since this allocator does not
+     * change CFG, so it simply relies on whatever optimizer holds
+     *
+     * If there is no data, allocator will create it
+    */
+    if (!om->variables) { optimizer_populate_variables(om); }
+    if (!om->instructions) { optimizer_populate_instructions(om); }
+
+    // facts needed
+    optimizer_defuse_analyze(om);
+    optimizer_liveness_analyze(om);
+
     size_t num_intervals = om->profile.num_locals;
     size_t sz_intervals = sizeof(live_interval) * num_intervals;
+    size_t sz_byte_intervals = sizeof(byte) * num_intervals;
 
     allocator->om = om;
     allocator->num_intervals = num_intervals;
     allocator->num_registers = num_registers;
     allocator->num_on_stack = 0;
-    allocator->register_occupied = (byte*)malloc_assert(sizeof(byte) * num_intervals);
+    allocator->register_occupied = (byte*)malloc_assert(sz_byte_intervals);
     allocator->intervals = (live_interval*)malloc_assert(sz_intervals);
-    allocator->active = (byte*)malloc_assert(sizeof(byte) * num_intervals);
+    allocator->active = (byte*)malloc_assert(sz_byte_intervals);
     allocator->active_count = 0;
 
-    // initialize intervals
+    // initizlize data
+    memset(allocator->register_occupied, 0, sz_byte_intervals);
     memset(allocator->intervals, 0, sz_intervals);
+    memset(allocator->active, 0, sz_byte_intervals);
+
+    // fill initial interval range data 
+    // start point need to be max value by default, end point needs to be 0 by default
+    for (size_t i = 0; i < num_intervals; i++)
+    {
+        interval_range_data_init(allocator, &allocator->intervals[i]);
+    }
 
     // fill intervals
     for (size_t i = 0; i < om->profile.num_instructions; i++)
     {
-        live_set_to_interval(allocator, &om->instructions[i].in, i);
+        /**
+         * TODO: need live-in?
+        */
+        // live_set_to_interval(allocator, &om->instructions[i].in, i);
         live_set_to_interval(allocator, &om->instructions[i].out, i);
     }
 
@@ -341,11 +455,11 @@ static void init_linear_scan_allocator(optimizer* om, linear_scan_allocator* all
 
 static void release_linear_scan_allocator(linear_scan_allocator* allocator)
 {
-    delete_intervals(allocator->intervals);
+    free(allocator->intervals);
     free(allocator->scan_order);
     free(allocator->active_order);
-    free(&allocator->register_occupied);
-    free(&allocator->active);
+    free(allocator->register_occupied);
+    free(allocator->active);
 }
 
 /**
@@ -400,18 +514,39 @@ static void linear_scan_spill(linear_scan_allocator* allocator, size_t idx_inter
     }
 }
 
+/**
+ * Linear Scan Register Allocator
+*/
 void optimizer_allocator_linear(optimizer* om, size_t num_avail_registers)
 {
     linear_scan_allocator allocator;
 
     // init allocator
     init_linear_scan_allocator(om, &allocator, num_avail_registers);
+    __debug_print_linear_allocator(&allocator);
 
     // main loop
     for (size_t i = 0; i < allocator.num_intervals; i++)
     {
         size_t idx_current_interval = allocator.scan_order[i];
         live_interval* in = &allocator.intervals[idx_current_interval];
+
+        // ignore invalid interval
+        if (!interval_valid(&allocator, in))
+        {
+            definition* var = om->variables[varmap_lid2idx(om, idx_current_interval)].ref;
+
+            if (is_def_user_defined_variable(var))
+            {
+                fprintf(stderr, "TODO warning: unused variable: lid=%zd\n", var->lid);
+            }
+            else
+            {
+                fprintf(stderr, "TODO info: variable lid=%zd has uninitialized interval.\n", var->lid);
+            }
+
+            continue;
+        }
 
         linear_scan_expire(&allocator, idx_current_interval);
 
@@ -434,9 +569,17 @@ void optimizer_allocator_linear(optimizer* om, size_t num_avail_registers)
         variable_item* var = &om->variables[varmap_lid2idx(om, i)];
         live_interval* in = &allocator.intervals[i];
 
-        var->alloc_type = in->spilled ? VAR_ALLOC_STACK : VAR_ALLOC_REGISTER;
-        var->alloc_loc = in->spilled ? in->alloc.stack : in->alloc.reg;
+        if (interval_valid(&allocator, in))
+        {
+            var->alloc_type = in->spilled ? VAR_ALLOC_STACK : VAR_ALLOC_REGISTER;
+            var->alloc_loc = in->spilled ? in->alloc.stack : in->alloc.reg;
+        }
+        else
+        {
+            var->alloc_type = VAR_ALLOC_UNDEFINED;
+        }
     }
 
+    __debug_print_linear_allocator(&allocator);
     release_linear_scan_allocator(&allocator);
 }

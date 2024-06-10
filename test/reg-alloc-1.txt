@@ -1,0 +1,28 @@
+// example: https://web.stanford.edu/class/archive/cs/cs143/cs143.1128/lectures/17/Slides17.pdf, page 64
+// 4-register linear allocation result should match page 79 (ignore temp vars, match reg number to each color)
+class LinearAllocatorTest
+{
+    void allocator()
+    {
+        int a,b,c,d,e,f,g;
+
+        e = d + a;
+        f = b + c;
+        f = f + b;
+
+        if (e == 0)
+        {
+            d = e - f;
+        }
+        else
+        {
+            d = e + f;
+        }
+
+        g = d;
+
+        // this is inserted to "use" variable "g"
+        // comment this to see "unused variable warning"
+        return g;
+    }
+}

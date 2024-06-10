@@ -6,8 +6,16 @@
 #include "ir.h"
 #include "index-set.h"
 
+/**
+ * Variable Allocation Type
+ *
+ * VAR_ALLOC_UNDEFINED:
+ * when a variable is detected by optimizer such that it can be optimized out
+ * somehow, then allocation info is undefined
+*/
 typedef enum _variable_allocation_type
 {
+    VAR_ALLOC_UNDEFINED = 0,
     VAR_ALLOC_REGISTER,
     VAR_ALLOC_STACK,
 } variable_allocation_type;
@@ -32,6 +40,7 @@ typedef struct _instruction_item
 
 typedef struct _optimizer_profile
 {
+    size_t num_nodes;
     size_t num_members;
     size_t num_locals;
     size_t num_variables;
@@ -103,9 +112,9 @@ void optimizer_profile_copy(optimizer* om, optimizer_profile* profile);
 void optimizer_profile_apply(optimizer* om, optimizer_profile* profile);
 
 void optimizer_defuse_analyze(optimizer* om);
+void optimizer_liveness_analyze(optimizer* om);
 void optimizer_ssa_build(optimizer* om);
 void optimizer_ssa_eliminate(optimizer* om);
-void optimizer_liveness_analyze(optimizer* om);
 void optimizer_allocator_heuristic(optimizer* om, size_t num_avail_registers);
 void optimizer_allocator_linear(optimizer* om, size_t num_avail_registers);
 
