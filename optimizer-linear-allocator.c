@@ -79,11 +79,11 @@ typedef struct _linear_scan_allocator
 
 static void __debug_print_interval(const live_interval* interval)
 {
-    printf("(%zd, %zd), %s, active order: %zd, alloc: %zd\n",
+    printf("(%zd, %zd), active order: %zd, alloc: %c%zd\n",
         interval->start,
         interval->end,
-        interval->spilled ? "spilled" : "not spilled",
         interval->active_order,
+        interval->spilled ? 's' : 'r',
         interval->spilled ? interval->alloc.stack : interval->alloc.reg
     );
 }
@@ -435,10 +435,7 @@ static void init_linear_scan_allocator(optimizer* om, linear_scan_allocator* all
     // fill intervals
     for (size_t i = 0; i < om->profile.num_instructions; i++)
     {
-        /**
-         * TODO: need live-in?
-        */
-        // live_set_to_interval(allocator, &om->instructions[i].in, i);
+        live_set_to_interval(allocator, &om->instructions[i].in, i);
         live_set_to_interval(allocator, &om->instructions[i].out, i);
     }
 

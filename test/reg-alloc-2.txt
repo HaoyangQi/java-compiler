@@ -1,0 +1,23 @@
+// example: https://groups.seas.harvard.edu/courses/cs153/2019fa/lectures/Lec22-Reg-alloc-ctd.pdf, page 28
+class RegisterAllocatorTest
+{
+    void allocator(int b, int c, int d, int e, int f, int g, int h, int m)
+    {
+        int j,k;
+
+        g = j + 12;
+        h = k - 1;
+        f = g * h;
+        e = j + 8;
+        m = j + 16;
+        b = f + 0;
+        c = e + 8;
+        d = c;
+        k = m + 4;
+        j = b;
+
+        // this is inserted to "use" variables
+        // comment this to see "unused variable warning"
+        return d + j + k;
+    }
+}
