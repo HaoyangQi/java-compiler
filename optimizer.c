@@ -137,6 +137,6 @@ void optimizer_execute(optimizer* om)
     optimizer_ssa_eliminate(om);
 
     // register allocation
-    // optimizer_allocator_heuristic(om, 4);
-    optimizer_allocator_linear(om, 4);
+    optimizer_allocator_heuristic(om, 4);
+    // optimizer_allocator_linear(om, 4);
 }

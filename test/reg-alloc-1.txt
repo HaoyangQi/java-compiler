@@ -1,7 +1,9 @@
 // example: https://web.stanford.edu/class/archive/cs/cs143/cs143.1128/lectures/17/Slides17.pdf, page 64
-// 4-register linear allocation result should match page 79 (ignore temp vars, match reg number to each color)
-class LinearAllocatorTest
+class RegisterAllocatorTest
 {
+    short m1, m2;
+    int n3;
+
     void allocator()
     {
         int a,b,c,d,e,f,g;

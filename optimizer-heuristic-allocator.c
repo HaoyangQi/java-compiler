@@ -56,6 +56,17 @@ typedef ig_cell* ig_row;
 typedef ig_row* ig_matrix;
 
 /**
+ * Node's Color State
+*/
+typedef struct _ig_node_color_state
+{
+    // #color remained for this node
+    size_t num_color_available;
+    // use status for each color, 1 means occupied, 0 means available
+    byte* colors;
+} ig_node_color_state;
+
+/**
  * Interference Graph
  *
  * it is an N x N byte matrix, where:
@@ -81,6 +92,9 @@ typedef struct _interference_graph
     // track if a node exists in graph IG_BIT_PLANE_MUTABLE
     // (because deg=0 does not imply the node is not in graph)
     byte* mutable_nodes;
+
+    // color state for each node
+    ig_node_color_state* color_state;
 } interference_graph;
 
 /**
@@ -108,13 +122,115 @@ typedef struct _heuristic_allocator
     color_stack_frame* color_stack;
 } heuristic_allocator;
 
-static void ig_init(interference_graph* ig, size_t n)
+static void __debug_print_interference_graph_plane(const interference_graph* ig, interference_graph_plane plane)
+{
+    switch (plane)
+    {
+        case IG_BIT_PLANE_MUTABLE:
+            printf("IG Plane: IG_BIT_PLANE_MUTABLE\n");
+            break;
+        case IG_BIT_PLANE_FULL:
+            printf("IG Plane: IG_BIT_PLANE_FULL\n");
+            break;
+        case IG_BIT_PLANE_MOVE_RELATED:
+            printf("IG Plane: IG_BIT_PLANE_MOVE_RELATED\n");
+            break;
+        case IG_BIT_PLANE_COALESCE:
+            printf("IG Plane: IG_BIT_PLANE_COALESCE\n");
+            break;
+        default:
+            printf("IG Plane: (unknown: 0x%02x)", plane);
+            return;
+    }
+
+    for (size_t i = 0; i < ig->dim; i++)
+    {
+        printf("%zd -> {", i);
+
+        for (size_t j = 0, k = 0; j < ig->dim; j++)
+        {
+            if (ig->matrix[i][j] & plane)
+            {
+                if (k) { printf(", "); }
+                printf("%zd", j);
+                k = 1;
+            }
+        }
+
+        printf("}\n");
+    }
+}
+
+static void __debug_print_heuristic_allocator(heuristic_allocator* allocator)
+{
+    interference_graph* ig = &allocator->ig;
+
+    printf("\n===== GRAPH COLORING ALLOCATOR INFO =====\n");
+
+    printf("No. Registers: %zd\nNo. Spilled: %zd\nGraph Dimension: %zd\n",
+        allocator->num_registers,
+        allocator->num_spilled,
+        ig->dim
+    );
+
+    __debug_print_interference_graph_plane(ig, IG_BIT_PLANE_MUTABLE);
+    __debug_print_interference_graph_plane(ig, IG_BIT_PLANE_FULL);
+    __debug_print_interference_graph_plane(ig, IG_BIT_PLANE_MOVE_RELATED);
+    __debug_print_interference_graph_plane(ig, IG_BIT_PLANE_COALESCE);
+
+    printf("IG_BIT_PLANE_MUTABLE node degree:\n");
+    for (size_t i = 0; i < ig->dim; i++)
+    {
+        printf("%zd ", ig->deg_graph[i]);
+    }
+    printf("\n");
+
+    printf("IG_BIT_PLANE_MOVE_RELATED node degree:\n");
+    for (size_t i = 0; i < ig->dim; i++)
+    {
+        printf("%zd ", ig->deg_move[i]);
+    }
+    printf("\n");
+
+    printf("IG_BIT_PLANE_MUTABLE node existence:\n");
+    for (size_t i = 0; i < ig->dim; i++)
+    {
+        printf("%d ", (int)(ig->mutable_nodes[i]));
+    }
+    printf("\n");
+
+    printf("Color Result:\n");
+    for (size_t i = 0; i < ig->dim; i++)
+    {
+        variable_item* v = &allocator->om->variables[varmap_lid2idx(allocator->om, i)];
+
+        switch (v->alloc_type)
+        {
+            case VAR_ALLOC_UNDEFINED:
+                printf("_, ");
+                break;
+            case VAR_ALLOC_STACK:
+                printf("s%zd, ", v->alloc_loc);
+                break;
+            case VAR_ALLOC_REGISTER:
+                printf("r%zd, ", v->alloc_loc);
+                break;
+            default:
+                printf("?, ");
+                break;
+        }
+    }
+    printf("\n");
+}
+
+static void ig_init(interference_graph* ig, size_t n, size_t num_registers)
 {
     ig->dim = n;
     ig->matrix = (ig_matrix)malloc_assert(sizeof(ig_row) * n);
     ig->deg_graph = (size_t*)malloc_assert(sizeof(size_t) * n);
     ig->deg_move = (size_t*)malloc_assert(sizeof(size_t) * n);
     ig->mutable_nodes = (byte*)malloc_assert(sizeof(byte) * n);
+    ig->color_state = (ig_node_color_state*)malloc_assert(sizeof(ig_node_color_state) * n);
 
     for (size_t i = 0; i < n; i++)
     {
@@ -122,8 +238,11 @@ static void ig_init(interference_graph* ig, size_t n)
         ig->deg_move[i] = 0;
         ig->matrix[i] = (ig_row)malloc_assert(sizeof(ig_cell) * n);
         ig->mutable_nodes[i] = 0;
+        ig->color_state[i].num_color_available = num_registers;
+        ig->color_state[i].colors = (byte*)malloc_assert(sizeof(byte) * num_registers);
 
         memset(ig->matrix[i], 0, sizeof(ig_cell) * n);
+        memset(ig->color_state[i].colors, 0, sizeof(byte) * num_registers);
     }
 
     /**
@@ -143,12 +262,14 @@ static void ig_release(interference_graph* ig)
     for (size_t i = 0; i < ig->dim; i++)
     {
         free(ig->matrix[i]);
+        free(ig->color_state[i].colors);
     }
 
     free(ig->matrix);
     free(ig->deg_graph);
     free(ig->deg_move);
     free(ig->mutable_nodes);
+    free(ig->color_state);
 }
 
 static bool ig_empty(const interference_graph* ig)
@@ -305,6 +426,9 @@ static size_t ig_node_get_coalesce_site(interference_graph* ig, size_t n)
 */
 static size_t ig_node_coalesce(interference_graph* ig, size_t dest, size_t src)
 {
+    // every node is coalesced by itself by default, no need to do anything
+    if (dest == src) { return dest; }
+
     // makes sure dest is not the one that is already coalesced
     dest = ig_node_get_coalesce_site(ig, dest);
 
@@ -511,10 +635,103 @@ static void allocator_spill_code_write(heuristic_allocator* allocator, instructi
 }
 
 /**
- * Build Stage
+ * Flush array of variables into interference graph
  *
- * TODO: live-in AND live-out needed?
- * (see: https://web.stanford.edu/class/archive/cs/cs143/cs143.1128/lectures/17/Slides17.pdf, page 130)
+ * the array represents that all variables interfere with each other
+ *
+ * NOTE:
+ * "buf" is the varmap set, indices from om->variables, use varmap_* APIs
+ * to convert from varmap index to lid
+*/
+static void allocator_ig_connect_varmap_set(heuristic_allocator* allocator, size_t* buf, size_t len)
+{
+    interference_graph* ig = &allocator->ig;
+    optimizer* om = allocator->om;
+
+    for (size_t i = 0; i < len; i++)
+    {
+        // ignore member variables
+        if (varmap_idx_is_member(om, buf[i])) { continue; }
+
+        // make sure every node goes into graph IG_BIT_PLANE_MUTABLE
+        ig_node_add_mutable(ig, varmap_idx2lid(om, buf[i]));
+
+        // generate edges
+        for (size_t j = i + 1; j < len; j++)
+        {
+            // ignore member variables
+            if (varmap_idx_is_member(om, buf[j])) { continue; }
+
+            ig_connect(
+                ig,
+                IG_BIT_PLANE_MUTABLE | IG_BIT_PLANE_FULL,
+                varmap_idx2lid(om, buf[i]),
+                varmap_idx2lid(om, buf[j])
+            );
+        }
+    }
+}
+
+static void allocator_ig_build_from_instruction(heuristic_allocator* allocator, instruction_item* inst_item)
+{
+    interference_graph* ig = &allocator->ig;
+    size_t* buf = (size_t*)malloc_assert(sizeof(size_t) * allocator->om->profile.num_locals);
+    size_t len;
+
+    // live-in set
+    len = index_set_to_array(&inst_item->in, buf);
+    allocator_ig_connect_varmap_set(allocator, buf, len);
+
+    // live-out set
+    len = index_set_to_array(&inst_item->out, buf);
+    allocator_ig_connect_varmap_set(allocator, buf, len);
+
+    free(buf);
+}
+
+/**
+ * Color a node
+ *
+ * if color is depleted, process will fail and return false
+ */
+static bool allocator_ig_node_assign_color(heuristic_allocator* allocator, size_t n)
+{
+    interference_graph* ig = &allocator->ig;
+    size_t color;
+
+    // do nothing is color depleted
+    if (!ig->color_state[n].num_color_available) { return false; }
+
+    // locate the color
+    for (color = 0; color < allocator->num_registers && ig->color_state[n].colors[color]; color++);
+
+    // color it, along with all coalesced ones
+    // coalesce graph includes the node itself so the loop covers both cases
+    for (size_t i = 0; i < ig->dim; i++)
+    {
+        if (!ig_cell_get(ig, IG_BIT_PLANE_COALESCE, n, i)) { continue; }
+
+        variable_item* var = &allocator->om->variables[varmap_lid2idx(allocator->om, i)];
+
+        var->alloc_type = VAR_ALLOC_REGISTER;
+        var->alloc_loc = color;
+
+        // propagate the color use info to neighbors
+        for (size_t j = 0; j < ig->dim; j++)
+        {
+            if (ig_cell_get(ig, IG_BIT_PLANE_FULL, i, j))
+            {
+                ig->color_state[j].colors[color] = 1;
+                ig->color_state[j].num_color_available--;
+            }
+        }
+    }
+
+    return true;
+}
+
+/**
+ * Build Stage
  *
  * Build inteference graph, and detect move-related variables
  * This stage is very expensive
@@ -522,48 +739,23 @@ static void allocator_spill_code_write(heuristic_allocator* allocator, instructi
 static void optimizer_allocator_build(heuristic_allocator* allocator)
 {
     interference_graph* ig = &allocator->ig;
-    size_t num_variables = allocator->om->profile.num_locals;
-    size_t* buf = (size_t*)malloc_assert(sizeof(size_t) * num_variables);
-    size_t len;
-    instruction* inst;
 
-    ig_init(ig, num_variables);
+    ig_init(ig, allocator->om->profile.num_locals, allocator->num_registers);
 
     // build interference graph
     for (size_t i = 0; i < allocator->om->profile.num_instructions; i++)
     {
-        inst = allocator->om->instructions[i].ref;
-        len = index_set_to_array(&allocator->om->instructions[i].out, buf);
-
-        // connect all pairs
-        for (size_t i = 0; i < len; i++)
-        {
-            // ignore member variables
-            if (varmap_idx_is_member(allocator->om, buf[i])) { continue; }
-
-            // make sure every node goes into graph IG_BIT_PLANE_MUTABLE
-            ig_node_add_mutable(ig, varmap_idx2lid(allocator->om, buf[i]));
-
-            // generate edges
-            for (size_t j = i + 1; j < len; j++)
-            {
-                // ignore member variables
-                if (varmap_idx_is_member(allocator->om, buf[j])) { continue; }
-
-                ig_connect(
-                    ig,
-                    IG_BIT_PLANE_MUTABLE | IG_BIT_PLANE_FULL,
-                    varmap_idx2lid(allocator->om, buf[i]),
-                    varmap_idx2lid(allocator->om, buf[j])
-                );
-            }
-        }
+        allocator_ig_build_from_instruction(allocator, &allocator->om->instructions[i]);
     }
 
     // connect move-related pairs (pairs in instruction with form "a := b")
     for (size_t i = 0; i < allocator->om->profile.num_instructions; i++)
     {
-        inst = allocator->om->instructions[i].ref;
+        instruction* inst = allocator->om->instructions[i].ref;
+
+        // skip incorrect form
+        if (!inst->lvalue || !inst->operand_1) { continue; }
+
         definition* v1 = inst->lvalue->def;
         definition* v2 = inst->operand_1->def;
 
@@ -583,8 +775,6 @@ static void optimizer_allocator_build(heuristic_allocator* allocator)
         }
     }
 
-    // cleanup
-    free(buf);
     allocator->state = ALLOCATOR_STATE_SIMPLIFY;
 }
 
@@ -647,7 +837,7 @@ static void optimizer_allocator_coalesce(heuristic_allocator* allocator)
         {
             bool coalesce = true;
 
-            if (!allocator->ig.mutable_nodes[y] || !ig_cell_get(ig, IG_BIT_PLANE_COALESCE, x, y))
+            if (x == y || !allocator->ig.mutable_nodes[y] || !ig_cell_get(ig, IG_BIT_PLANE_COALESCE, x, y))
             {
                 continue;
             }
@@ -782,17 +972,7 @@ static void optimizer_allocator_spill(heuristic_allocator* allocator)
 static void optimizer_allocator_select(heuristic_allocator* allocator)
 {
     interference_graph* ig = &allocator->ig;
-    byte** color_used = (byte**)malloc_assert(sizeof(byte*) * ig->dim);
-    size_t* color_remained = (size_t*)malloc_assert(sizeof(size_t) * ig->dim);
     color_stack_frame* frame = allocator->color_stack;
-
-    for (size_t i = 0; i < ig->dim; i++)
-    {
-        color_used[i] = (byte*)malloc_assert(sizeof(byte) * allocator->num_registers);
-        color_remained[i] = allocator->num_registers;
-
-        memset(color_used[i], 0, sizeof(byte) * allocator->num_registers);
-    }
 
     allocator->state = ALLOCATOR_STATE_DONE;
 
@@ -800,46 +980,18 @@ static void optimizer_allocator_select(heuristic_allocator* allocator)
     while (frame)
     {
         size_t n = frame->node;
-        size_t color;
 
-        // if the node is not colorable, stop here and spill code
-        if (!color_remained[n])
+        // determine action to the node
+        if (frame->spill)
         {
-            if (frame->spill)
-            {
-                allocator->state = ALLOCATOR_STATE_BUILD;
-            }
-            else
-            {
-                // non-spilled node must have at least 1 register available
-                fprintf(stderr, "TODO error: register depleted for node %zd.\n", n);
-            }
-
+            // if to spill, we pick this node and stop here
+            allocator->state = ALLOCATOR_STATE_BUILD;
             break;
         }
-
-        // locate the color
-        for (color = 0; color < allocator->num_registers && color_used[color]; color++);
-
-        // color it, along with all coalesced ones
-        for (size_t i = 0; i < ig->dim; i++)
+        else if (!allocator_ig_node_assign_color(allocator, n))
         {
-            if (!ig_cell_get(ig, IG_BIT_PLANE_COALESCE, n, i)) { continue; }
-
-            variable_item* var = &allocator->om->variables[varmap_lid2idx(allocator->om, i)];
-
-            var->alloc_type = VAR_ALLOC_REGISTER;
-            var->alloc_loc = color;
-
-            // propagate the color use info to neighbors
-            for (size_t j = 0; j < ig->dim; j++)
-            {
-                if (ig_cell_get(ig, IG_BIT_PLANE_FULL, i, j))
-                {
-                    color_used[j][color] = 1;
-                    color_remained[j]--;
-                }
-            }
+            // non-spilled node must have at least 1 register available
+            fprintf(stderr, "TODO error: register depleted for node %zd.\n", n);
         }
 
         frame = frame->next;
@@ -885,11 +1037,6 @@ static void optimizer_allocator_select(heuristic_allocator* allocator)
             }
         }
     }
-
-    // cleanup
-    for (size_t i = 0; i < ig->dim; i++) { free(color_used[i]); }
-    free(color_used);
-    free(color_remained);
 }
 
 /**
@@ -916,6 +1063,7 @@ static bool optimizer_allocator_heuristics_state_machine(
         {
             case ALLOCATOR_STATE_BUILD:
                 optimizer_allocator_build(&allocator);
+                __debug_print_heuristic_allocator(&allocator);
                 break;
             case ALLOCATOR_STATE_SIMPLIFY:
                 optimizer_allocator_simplify(&allocator);
@@ -947,6 +1095,7 @@ static bool optimizer_allocator_heuristics_state_machine(
         }
     }
 
+    __debug_print_heuristic_allocator(&allocator);
     release_heuristic_allocator(&allocator);
     return true;
 }
@@ -962,7 +1111,7 @@ void optimizer_allocator_heuristic(optimizer* om, size_t num_avail_registers)
 
     optimizer_profile_copy(om, &profile);
 
-    while (true)
+    do
     {
         // repopulate
         optimizer_profile_apply(om, &profile);
@@ -970,10 +1119,5 @@ void optimizer_allocator_heuristic(optimizer* om, size_t num_avail_registers)
         // facts needed by allocator
         optimizer_defuse_analyze(om);
         optimizer_liveness_analyze(om);
-
-        if (optimizer_allocator_heuristics_state_machine(om, &profile, num_avail_registers))
-        {
-            break;
-        }
-    }
+    } while (!optimizer_allocator_heuristics_state_machine(om, &profile, num_avail_registers));
 }
