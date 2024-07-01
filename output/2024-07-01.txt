@@ -32,21 +32,21 @@ longest chain: 1
 >>>>> 696 bytes: 1/2 nodes, 0/2 edges, 3 instructions
 
 *       Member: 4 member(s)
-            [000001E3AB627230] allocator: def method, uses 0 member(s), Access: No Modifier, Parameter Count: 0(), Return: JLT_RWD_VOID
+            [000002243FF072F0] allocator: def method, uses 0 member(s), Access: No Modifier, Parameter Count: 0(), Return: JLT_RWD_VOID
 >                Definition Pool: 13 definition(s), 672 byte(s)
->                    [0](000001E3AB627410): def temporary var, order 7, Access: No Modifier, Type: (undefined)
->                    [1](000001E3AB627290): def temporary var, order 8, Access: No Modifier, Type: (undefined)
->                    [2](000001E3AB6272C0): def temporary var, order 9, Access: No Modifier, Type: (undefined)
->                    [3](000001E3AB6275C0): def temporary var, order 10, Access: No Modifier, Type: (undefined)
->                    [4](000001E3AB6276B0): def temporary var, order 11, Access: No Modifier, Type: (undefined)
->                    [5](000001E3AB627590): def temporary var, order 12, Access: No Modifier, Type: (undefined)
->                    [6](000001E3AB627560): def local var, order 2, Access: No Modifier, Type: JLT_RWD_INT
->                    [7](000001E3AB627110): def local var, order 4, Access: No Modifier, Type: JLT_RWD_INT
->                    [8](000001E3AB6274D0): def local var, order 1, Access: No Modifier, Type: JLT_RWD_INT
->                    [9](000001E3AB627350): def local var, order 3, Access: No Modifier, Type: JLT_RWD_INT
->                    [10](000001E3AB627470): def local var, order 0, Access: No Modifier, Type: JLT_RWD_INT
->                    [11](000001E3AB627530): def local var, order 6, Access: No Modifier, Type: JLT_RWD_INT
->                    [12](000001E3AB6272F0): def local var, order 5, Access: No Modifier, Type: JLT_RWD_INT
+>                    [0](000002243FF07140): def temporary var, order 7, Access: No Modifier, Type: (undefined)
+>                    [1](000002243FF07380): def temporary var, order 8, Access: No Modifier, Type: (undefined)
+>                    [2](000002243FF07170): def temporary var, order 9, Access: No Modifier, Type: (undefined)
+>                    [3](000002243FF07500): def temporary var, order 10, Access: No Modifier, Type: (undefined)
+>                    [4](000002243FF07560): def temporary var, order 11, Access: No Modifier, Type: (undefined)
+>                    [5](000002243FF07740): def temporary var, order 12, Access: No Modifier, Type: (undefined)
+>                    [6](000002243FF07260): def local var, order 2, Access: No Modifier, Type: JLT_RWD_INT
+>                    [7](000002243FF070E0): def local var, order 4, Access: No Modifier, Type: JLT_RWD_INT
+>                    [8](000002243FF074A0): def local var, order 1, Access: No Modifier, Type: JLT_RWD_INT
+>                    [9](000002243FF074D0): def local var, order 3, Access: No Modifier, Type: JLT_RWD_INT
+>                    [10](000002243FF077A0): def local var, order 0, Access: No Modifier, Type: JLT_RWD_INT
+>                    [11](000002243FF07680): def local var, order 6, Access: No Modifier, Type: JLT_RWD_INT
+>                    [12](000002243FF07050): def local var, order 5, Access: No Modifier, Type: JLT_RWD_INT
 |                node[0] (entry point) <TEST> -> 1(TRUE) -> 3(FALSE)
 |                    [0] [0]: %L0[0] <- (li: null object) IROP_ASN (null)
 |                    [0] [1]: %L1[0] <- (li: null object) IROP_ASN (null)
@@ -74,13 +74,13 @@ longest chain: 1
 |                    [3] [16]: %L3[3] <- %L12 IROP_ASN (null)
 >>>>> 4360 bytes: 4/4 nodes, 4/4 edges, 21 instructions
 
-            [000001E3AB6274A0] n3: def member var, order 2, Access: No Modifier, Type: JLT_RWD_INT
-            [000001E3AB6275F0] m1: def member var, order 0, Access: No Modifier, Type: JLT_RWD_SHORT
-            [000001E3AB627170] m2: def member var, order 1, Access: No Modifier, Type: JLT_RWD_SHORT
+            [000002243FF071D0] n3: def member var, order 2, Access: No Modifier, Type: JLT_RWD_INT
+            [000002243FF07020] m1: def member var, order 0, Access: No Modifier, Type: JLT_RWD_SHORT
+            [000002243FF073E0] m2: def member var, order 1, Access: No Modifier, Type: JLT_RWD_SHORT
 
 *       Literals: 2 literal(s)
-            [000001E3AB627380] 0: number, 0x0
-            [000001E3AB627650] null: null object
+            [000002243FF073B0] 0: number, 0x0
+            [000002243FF070B0] null: null object
 
 
 ===== LOOKUP STACK =====
@@ -124,7 +124,7 @@ IR Code:
     [13] IROP_EQ r1 r0 (li: 0x0{0})
     [14] IROP_TEST r1  jt=[17]
     [15] IROP_ADD r1 r0 r2
-    [16] IROP_ASN r3 r1
+    [16] IROP_ASN r3 r1  jmp=[19]
     [17] IROP_SUB r1 r0 r2
     [18] IROP_ASN r3 r1
     [19] IROP_ASN r0 r3

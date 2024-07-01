@@ -438,24 +438,36 @@ void debug_optimization_context(optimization_context* oc)
             for (size_t k = 0; k < code->om.profile.num_instructions; k++)
             {
                 instruction_item* item = &code->om.instructions[k];
+                basic_block* bb = item->ref->node;
+                size_t dest;
 
                 debug_print_instruction_item(item, k, 1);
 
                 if (item->ref->op == IROP_TEST)
                 {
-                    basic_block* test = item->ref->node;
                     cfg_edge* out;
 
-                    out = test->out.arr[0];
-                    if (out->to->inst_first->id != item->ref->id + 1)
+                    out = bb->out.arr[0];
+                    dest = out->to->inst_first->id;
+                    if (dest != item->ref->id + 1)
                     {
-                        printf(" j%c=[%zd] ", out->type == EDGE_TRUE ? 't' : 'f', out->to->inst_first->id);
+                        printf(" j%c=[%zd] ", out->type == EDGE_TRUE ? 't' : 'f', dest);
                     }
 
-                    out = test->out.arr[1];
-                    if (out->to->inst_first->id != item->ref->id + 1)
+                    out = bb->out.arr[1];
+                    dest = out->to->inst_first->id;
+                    if (dest != item->ref->id + 1)
                     {
-                        printf(" j%c=[%zd] ", out->type == EDGE_TRUE ? 't' : 'f', out->to->inst_first->id);
+                        printf(" j%c=[%zd] ", out->type == EDGE_TRUE ? 't' : 'f', dest);
+                    }
+                }
+                else if (!item->ref->next && k + 1 < code->om.profile.num_instructions)
+                {
+                    dest = bb->out.arr[0]->to->inst_first->id;
+
+                    if (dest != code->om.instructions[k + 1].ref->id)
+                    {
+                        printf(" jmp=[%zd] ", dest);
                     }
                 }
 
