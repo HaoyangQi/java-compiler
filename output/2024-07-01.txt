@@ -1,0 +1,135 @@
+===== COMPILER RUNTIME REPORT =====
+Language version: 1
+Reserved word:
+    count: 50
+    memory: 4824 bytes
+    load factor: 14.16%
+    longest chain: 1
+Expression static data size: 1072 bytes
+Error static data size: 1014 bytes
+===== END OF REPORT =====
+
+File 1: ./test/reg-alloc-1.txt
+
+===== IMPORTS =====
+count: 0
+memory: 88 bytes
+load factor: 0.00%
+longest chain: 0
+
+===== GLOBAL NAMES =====
+count: 1
+memory: 128 bytes
+load factor: 9.09%
+longest chain: 1
+    RegisterAllocatorTest: Access: No Modifier
+*       Member Variable Initialization:
+>            Definition Pool: 0 definition(s), 40 byte(s)
+|            node[0] (entry point) <ANY>
+|                [0] [0]: %M2[0] <- (li: null object) IROP_ASN (null)
+|                [0] [1]: %M0[0] <- (li: null object) IROP_ASN (null)
+|                [0] [2]: %M1[0] <- (li: null object) IROP_ASN (null)
+>>>>> 696 bytes: 1/2 nodes, 0/2 edges, 3 instructions
+
+*       Member: 4 member(s)
+            [000001E3AB627230] allocator: def method, uses 0 member(s), Access: No Modifier, Parameter Count: 0(), Return: JLT_RWD_VOID
+>                Definition Pool: 13 definition(s), 672 byte(s)
+>                    [0](000001E3AB627410): def temporary var, order 7, Access: No Modifier, Type: (undefined)
+>                    [1](000001E3AB627290): def temporary var, order 8, Access: No Modifier, Type: (undefined)
+>                    [2](000001E3AB6272C0): def temporary var, order 9, Access: No Modifier, Type: (undefined)
+>                    [3](000001E3AB6275C0): def temporary var, order 10, Access: No Modifier, Type: (undefined)
+>                    [4](000001E3AB6276B0): def temporary var, order 11, Access: No Modifier, Type: (undefined)
+>                    [5](000001E3AB627590): def temporary var, order 12, Access: No Modifier, Type: (undefined)
+>                    [6](000001E3AB627560): def local var, order 2, Access: No Modifier, Type: JLT_RWD_INT
+>                    [7](000001E3AB627110): def local var, order 4, Access: No Modifier, Type: JLT_RWD_INT
+>                    [8](000001E3AB6274D0): def local var, order 1, Access: No Modifier, Type: JLT_RWD_INT
+>                    [9](000001E3AB627350): def local var, order 3, Access: No Modifier, Type: JLT_RWD_INT
+>                    [10](000001E3AB627470): def local var, order 0, Access: No Modifier, Type: JLT_RWD_INT
+>                    [11](000001E3AB627530): def local var, order 6, Access: No Modifier, Type: JLT_RWD_INT
+>                    [12](000001E3AB6272F0): def local var, order 5, Access: No Modifier, Type: JLT_RWD_INT
+|                node[0] (entry point) <TEST> -> 1(TRUE) -> 3(FALSE)
+|                    [0] [0]: %L0[0] <- (li: null object) IROP_ASN (null)
+|                    [0] [1]: %L1[0] <- (li: null object) IROP_ASN (null)
+|                    [0] [2]: %L2[0] <- (li: null object) IROP_ASN (null)
+|                    [0] [3]: %L3[0] <- (li: null object) IROP_ASN (null)
+|                    [0] [4]: %L4[0] <- (li: null object) IROP_ASN (null)
+|                    [0] [5]: %L5[0] <- (li: null object) IROP_ASN (null)
+|                    [0] [6]: %L6[0] <- (li: null object) IROP_ASN (null)
+|                    [0] [7]: %L7 <- %L3[0] IROP_ADD %L0[0]
+|                    [0] [8]: %L4[1] <- %L7 IROP_ASN (null)
+|                    [0] [9]: %L8 <- %L1[0] IROP_ADD %L2[0]
+|                    [0] [10]: %L5[1] <- %L8 IROP_ASN (null)
+|                    [0] [11]: %L9 <- %L5[1] IROP_ADD %L1[0]
+|                    [0] [12]: %L5[2] <- %L9 IROP_ASN (null)
+|                    [0] [13]: %L10 <- %L4[1] IROP_EQ (li: 0x0{0})
+|                    [0] [14]: %L10 IROP_TEST (null)
+|                node[1] <ANY> -> 2
+|                    [1] [17]: %L11 <- %L4[1] IROP_SUB %L5[2]
+|                    [1] [18]: %L3[1] <- %L11 IROP_ASN (null)
+|                node[2] <RETURN>
+|                    [2] [19]: %L6[1] <- %L3[2] IROP_ASN (null)
+|                    [2] [20]: %L6[1] IROP_RET (null)
+|                node[3] <ANY> -> 2
+|                    [3] [15]: %L12 <- %L4[1] IROP_ADD %L5[2]
+|                    [3] [16]: %L3[3] <- %L12 IROP_ASN (null)
+>>>>> 4360 bytes: 4/4 nodes, 4/4 edges, 21 instructions
+
+            [000001E3AB6274A0] n3: def member var, order 2, Access: No Modifier, Type: JLT_RWD_INT
+            [000001E3AB6275F0] m1: def member var, order 0, Access: No Modifier, Type: JLT_RWD_SHORT
+            [000001E3AB627170] m2: def member var, order 1, Access: No Modifier, Type: JLT_RWD_SHORT
+
+*       Literals: 2 literal(s)
+            [000001E3AB627380] 0: number, 0x0
+            [000001E3AB627650] null: null object
+
+
+===== LOOKUP STACK =====
+(lookup stack is empty)
+
+===== OPTIMIZATION CONTEXT =====
+Method Name: RegisterAllocatorTest::allocator
+Number of Registers Available: 4
+Number of Variables Require Stack Space: 1
+Variable Allocation Info:
+    [0] (Not registered because it is not used in CFG)
+    [1] (Not registered because it is not used in CFG)
+    [2] (Not registered because it is not used in CFG)
+    [3] Variable lid=0: REG_ALLOC_REGISTER, loc: 0
+    [4] Variable lid=1: REG_ALLOC_STACK, loc: 0
+    [5] Variable lid=2: REG_ALLOC_REGISTER, loc: 2
+    [6] Variable lid=3: REG_ALLOC_REGISTER, loc: 3
+    [7] Variable lid=4: REG_ALLOC_REGISTER, loc: 0
+    [8] Variable lid=5: REG_ALLOC_REGISTER, loc: 2
+    [9] Variable lid=6: REG_ALLOC_REGISTER, loc: 0
+    [10] Variable lid=7: REG_ALLOC_REGISTER, loc: 1
+    [11] Variable lid=8: REG_ALLOC_REGISTER, loc: 1
+    [12] Variable lid=9: REG_ALLOC_REGISTER, loc: 1
+    [13] Variable lid=10: REG_ALLOC_REGISTER, loc: 1
+    [14] Variable lid=11: REG_ALLOC_REGISTER, loc: 1
+    [15] Variable lid=12: REG_ALLOC_REGISTER, loc: 1
+IR Code:
+    [0] IROP_ASN r0 (li: null object)
+    [1] IROP_ASN [base+0] (li: null object)
+    [2] IROP_ASN r2 (li: null object)
+    [3] IROP_ASN r3 (li: null object)
+    [4] (this instruction on lid=4 is optimized because variable's dataflow always overrides this operation)
+    [5] (this instruction on lid=5 is optimized because variable's dataflow always overrides this operation)
+    [6] (this instruction on lid=6 is optimized because variable's dataflow always overrides this operation)
+    [7] IROP_ADD r1 r3 r0
+    [8] IROP_ASN r0 r1
+    [9] IROP_ADD r1 [base+0] r2
+    [10] IROP_ASN r2 r1
+    [11] IROP_ADD r1 r2 [base+0]
+    [12] IROP_ASN r2 r1
+    [13] IROP_EQ r1 r0 (li: 0x0{0})
+    [14] IROP_TEST r1  jt=[17]
+    [15] IROP_ADD r1 r0 r2
+    [16] IROP_ASN r3 r1
+    [17] IROP_SUB r1 r0 r2
+    [18] IROP_ASN r3 r1
+    [19] IROP_ASN r0 r3
+    [20] IROP_RET r0
+
+===== ERROR LOGGER (MAIN STREAM) =====
+(null)
+Press any key to continue . . .
