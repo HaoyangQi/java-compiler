@@ -34,6 +34,11 @@ void debug_print_definition_pool(definition_pool* pool, size_t depth);
 void debug_print_name_definition_table(hash_table* table, size_t depth);
 void debug_print_error_stack(java_error_stack* stack, size_t depth);
 void debug_print_index_set(index_set* ixs);
+void debug_print_register_allocation_type(register_allocation_type type);
+void debug_print_register_allocation_info(register_allocation_info* info);
+void debug_print_variable_item(variable_item* item, size_t index, size_t depth);
+void debug_print_reference_with_allocation_info(reference* ref, bool lvalue, register_allocation_info* info);
+void debug_print_instruction_item(instruction_item* item, size_t index, size_t depth);
 
 void debug_report(compiler* compiler);
 void debug_reserved_words();
@@ -45,6 +50,7 @@ void debug_java_symbol_lookup_table_no_collision_test(bool use_prime_size);
 void debug_global_import(java_ir* ir);
 void debug_ir_global_names(java_ir* ir);
 void debug_error_logger(java_error_logger* logger);
+void debug_optimization_context(optimization_context* oc);
 
 void debug_test_number_library();
 void debug_test_dominance();

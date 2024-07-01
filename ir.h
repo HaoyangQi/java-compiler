@@ -50,6 +50,46 @@ typedef unsigned char def_use_control;
 typedef struct _definition definition;
 
 /**
+ * Register Allocation Type
+ *
+ * REG_ALLOC_UNDEFINED: default value
+ * when a variable is detected by optimizer such that it can be optimized out
+ * somehow, then allocation info is undefined
+ * this value is 0 by design, due to the use of memset() everywhere :P
+ *
+ * REG_ALLOC_REGISTER:
+ * when target binds to a register, this value is set
+ *
+ * REG_ALLOC_STACK:
+ * when target binds to stack location, this value is set
+ *
+ * REG_ALLOC_HYBRID:
+ * variable may reference multiple sources during its lifetime
+*/
+typedef enum _register_allocation_type
+{
+    REG_ALLOC_UNDEFINED = 0,
+    REG_ALLOC_REGISTER,
+    REG_ALLOC_STACK,
+    REG_ALLOC_HYBRID,
+} register_allocation_type;
+
+/**
+ * Register Allocation Info
+ *
+ * REG_ALLOC_UNDEFINED: data is undefined
+ * REG_ALLOC_REGISTER: location.reg is set
+ * REG_ALLOC_STACK: location.stack is set
+ * REG_ALLOC_HYBRID: data is undefined
+ */
+typedef struct _register_allocation_info
+{
+    register_allocation_type type;
+    size_t location;
+    bool stack_loc_allocated;
+} register_allocation_info;
+
+/**
  * Symbol Lookup Hierarchy
  *
  * It is a compile-time dynamic stack trace of
@@ -206,6 +246,8 @@ typedef struct _instruction
      * this value is only used in IROP_READ and IROP_WRITE
     */
     size_t operand_rw_stack_loc;
+    // register allocation info
+    register_allocation_info allocation[3];
 
     // reference to the node this instruction belongs to
     struct _basic_block* node;
@@ -409,6 +451,8 @@ typedef struct
     lbit_flag modifier;
     // type
     type_name type;
+    // register allocation info
+    register_allocation_info allocation;
 } definition_variable;
 
 typedef struct
@@ -597,6 +641,8 @@ typedef struct
     size_t num_implement;
     // number of member variables
     size_t num_fields;
+    // number of member functions
+    size_t num_methods;
     // variable pool for member initialization code
     definition_pool member_init_variables;
     // member initialization code
@@ -737,6 +783,9 @@ bool is_def_variable(const definition* def);
 bool is_def_member_variable(const definition* def);
 bool is_def_temporary_variable(const definition* def);
 bool is_def_user_defined_variable(const definition* def);
+bool is_def_parameter_variable(const definition* def);
+bool is_def_register_optimizable_variable(const definition* def);
+size_t get_variable_id(const definition* def);
 definition* def(
     java_ir* ir,
     char** name,

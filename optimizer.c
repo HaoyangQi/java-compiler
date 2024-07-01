@@ -33,10 +33,12 @@ void release_optimizer(optimizer* om)
  *
  * TODO: probably just register using top-level,
  * and do everything within?
+ *
+ * It returns true if attach target is valid, false otherwise
 */
-void optimizer_attach(optimizer* om, global_top_level* top_level, definition* target)
+bool optimizer_attach(optimizer* om, global_top_level* top_level, definition* target)
 {
-    if (!om || !top_level || !target) { return; }
+    if (!om || !top_level || !target) { return false; }
 
     /**
      * TODO: how to handle member init code?
@@ -67,7 +69,7 @@ void optimizer_attach(optimizer* om, global_top_level* top_level, definition* ta
             break;
         default:
             // halt if target is invalid
-            return;
+            return false;
     }
 
     /**
@@ -100,6 +102,8 @@ void optimizer_attach(optimizer* om, global_top_level* top_level, definition* ta
             om->profile.num_instructions++;
         }
     }
+
+    return true;
 }
 
 /**
@@ -137,6 +141,7 @@ void optimizer_execute(optimizer* om)
     optimizer_ssa_eliminate(om);
 
     // register allocation
-    optimizer_allocator_heuristic(om, 4);
-    // optimizer_allocator_linear(om, 4);
+    // optimizer_allocator_heuristic(om, 4);
+    // optimizer_allocator_linear(om, 4, LINEAR_ALLOCATOR_RANGE_MERGE);
+    optimizer_allocator_linear(om, 4, LINEAR_ALLOCATOR_RANGE_SPLIT);
 }

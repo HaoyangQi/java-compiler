@@ -11,8 +11,9 @@
 #include "il.h"
 #include "error.h"
 #include "optimizer.h"
+#include "optimization-context.h"
 
-typedef struct
+typedef struct _compiler
 {
     unsigned int version;
 
@@ -24,7 +25,7 @@ typedef struct
     java_lexer lexer;
     java_parser context;
     java_ir ir;
-    optimizer om;
+    optimization_context optimizers;
     java_error_logger logger;
 } compiler;
 

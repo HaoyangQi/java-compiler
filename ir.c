@@ -420,6 +420,8 @@ global_top_level* new_global_top_level(top_level_type type)
     top->extend = NULL;
     top->implement = NULL;
     top->num_implement = 0;
+    top->num_fields = 0;
+    top->num_methods = 0;
     top->code_member_init = NULL;
     top->node_first_body_decl = NULL;
 
