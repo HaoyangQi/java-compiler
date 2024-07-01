@@ -1078,6 +1078,12 @@ void debug_print_irop(irop op)
         case IROP_NOOP:
             printf("IROP_NOOP");
             break;
+        case IROP_READ:
+            printf("IROP_READ");
+            break;
+        case IROP_WRITE:
+            printf("IROP_WRITE");
+            break;
         case IROP_MAX:
             printf("(Invalid: IROP_MAX)");
             break;
@@ -1136,8 +1142,12 @@ void debug_print_reference(reference* r)
                 case VARIABLE_KIND_LOCAL:
                     printf("%%L%zd[%zd]", d->lid, r->ver);
                     break;
-                default:
+                case VARIABLE_KIND_TEMPORARY:
+                case VARIABLE_KIND_PARAMETER:
                     printf("%%L%zd", d->lid);
+                    break;
+                default:
+                    printf("%%(UNKNOWN KIND)%zd", d->lid);
                     break;
             }
             break;
@@ -1229,47 +1239,55 @@ void debug_print_instructions(instruction* inst, size_t* cnt, size_t depth)
         printf(" ");
         debug_print_reference(inst->operand_2);
 
-        if (inst->op == IROP_PHI)
+        switch (inst->op)
         {
-            printf(" phi(");
+            case IROP_PHI:
+                printf(" phi(");
 
-            for (size_t i = 0; i < inst->operand_phi.num; i++)
-            {
-                instruction* phi_ref = inst->operand_phi.arr[i];
-
-                if (i) { printf(", "); }
-
-                if (!phi_ref)
+                for (size_t i = 0; i < inst->operand_phi.num; i++)
                 {
-                    /**
-                     * if phi operand is null AND lvalue is a member
-                     * variable, then the NULL operand is valid and
-                     * implies the very first value this variable
-                     * contains upon code entry
-                    */
-                    if (is_def_member_variable(inst->lvalue->def))
+                    instruction* phi_ref = inst->operand_phi.arr[i];
+
+                    if (i) { printf(", "); }
+
+                    if (!phi_ref)
                     {
-                        printf("entry");
+                        /**
+                         * if phi operand is null AND lvalue is a member
+                         * variable, then the NULL operand is valid and
+                         * implies the very first value this variable
+                         * contains upon code entry
+                        */
+                        if (is_def_member_variable(inst->lvalue->def))
+                        {
+                            printf("entry");
+                        }
+                        else
+                        {
+                            printf("null");
+                        }
+                    }
+                    else if (phi_ref->lvalue->def != inst->lvalue->def)
+                    {
+                        printf("err: ");
+                        debug_print_reference(phi_ref->lvalue);
+                        printf(" ");
+                        debug_print_reference(inst->lvalue);
                     }
                     else
                     {
-                        printf("null");
+                        printf("%zd", inst->operand_phi.arr[i]->lvalue->ver);
                     }
                 }
-                else if (phi_ref->lvalue->def != inst->lvalue->def)
-                {
-                    printf("err: ");
-                    debug_print_reference(phi_ref->lvalue);
-                    printf(" ");
-                    debug_print_reference(inst->lvalue);
-                }
-                else
-                {
-                    printf("%zd", inst->operand_phi.arr[i]->lvalue->ver);
-                }
-            }
 
-            printf(")");
+                printf(")");
+                break;
+            case IROP_READ:
+            case IROP_WRITE:
+                printf(" stack(%zd)", inst->operand_rw_stack_loc);
+                break;
+            default:
+                break;
         }
 
         printf("\n");
@@ -1586,4 +1604,137 @@ void debug_print_index_set(index_set* ixs)
     }
 
     printf("}");
+}
+
+void debug_print_register_allocation_type(register_allocation_type type)
+{
+    switch (type)
+    {
+        case REG_ALLOC_UNDEFINED:
+            printf("UNDEFINED");
+            break;
+        case REG_ALLOC_REGISTER:
+            printf("REG_ALLOC_REGISTER");
+            break;
+        case REG_ALLOC_STACK:
+            printf("REG_ALLOC_STACK");
+            break;
+        case REG_ALLOC_HYBRID:
+            printf("REG_ALLOC_HYBRID");
+            break;
+        default:
+            printf("INVALID (%d)", type);
+            break;
+    }
+}
+
+void debug_print_register_allocation_info(register_allocation_info* info)
+{
+    debug_print_register_allocation_type(info->type);
+
+    switch (info->type)
+    {
+        case REG_ALLOC_REGISTER:
+        case REG_ALLOC_STACK:
+            printf(", loc: %zd", info->location);
+            break;
+        case REG_ALLOC_HYBRID:
+            printf(" (hybrid allocation is case-by-case scenario)");
+            break;
+        default:
+            printf(" (undefined allocation type: %d)", info->type);
+            break;
+    }
+}
+
+void debug_print_variable_item(variable_item* item, size_t index, size_t depth)
+{
+    // so far only local ones are register-allocated
+    debug_print_indentation(depth);
+
+    printf("[%zd] ", index);
+
+    if (item->ref)
+    {
+        printf("Variable lid=%zd: ", item->ref->lid);
+        debug_print_register_allocation_info(&item->ref->variable->allocation);
+    }
+    else
+    {
+        printf("(Not registered because it is not used in CFG)");
+    }
+}
+
+void debug_print_reference_with_allocation_info(reference* ref, bool lvalue, register_allocation_info* info)
+{
+    // print nothing on-purpose to give clean output
+    if (!ref) { return; }
+
+    definition* def = ref2vardef(ref);
+
+    if (is_def_register_optimizable_variable(def))
+    {
+        switch (info->type)
+        {
+            case REG_ALLOC_REGISTER:
+                printf("r%zd", info->location);
+                break;
+            case REG_ALLOC_STACK:
+                printf("[base+%zd]", info->location);
+                break;
+            default:
+                printf("(invalid: %d)", info->type);
+                break;
+        }
+    }
+    else if (is_def_parameter_variable(def))
+    {
+        printf("p%zd", def->lid);
+    }
+    else
+    {
+        debug_print_reference(ref);
+    }
+}
+
+void debug_print_instruction_item(instruction_item* item, size_t index, size_t depth)
+{
+    instruction* inst = item->ref;
+    definition* ldef = ref2vardef(inst->lvalue);
+
+    debug_print_indentation(depth);
+    printf("[%zd] ", index);
+
+    if (is_def_register_optimizable_variable(ldef) && inst->allocation[0].type == REG_ALLOC_UNDEFINED)
+    {
+        printf("(this instruction on lid=%zd is optimized because variable's dataflow always overrides this operation)",
+            ldef->lid
+        );
+
+        return;
+    }
+
+    debug_print_irop(inst->op);
+    printf(" ");
+
+    if (inst->lvalue)
+    {
+        debug_print_reference_with_allocation_info(inst->lvalue, true, &inst->allocation[0]);
+        printf(" ");
+    }
+    else if (inst->op == IROP_WRITE)
+    {
+        printf("[base+%zd] ", inst->operand_rw_stack_loc);
+    }
+
+    if (inst->op == IROP_READ)
+    {
+        printf("[base+%zd]", inst->operand_rw_stack_loc);
+    }
+    else
+    {
+        debug_print_reference_with_allocation_info(inst->operand_1, false, &inst->allocation[1]);
+        printf(" ");
+        debug_print_reference_with_allocation_info(inst->operand_2, false, &inst->allocation[2]);
+    }
 }

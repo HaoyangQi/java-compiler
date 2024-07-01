@@ -3,7 +3,7 @@
 
 bool is_def_variable(const definition* def)
 {
-    return def && def->type == DEFINITION_VARIABLE;
+    return def && def->type == DEFINITION_VARIABLE && def->variable->kind != VARIABLE_KIND_MAX;
 }
 
 bool is_def_member_variable(const definition* def)
@@ -18,7 +18,22 @@ bool is_def_temporary_variable(const definition* def)
 
 bool is_def_user_defined_variable(const definition* def)
 {
-    return def && def->type == DEFINITION_VARIABLE && def->variable->kind != VARIABLE_KIND_TEMPORARY;
+    return is_def_variable(def) && def->variable->kind != VARIABLE_KIND_TEMPORARY;
+}
+
+bool is_def_parameter_variable(const definition* def)
+{
+    return is_def_variable(def) && def->variable->kind == VARIABLE_KIND_PARAMETER;
+}
+
+bool is_def_register_optimizable_variable(const definition* def)
+{
+    return is_def_variable(def) && (def->variable->kind == VARIABLE_KIND_LOCAL || def->variable->kind == VARIABLE_KIND_TEMPORARY);
+}
+
+size_t get_variable_id(const definition* def)
+{
+    return is_def_member_variable(def) ? def->mid : def->lid;
 }
 
 /**
@@ -1021,6 +1036,7 @@ static void def_class(java_ir* ir, tree_node* node)
                     break;
                 case JNT_METHOD_DECL:
                     def_method(ir, probe, part->data.top_level->modifier);
+                    ir->working_top_level->num_methods++;
                     break;
                 default:
                     break;

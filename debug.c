@@ -407,3 +407,60 @@ void debug_error_logger(java_error_logger* logger)
         debug_print_error_stack(logger->current_stream, 0);
     }
 }
+
+void debug_optimization_context(optimization_context* oc)
+{
+    printf("\n===== OPTIMIZATION CONTEXT =====\n");
+
+    for (size_t i = 0; i < oc->num_top_level; i++)
+    {
+        top_level_optimizer* tlo = &oc->top_levels[i];
+
+        for (size_t j = 0; j < tlo->num_methods; j++)
+        {
+            code_context* code = &tlo->contexts[j];
+
+            printf("Method Name: %s::%s\nNumber of Registers Available: %zd\nNumber of Variables Require Stack Space: %zd\n",
+                code->name_top_level,
+                code->name_method,
+                code->om.profile.num_registers,
+                code->om.profile.num_var_on_stack
+            );
+
+            printf("Variable Allocation Info:\n");
+            for (size_t k = 0; k < code->om.profile.num_variables; k++)
+            {
+                debug_print_variable_item(&code->om.variables[k], k, 1);
+                printf("\n");
+            }
+
+            printf("IR Code:\n");
+            for (size_t k = 0; k < code->om.profile.num_instructions; k++)
+            {
+                instruction_item* item = &code->om.instructions[k];
+
+                debug_print_instruction_item(item, k, 1);
+
+                if (item->ref->op == IROP_TEST)
+                {
+                    basic_block* test = item->ref->node;
+                    cfg_edge* out;
+
+                    out = test->out.arr[0];
+                    if (out->to->inst_first->id != item->ref->id + 1)
+                    {
+                        printf(" j%c=[%zd] ", out->type == EDGE_TRUE ? 't' : 'f', out->to->inst_first->id);
+                    }
+
+                    out = test->out.arr[1];
+                    if (out->to->inst_first->id != item->ref->id + 1)
+                    {
+                        printf(" j%c=[%zd] ", out->type == EDGE_TRUE ? 't' : 'f', out->to->inst_first->id);
+                    }
+                }
+
+                printf("\n");
+            }
+        }
+    }
+}

@@ -204,16 +204,16 @@ static void __debug_print_heuristic_allocator(heuristic_allocator* allocator)
     {
         variable_item* v = &allocator->om->variables[varmap_lid2idx(allocator->om, i)];
 
-        switch (v->alloc_type)
+        switch (v->allocation.type)
         {
-            case VAR_ALLOC_UNDEFINED:
+            case REG_ALLOC_UNDEFINED:
                 printf("_, ");
                 break;
-            case VAR_ALLOC_STACK:
-                printf("s%zd, ", v->alloc_loc);
+            case REG_ALLOC_STACK:
+                printf("s%zd, ", v->allocation.location);
                 break;
-            case VAR_ALLOC_REGISTER:
-                printf("r%zd, ", v->alloc_loc);
+            case REG_ALLOC_REGISTER:
+                printf("r%zd, ", v->allocation.location);
                 break;
             default:
                 printf("?, ");
@@ -580,7 +580,7 @@ static void allocator_spill_code_read(heuristic_allocator* allocator, instructio
     inst->op = IROP_READ;
     inst->node = target->node;
     inst->lvalue = new_reference(IR_ASN_REF_DEFINITION, var_new);
-    inst->operand_rw_stack_loc = var_item->alloc_loc;
+    inst->operand_rw_stack_loc = var_item->allocation.location;
     instruction_insert(target->node, target->prev, inst);
 
     // replace operand reference with new variable
@@ -627,7 +627,7 @@ static void allocator_spill_code_write(heuristic_allocator* allocator, instructi
     inst->op = IROP_WRITE;
     inst->node = target->node;
     inst->operand_1 = new_reference(IR_ASN_REF_DEFINITION, var);
-    inst->operand_rw_stack_loc = var_item->alloc_loc;
+    inst->operand_rw_stack_loc = var_item->allocation.location;
     instruction_insert(target->node, target, inst);
 
     // update profile
@@ -713,8 +713,8 @@ static bool allocator_ig_node_assign_color(heuristic_allocator* allocator, size_
 
         variable_item* var = &allocator->om->variables[varmap_lid2idx(allocator->om, i)];
 
-        var->alloc_type = VAR_ALLOC_REGISTER;
-        var->alloc_loc = color;
+        var->allocation.type = REG_ALLOC_REGISTER;
+        var->allocation.location = color;
 
         // propagate the color use info to neighbors
         for (size_t j = 0; j < ig->dim; j++)
@@ -1004,8 +1004,8 @@ static void optimizer_allocator_select(heuristic_allocator* allocator)
         variable_item* var_spilled = &allocator->om->variables[varmap_lid2idx(allocator->om, frame->node)];
 
         // assign stack index, later in backend this index will be translated into offset
-        var_spilled->alloc_type = VAR_ALLOC_STACK;
-        var_spilled->alloc_loc = allocator->num_spilled++;
+        var_spilled->allocation.type = REG_ALLOC_STACK;
+        var_spilled->allocation.location = allocator->num_spilled++;
 
         /**
          * TODO: is it possible that the spilled node also coalesced?
@@ -1113,11 +1113,14 @@ void optimizer_allocator_heuristic(optimizer* om, size_t num_avail_registers)
 
     do
     {
-        // repopulate
-        optimizer_profile_apply(om, &profile);
+        // repopulate, no need to make persistent though
+        optimizer_profile_apply(om, &profile, false);
 
         // facts needed by allocator
         optimizer_defuse_analyze(om);
         optimizer_liveness_analyze(om);
     } while (!optimizer_allocator_heuristics_state_machine(om, &profile, num_avail_registers));
+
+    // make data persistent
+    optimizer_profile_apply(om, &profile, true);
 }

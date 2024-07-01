@@ -23,8 +23,8 @@ static char* test_paths[] = {
     // "./test/simple.txt",
     // "./test/il.txt",
     // "./test/ssa.txt",
-    // "./test/reg-alloc-1.txt",
-    "./test/reg-alloc-2.txt",
+    "./test/reg-alloc-1.txt",
+    // "./test/reg-alloc-2.txt",
 
     // "./test/general-no-block-and-statement.txt",
 
@@ -81,6 +81,7 @@ int main(int argc, char* argv[])
 
         // debug_file_buffer(&compiler.reader);
         // debug_tokenize(&compiler.reader, &compiler.rw_lookup_table, &compiler->logger);
+        debug_optimization_context(&compiler.optimizers);
         compiler_error_format_print(&compiler);
         debug_error_logger(&compiler.logger);
     }

@@ -255,9 +255,29 @@ void optimizer_profile_copy(optimizer* om, optimizer_profile* profile)
 
 /**
  * Repopulate Using Profile
+ *
+ * It also move any optimizer data to persistent storage (make_persistent=true)
 */
-void optimizer_profile_apply(optimizer* om, optimizer_profile* profile)
+void optimizer_profile_apply(optimizer* om, optimizer_profile* profile, bool make_persistent)
 {
+    if (make_persistent)
+    {
+        // move register allocation infomation to persistent target in definition
+        for (size_t k = 0; k < om->profile.num_variables; k++)
+        {
+            // unused variables will not be registered in optimizer as the source is CFG IR instruction object
+            if (!om->variables[k].ref) { continue; }
+
+            memcpy(&om->variables[k].ref->variable->allocation, &om->variables[k].allocation, sizeof(register_allocation_info));
+        }
+
+        // move register allocation infomation to persistent target in definition
+        for (size_t k = 0; k < om->profile.num_instructions; k++)
+        {
+            memcpy(om->instructions[k].ref->allocation, om->instructions[k].allocation, sizeof(register_allocation_info) * 3);
+        }
+    }
+
     optimizer_invalidate_instructions(om);
     optimizer_invalidate_variables(om);
 
@@ -267,4 +287,9 @@ void optimizer_profile_apply(optimizer* om, optimizer_profile* profile)
     // re-populate
     optimizer_populate_variables(om);
     optimizer_populate_instructions(om);
+}
+
+bool optimizer_profile_changed(const optimizer* om, const optimizer_profile* profile)
+{
+    return memcmp(&om->profile, profile, sizeof(optimizer_profile)) != 0;
 }

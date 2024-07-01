@@ -7,28 +7,48 @@
 #include "index-set.h"
 
 /**
- * Variable Allocation Type
+ * Linear Allocator Range Process
  *
- * VAR_ALLOC_UNDEFINED:
- * when a variable is detected by optimizer such that it can be optimized out
- * somehow, then allocation info is undefined
-*/
-typedef enum _variable_allocation_type
+ * Split: one variable may have one or more ranges, each range does not have any hole,
+ *        while exists hole between any two ranges
+ * Merge: one variable has one and only one range
+ *
+ */
+typedef enum _linear_allocator_range_process
 {
-    VAR_ALLOC_UNDEFINED = 0,
-    VAR_ALLOC_REGISTER,
-    VAR_ALLOC_STACK,
-} variable_allocation_type;
+    LINEAR_ALLOCATOR_RANGE_SPLIT,
+    LINEAR_ALLOCATOR_RANGE_MERGE,
+} linear_allocator_range_process;
 
+/**
+ * Variable Item
+ *
+ * WARNING: do NOT add persistent data in here
+ * because optimizer data might be pruged and rebuilt multiple
+ * times during optimization
+ */
 typedef struct _variable_item
 {
     definition* ref;
-    variable_allocation_type alloc_type;
-    size_t alloc_loc;
     size_t ud_loop_inside;
     size_t ud_loop_outside;
+
+    /**
+     * if a variable has consistent allocation profile, this will be set
+     * this field takes higher priority than the one in instruction_item
+     *
+     * WARNING: do NOT use this as persistent info
+     */
+    register_allocation_info allocation;
 } variable_item;
 
+/**
+ * Instruction Item
+ *
+ * WARNING: do NOT add persistent data in here
+ * because optimizer data might be pruged and rebuilt multiple
+ * times during optimization
+ */
 typedef struct _instruction_item
 {
     instruction* ref;
@@ -36,6 +56,14 @@ typedef struct _instruction_item
     index_set use;
     index_set in;
     index_set out;
+
+    /**
+     * if a variable has specific allocation profile, this will be set
+     * format: "lvalue <- op1 OP op2" => "[lvalue, op1, op2]"
+     *
+     * WARNING: do NOT use this as persistent info
+     */
+    register_allocation_info allocation[3];
 } instruction_item;
 
 typedef struct _optimizer_profile
@@ -47,7 +75,7 @@ typedef struct _optimizer_profile
     size_t num_instructions;
 
     // max number of register available
-    size_t reg_count;
+    size_t num_registers;
     // number of variable allocated on stack
     size_t num_var_on_stack;
 } optimizer_profile;
@@ -109,18 +137,19 @@ void optimizer_populate_instructions(optimizer* om);
 void optimizer_invalidate_variables(optimizer* om);
 void optimizer_invalidate_instructions(optimizer* om);
 void optimizer_profile_copy(optimizer* om, optimizer_profile* profile);
-void optimizer_profile_apply(optimizer* om, optimizer_profile* profile);
+void optimizer_profile_apply(optimizer* om, optimizer_profile* profile, bool make_persistent);
+bool optimizer_profile_changed(const optimizer* om, const optimizer_profile* profile);
 
 void optimizer_defuse_analyze(optimizer* om);
 void optimizer_liveness_analyze(optimizer* om);
 void optimizer_ssa_build(optimizer* om);
 void optimizer_ssa_eliminate(optimizer* om);
 void optimizer_allocator_heuristic(optimizer* om, size_t num_avail_registers);
-void optimizer_allocator_linear(optimizer* om, size_t num_avail_registers);
+void optimizer_allocator_linear(optimizer* om, size_t num_avail_registers, linear_allocator_range_process program);
 
 void init_optimizer(optimizer* om);
 void release_optimizer(optimizer* om);
-void optimizer_attach(optimizer* om, global_top_level* top_level, definition* target);
+bool optimizer_attach(optimizer* om, global_top_level* top_level, definition* target);
 void optimizer_detach(optimizer* om);
 void optimizer_execute(optimizer* om);
 
